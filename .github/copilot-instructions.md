@@ -82,18 +82,18 @@ Tài liệu SDD mô tả thiết kế kỹ thuật của phần mềm, dùng là
 
 Hệ thống được xây dựng theo kiến trúc **web client-server**:
 
-| Tầng | Công nghệ |
-|---|---|
-| Frontend | **React 18** + React Router + Axios |
-| Backend | **Java 17 + Spring Boot 3.x** (Spring Web, Spring Security, Spring Data JPA, **Spring Mail**) |
-| Giao tiếp | **REST API** (JSON over HTTP) |
-| CSDL | **MySQL 8.x** |
-| Bảo mật | **JWT** + **BCrypt** + phân quyền theo role (RBAC) |
-| Gửi email OTP | **Spring Mail / JavaMailSender** qua SMTP |
-| Thanh toán online | **VNPay Sandbox** (Return URL + IPN URL) |
-| Xuất file | Apache POI (Excel), iText hoặc OpenPDF (PDF) |
-| Quản lý mã nguồn | Git + GitHub |
-| Build | Maven (backend), npm/Vite (frontend) |
+| Tầng | Công nghệ                                                                                              |
+|---|--------------------------------------------------------------------------------------------------------|
+| Frontend | **React 18** + React Router + Axios                                                                    |
+| Backend | **Java 21** + **Spring Boot 4.x** (Spring Web, Spring Security, Spring Data JPA, **Spring Mail**) |
+| Giao tiếp | **REST API** (JSON over HTTP)                                                                          |
+| CSDL | **MySQL 8.x**                                                                                          |
+| Bảo mật | **JWT** + **BCrypt** + phân quyền theo role (RBAC)                                                     |
+| Gửi email OTP | **Spring Mail / JavaMailSender** qua SMTP                                                              |
+| Thanh toán online | **VNPay Sandbox** (Return URL + IPN URL)                                                               |
+| Xuất file | Apache POI (Excel), iText hoặc OpenPDF (PDF)                                                           |
+| Quản lý mã nguồn | Git + GitHub                                                                                           |
+| Build | Maven (backend), npm/Vite (frontend)                                                                   |
 
 Toàn bộ luồng nghiệp vụ, các khoản phí, định mức và actor được giữ theo đúng đề bài chương 1 của Bộ bài tập, có bổ sung thêm các chức năng khiếu nại, thông báo, cho thuê chỗ gửi xe thừa, xuất báo cáo, **xác thực OTP qua email** và **thanh toán online qua VNPay Sandbox** theo yêu cầu mở rộng của Ban quản trị BlueMoon.
 
