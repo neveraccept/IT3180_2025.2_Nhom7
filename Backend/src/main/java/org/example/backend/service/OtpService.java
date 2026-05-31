@@ -1,5 +1,7 @@
 package org.example.backend.service;
 
+import org.example.backend.dto.OtpRequestDTO;
+import org.example.backend.dto.VerifyOtpRequestDTO;
 import org.example.backend.entity.EmailOtp;
 import org.example.backend.repository.EmailOtpRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +29,11 @@ public class OtpService {
      * Sinh và lưu mã OTP mới vào cơ sở dữ liệu
      */
     @Transactional
-    public String generateAndSaveOtp(String email, String purpose) {
+    public String generateAndSaveOtp(OtpRequestDTO request) {
+        // Trích xuất dữ liệu trực tiếp từ DTO
+        String email = request.getEmail();
+        String purpose = request.getPurpose();
+
         // Áp dụng rate-limit: Tối đa 5 lần gửi trong 15 phút
         int recentRequests = emailOtpRepo.countRecentOtps(email);
         if (recentRequests >= 5) {
@@ -60,7 +66,12 @@ public class OtpService {
      * Xác thực mã OTP người dùng nhập vào
      */
     @Transactional
-    public boolean verifyOtp(String email, String plainOtp, String purpose) {
+    public boolean verifyOtp(VerifyOtpRequestDTO request) {
+        // Trích xuất dữ liệu trực tiếp từ DTO
+        String email = request.getEmail();
+        String plainOtp = request.getOtp();
+        String purpose = request.getPurpose();
+
         // Lấy mã OTP mới nhất theo email và mục đích sử dụng
         Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);
 

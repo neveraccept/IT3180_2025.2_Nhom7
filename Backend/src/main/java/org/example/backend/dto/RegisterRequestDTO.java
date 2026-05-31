@@ -29,7 +29,4 @@ public class RegisterRequestDTO {
 
     @NotBlank(message = "Mã căn hộ yêu cầu không được để trống")
     private String requestedApartmentCode;
-
-//    @NotBlank(message = "Mã OTP không được để trống")
-//    private String otp;
 }
