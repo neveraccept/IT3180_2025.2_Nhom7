@@ -32,14 +32,16 @@ public class SecurityConfig {
 
                 // 2. Cấu hình phân quyền các endpoint
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/createAccount").hasAuthority("ROLE_ADMIN")
+
                         // Cho phép tất cả mọi người truy cập vào các API thuộc nhóm auth (Login, Register, OTP...)
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // Các endpoint liên quan đến VNPAY callback cũng phải là PUBLIC
                         .requestMatchers("/api/payments/vnpay/return", "/api/payments/vnpay/ipn").permitAll()
 
-                        // Bổ sung: Chỉ định rõ API duyệt tài khoản yêu cầu quyền ADMIN
-                        .requestMatchers("/api/users/*/approve").hasAuthority("ROLE_ADMIN")
+                        // Chỉ định rõ API duyệt tài khoản và tạo tài khoản nội bộ yêu cầu quyền ADMIN
+                        .requestMatchers("/api/auth/*/approve").hasAuthority("ROLE_ADMIN")
 
                         // Tất cả các request khác (quản lý user, hộ dân, khoản thu...) đều bắt buộc phải đăng nhập
                         .anyRequest().authenticated()
