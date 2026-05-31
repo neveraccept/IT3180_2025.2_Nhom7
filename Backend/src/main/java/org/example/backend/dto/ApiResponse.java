@@ -18,4 +18,3 @@ public record ApiResponse<T>(
         return new ApiResponse<>(false, null, message, errorCode);
     }
 }
-
