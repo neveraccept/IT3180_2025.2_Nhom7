@@ -17,7 +17,6 @@ public class UserDTO {
     private String role;
 
     // Hàm tiện ích để chuyển đổi từ Entity sang DTO
-    // Hàm tiện ích để chuyển đổi từ Entity sang DTO
     public static UserDTO fromEntity(User user) {
         if (user == null) return null;
 
@@ -35,7 +34,7 @@ public class UserDTO {
         dto.setEmailVerified(user.isEmailVerified());
         dto.setRequestedApartmentCode(user.getRequestedApartmentCode());
 
-        // Mở comment cho phần Household nếu bạn đã thiết lập quan hệ Entity
+        // TODO: Mở comment cho phần Household nếu bạn đã thiết lập quan hệ Entity User - Household
         // if (user.getHousehold() != null) {
         //     dto.setHouseholdId(user.getHousehold().getId());
         // }

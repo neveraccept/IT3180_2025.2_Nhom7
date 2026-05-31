@@ -1,5 +1,5 @@
 
-package org.example.backend.dto;
+package org.example.backend.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Data
-public class AdminRegisterRequestDTO {
+public class AdminRegisterRequest {
 
     @NotBlank(message = "Username không được để trống")
     private String username;

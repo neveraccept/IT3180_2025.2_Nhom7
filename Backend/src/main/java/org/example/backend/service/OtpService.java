@@ -1,7 +1,7 @@
 package org.example.backend.service;
 
-import org.example.backend.dto.OtpRequestDTO;
-import org.example.backend.dto.VerifyOtpRequestDTO;
+import org.example.backend.dto.request.OtpRequest;
+import org.example.backend.dto.request.VerifyOtpRequest;
 import org.example.backend.entity.EmailOtp;
 import org.example.backend.repository.EmailOtpRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +29,7 @@ public class OtpService {
      * Sinh và lưu mã OTP mới vào cơ sở dữ liệu
      */
     @Transactional
-    public String generateAndSaveOtp(OtpRequestDTO request) {
+    public String generateAndSaveOtp(OtpRequest request) {
         // Trích xuất dữ liệu trực tiếp từ DTO
         String email = request.getEmail();
         String purpose = request.getPurpose();
@@ -66,7 +66,7 @@ public class OtpService {
      * Xác thực mã OTP người dùng nhập vào
      */
     @Transactional
-    public boolean verifyOtp(VerifyOtpRequestDTO request) {
+    public boolean verifyOtp(VerifyOtpRequest request) {
         // Trích xuất dữ liệu trực tiếp từ DTO
         String email = request.getEmail();
         String plainOtp = request.getOtp();

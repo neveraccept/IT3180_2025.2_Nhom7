@@ -2,6 +2,7 @@ package org.example.backend.controller;
 
 import jakarta.validation.Valid;
 import org.example.backend.dto.*;
+import org.example.backend.dto.request.*;
 import org.example.backend.entity.User;
 import org.example.backend.service.AuthService;
 import org.example.backend.service.EmailService;
@@ -28,7 +29,7 @@ public class AuthController {
 
 	// 1. API Gửi mã OTP
 	@PostMapping("/send-otp")
-	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequestDTO request) {
+	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest request) {
 		try {
 			// Sinh mã OTP và băm lưu vào DB
 			String plainOtp = otpService.generateAndSaveOtp(request);
@@ -44,7 +45,7 @@ public class AuthController {
 
 	// 2. API Xác thực mã OTP
 	@PostMapping("/verify-otp")
-	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequestDTO request) {
+	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
 		try {
 			boolean isValid = otpService.verifyOtp(request);
 			if (isValid) {
@@ -59,17 +60,44 @@ public class AuthController {
 
 	// 3. API Đăng ký tài khoản
 	@PostMapping("/register")
-	public ResponseEntity<?> register(@RequestBody RegisterRequestDTO request) {
+	public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
 		try {
-			authService.registerResident(request);
-			return ResponseEntity.ok(Map.of("message", "Đăng ký thành công, vui lòng chờ Ban quản trị duyệt."));
-		} catch (RuntimeException e) {
-			return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+			// Gọi hàm đăng ký từ AuthService
+			User createdUser = authService.registerResident(request);
+
+			// Chuyển Entity sang DTO để ẩn thông tin nhạy cảm (như passwordHash)
+			UserDTO responseDto = UserDTO.fromEntity(createdUser);
+
+			return ResponseEntity.status(201).body(ApiResponse.ok(responseDto, "Đăng ký thành công, vui lòng chờ Ban quản trị duyệt."));
+
+		} catch (IllegalArgumentException ex) {
+			String errorMsg = ex.getMessage();
+			String errorCode = "CREATE_USER_FAILED"; // Mã mặc định
+
+			// Phân loại mã lỗi (ErrorCode) dựa trên thông điệp thực tế từ AuthService
+			if (errorMsg.contains("Tên đăng nhập đã tồn tại")) {
+				errorCode = "USERNAME_EXISTS";
+			} else if (errorMsg.contains("Email đã được sử dụng")) {
+				errorCode = "EMAIL_EXISTS";
+			} else if (errorMsg.contains("Email chưa được xác thực")) {
+				errorCode = "EMAIL_NON_VERIFIED";
+			} else if (errorMsg.contains("Mật khẩu xác nhận không khớp")) {
+				errorCode = "PASSWORD_MISMATCH";
+			} else if (errorMsg.contains("quyền cư dân")) {
+				errorCode = "ROLE_NOT_FOUND";
+			}
+
+			// Trả về HTTP 400 kèm mã lỗi hệ thống
+			return ResponseEntity.badRequest().body(ApiResponse.error(errorCode, errorMsg));
+
+		} catch (Exception ex) {
+			// Lỗi 500: Các lỗi bất ngờ từ Server (ví dụ: đứt kết nối Database)
+			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"));
 		}
 	}
 
 	@PostMapping("createAccount")
-	public ResponseEntity<?> createInternalAccount(@Valid @RequestBody AdminRegisterRequestDTO req) {
+	public ResponseEntity<?> createInternalAccount(@Valid @RequestBody AdminRegisterRequest req) {
 		try {
 			// 1. Gọi Service để tạo tài khoản
 			User createdUser = authService.createInternalAccount(req);
@@ -127,7 +155,7 @@ public class AuthController {
 	}
 
 	@PostMapping("/login")
-	public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDTO req) {
+	public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
 		try {
 			// AuthService sẽ chịu trách nhiệm kiểm tra thông tin và sinh ra token
 			LoginResponseDTO tokenResponse = authService.login(req);
