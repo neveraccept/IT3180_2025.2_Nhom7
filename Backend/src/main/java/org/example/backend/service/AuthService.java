@@ -1,18 +1,22 @@
 package org.example.backend.service;
 
-import org.example.backend.dto.RegisterRequest;
-import org.example.backend.dto.LoginRequest;
-import org.example.backend.dto.LoginResponse;
+import org.example.backend.dto.AdminRegisterRequestDTO;
+import org.example.backend.dto.RegisterRequestDTO;
+import org.example.backend.dto.LoginRequestDTO;
+import org.example.backend.dto.LoginResponseDTO;
 //import org.example.backend.entity.Apartment;
 //import org.example.backend.entity.Household;
+import org.example.backend.entity.EmailOtp;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
 //import org.example.backend.repository.ApartmentRepository;
 //import org.example.backend.repository.HouseholdRepository;
+import org.example.backend.repository.EmailOtpRepository;
 import org.example.backend.repository.RoleRepository;
 import org.example.backend.repository.UserRepository;
 import org.example.backend.security.JwtUtil;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.stereotype.Service;
@@ -22,125 +26,143 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 	private final UserRepository userRepo;
 	private final RoleRepository roleRepo;
+	private final EmailOtpRepository emailOtpRepo;
 //	private final ApartmentRepository apartmentRepo;
 //	private final HouseholdRepository householdRepo;
-	private final BCryptPasswordEncoder passwordEncoder;
-	private final OtpService otpService;
+	private final PasswordEncoder passwordEncoder;
 	private final JwtUtil jwtTokenProvider;
 
-	// Cập nhật Constructor: Tiêm thêm các Repository cần thiết
+	@Autowired
 	public AuthService(UserRepository userRepo,
-                       RoleRepository roleRepo,
-//	                   ApartmentRepository apartmentRepo,
-//	                   HouseholdRepository householdRepo,
-                       BCryptPasswordEncoder passwordEncoder,
-                       OtpService otpService, JwtUtil jwtTokenProvider) {
+	                   RoleRepository roleRepo,
+	                   PasswordEncoder passwordEncoder,
+					   EmailOtpRepository emailOtpRepo,
+	                   JwtUtil jwtTokenProvider) {
 		this.userRepo = userRepo;
 		this.roleRepo = roleRepo;
-//		this.apartmentRepo = apartmentRepo;
-//		this.householdRepo = householdRepo;
 		this.passwordEncoder = passwordEncoder;
-		this.otpService = otpService;
-        this.jwtTokenProvider = jwtTokenProvider;
-    }
+		this.emailOtpRepo = emailOtpRepo;
+		this.jwtTokenProvider = jwtTokenProvider;
+	}
 
-	//Đăng ký tài khoản cư dân
-
+	// Cập nhật Constructor: Tiêm thêm các Repository cần thiết
 	@Transactional
-	public User registerResident(RegisterRequest req) {
-		// 1. Kiểm tra xác nhận mật khẩu
-		if (!req.getPassword().equals(req.getConfirmPassword())) {
-			throw new IllegalArgumentException("Mật khẩu và xác nhận không khớp");
+	public void registerResident(RegisterRequestDTO request) {
+		// Kiểm tra xác nhận lại mật khẩu đã đúng chưa
+		if (!request.getPassword().equals(request.getConfirmPassword())) {
+			throw new RuntimeException("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!");
 		}
 
-		// 2. Kiểm tra tài khoản tồn tại
-		if (userRepo.existsByUsername(req.getUsername())) {
-			throw new IllegalArgumentException("USERNAME_EXISTS");
+		// Kiểm tra username đã tồn tại chưa
+		if (userRepo.existsByUsername(request.getUsername())) {
+			throw new RuntimeException("Tên đăng nhập đã tồn tại!");
 		}
 
-		// 3. Xác thực OTP
-//		boolean isOtpValid = otpService.verifyOtp(req.getEmail(), req.getOtp(), "REGISTER");
-//		if (!isOtpValid) {
-//			throw new IllegalArgumentException("Mã OTP không hợp lệ hoặc đã hết hạn");
-//		}
+		// Kiểm tra email đã tồn tại chưa
+		if (userRepo.existsByEmail(request.getEmail())) {
+			throw new RuntimeException("Email đã được sử dụng!");
+		}
 
-		// 4. Khởi tạo và lưu User
-		User u = new User();
-		u.setUsername(req.getUsername());
-		u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-		u.setFullName(req.getFullName());
-		u.setEmail(req.getEmail());
-		u.setPhone(req.getPhone());
-		u.setRequestedApartmentCode(req.getRequestedApartmentCode());
+		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
+		EmailOtp verifiedOtp = emailOtpRepo
+				.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.getEmail(), "REGISTER")
+				.orElseThrow(() -> new RuntimeException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
 
+		// Lấy Role RESIDENT từ Database
 		Role residentRole = roleRepo.findByName("RESIDENT")
-				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò RESIDENT trong CSDL"));
-		u.setRole(residentRole);
+				.orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy quyền cư dân (RESIDENT) trong hệ thống."));
 
-		u.setActive(false);
-		u.setEmailVerified(true);
+		// 4. Tạo đối tượng User mới
+		User newUser = User.builder()
+				.username(request.getUsername())
+				.passwordHash(passwordEncoder.encode(request.getPassword())) // Băm mật khẩu bằng BCrypt
+				.fullName(request.getFullName())
+				.email(request.getEmail())
+				.phone(request.getPhone())
+				.role(residentRole)
+				.active(false) //Tài khoản mới tạo mặc định chờ duyệt
+				.emailVerified(true)
+				// Cư dân tự đăng ký chưa có household_id chính thức
+				// TODO
+				// .household(null)
+				// Lưu lại mã căn hộ yêu cầu để Admin đối soát ở dashboard
+				.requestedApartmentCode(request.getRequestedApartmentCode())
+				.build();
 
-		return userRepo.save(u);
+		// 5. Lưu vào database
+		userRepo.save(newUser);
 	}
 
 	 //Admin tạo tài khoản nội bộ
 
 	@Transactional
-	public User createInternalUser(User req) {
+	public User createInternalAccount(AdminRegisterRequestDTO req) {
 		if (userRepo.existsByUsername(req.getUsername())) {
-			throw new IllegalArgumentException("USERNAME_EXISTS");
+			throw new IllegalArgumentException("Username đã được sử dụng");
 		}
 
-		req.setPasswordHash(passwordEncoder.encode(req.getPasswordHash()));
-
-		if (req.getRole() == null || req.getRole().getName() == null) {
-			throw new IllegalArgumentException("Thiếu thông tin vai trò (Role)");
+		// Kiểm tra xác nhận lại mật khẩu đã đúng chưa
+		if (!req.getPassword().equals(req.getConfirmPassword())) {
+			throw new IllegalArgumentException("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!");
 		}
-		Role role = roleRepo.findByName(req.getRole().getName())
-				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò này trong hệ thống"));
-		req.setRole(role);
 
-		req.setActive(true);
-		req.setEmailVerified(true);
+		// Kiểm tra email đã tồn tại chưa
+		if (userRepo.existsByEmail(req.getEmail())) {
+			throw new IllegalArgumentException("Email đã được sử dụng!");
+		}
 
-		return userRepo.save(req);
+		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
+		EmailOtp verifiedOtp = emailOtpRepo
+				.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.getEmail(), "REGISTER")
+				.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+
+		Role role = roleRepo.findByName(req.getRole())
+				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.getRole()));
+
+		User newUser = new User();
+		newUser.setUsername(req.getUsername());
+		newUser.setFullName(req.getFullName());
+		newUser.setEmail(req.getEmail());
+		newUser.setPhone(req.getPhone());
+		newUser.setRequestedApartmentCode(req.getRequestedApartmentCode());
+
+		// Mã hóa mật khẩu từ DTO
+		newUser.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+
+		// Tìm và set Role
+		newUser.setRole(role);
+
+		newUser.setActive(true);
+		newUser.setEmailVerified(true);
+
+		return userRepo.saveAndFlush(newUser);
 	}
 
-	//Admin duyệt tài khoản cư dân tự đăng ký
-
+	// Duyệt tài khoản cư dân đã đăng ký
 	@Transactional
-	public User approveResidentAccount(Long userId) {
-		// 1. Tìm tài khoản cư dân
-		User user = userRepo.findById(userId)
-				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản người dùng"));
+	public User approveResidentAccount(Long id) {
+		// 1. Tìm tài khoản cư dân theo ID
+		User user = userRepo.findById(id)
+				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
 
+		// 2. Kiểm tra xem tài khoản đã được duyệt trước đó chưa
 		if (user.isActive()) {
-			throw new IllegalArgumentException("Tài khoản này đã được duyệt từ trước");
+			throw new IllegalArgumentException("Tài khoản này đã được kích hoạt từ trước!");
 		}
 
-		String aptCode = user.getRequestedApartmentCode();
-		if (aptCode == null || aptCode.trim().isEmpty()) {
-			throw new IllegalArgumentException("Tài khoản này không có thông tin mã căn hộ yêu cầu");
-		}
-
-		// 2. Đối chiếu requested_apartment_code với danh sách căn hộ
-//		Apartment apartment = apartmentRepo.findByCode(aptCode)
-//				.orElseThrow(() -> new IllegalArgumentException("Mã căn hộ (" + aptCode + ") không tồn tại trong hệ thống"));
-
-		// 3. Tìm Hộ dân đang hoạt động (ACTIVE) bên trong căn hộ đó
-//		Household activeHousehold = householdRepo.findByApartmentIdAndStatus(apartment.getId(), "ACTIVE")
-//				.orElseThrow(() -> new IllegalArgumentException("Căn hộ " + aptCode + " hiện chưa có hộ dân nào đang hoạt động (ACTIVE) để gán"));
-
-		// 4. Gán hộ dân và kích hoạt tài khoản
-//		user.setHousehold(activeHousehold);
+		// 3. Duyệt tài khoản
 		user.setActive(true);
-		user.setRequestedApartmentCode(null);
 
-		return userRepo.save(user);
+		// TODO (Sau này khi làm module Căn Hộ/Hộ Khẩu):
+		// Lấy mã user.getRequestedApartmentCode() để tìm Căn hộ,
+		// lấy Household tương ứng và gán vào user.setHousehold(...)
+
+		// 4. Lưu thay đổi
+		return userRepo.saveAndFlush(user);
 	}
 
 	// Đăng nhập hệ thống và cấp phát JWT
-	public LoginResponse login(LoginRequest req) {
+	public LoginResponseDTO login(LoginRequestDTO req) {
 		System.out.println("Dang thu dang nhap voi username: [" + req.getUsername() + "]");
 		System.out.println("Mat khau client gui len: [" + req.getPassword() + "]");
 
@@ -177,7 +199,7 @@ public class AuthService {
 		// }
 
 		// 6. Đóng gói và trả về DTO
-		return new LoginResponse(
+		return new LoginResponseDTO(
 				accessToken,
 				user.getId(),
 				user.getRole().getName(),

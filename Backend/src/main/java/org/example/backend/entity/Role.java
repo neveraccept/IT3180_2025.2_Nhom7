@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 @Setter
 @NoArgsConstructor // Tự động sinh public Role() {}
 @AllArgsConstructor // Tự động sinh constructor full tham số
+@Builder
 public class Role {
 
     @Id

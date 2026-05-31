@@ -1,13 +1,18 @@
 package org.example.backend.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
 import lombok.*;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+
+import javax.sql.DataSource;
 
 @Entity
 @Table(name = "users")
-@Setter
 @Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,23 +33,21 @@ public class User {
 	@Column(length = 20)
 	private String phone;
 
-	@Column(nullable = false)
+	@Column
 	private boolean active = false;
 
-	@Column(name = "email_verified", nullable = false)
+	@Column(name = "email_verified")
 	private boolean emailVerified = false;
 
 	@Column(name = "requested_apartment_code", length = 20)
 	private String requestedApartmentCode;
 
-	@ManyToOne(fetch = FetchType.EAGER)
+	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "role_id", nullable = false)
 	private Role role;
 
 //	@Column(name = "household", length = 20)
 //	private Household household = null;
-
-	public User() {}
 }
 
 

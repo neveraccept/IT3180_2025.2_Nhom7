@@ -4,7 +4,7 @@ import lombok.*;
 
 @Setter
 @Getter
-public class LoginResponse {
+public class LoginResponseDTO {
 
     private String accessToken;
     private String tokenType = "Bearer";
@@ -13,11 +13,11 @@ public class LoginResponse {
     private Long householdId; // Có thể null đối với Admin hoặc Cư dân chưa được duyệt
 
     // Constructor mặc định
-    public LoginResponse() {
+    public LoginResponseDTO() {
     }
 
     // Constructor đầy đủ tham số (thường dùng khi khởi tạo trả về từ AuthService)
-    public LoginResponse(String accessToken, Long userId, String role, Long householdId) {
+    public LoginResponseDTO(String accessToken, Long userId, String role, Long householdId) {
         this.accessToken = accessToken;
         this.userId = userId;
         this.role = role;

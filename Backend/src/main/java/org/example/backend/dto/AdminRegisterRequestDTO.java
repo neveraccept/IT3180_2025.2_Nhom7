@@ -1,3 +1,4 @@
+
 package org.example.backend.dto;
 
 import jakarta.validation.constraints.Email;
@@ -6,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Data
-public class RegisterRequest {
+public class AdminRegisterRequestDTO {
 
     @NotBlank(message = "Username không được để trống")
     private String username;
@@ -27,9 +28,8 @@ public class RegisterRequest {
 
     private String phone;
 
-    @NotBlank(message = "Mã căn hộ yêu cầu không được để trống")
     private String requestedApartmentCode;
 
-//    @NotBlank(message = "Mã OTP không được để trống")
-//    private String otp;
+    @NotBlank(message = "Role không được để trống")
+    private String role; // Chỉ cần gửi tên role dạng chuỗi, VD: "ADMIN"
 }

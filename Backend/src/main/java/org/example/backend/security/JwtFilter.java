@@ -47,6 +47,8 @@ public class JwtFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                System.out.println("Quyền của user trong Context: " + authentication.getAuthorities());
             }
         } catch (Exception ex) {
             System.out.println("Không thể thiết lập xác thực người dùng trong Security Context: " + ex.getMessage());

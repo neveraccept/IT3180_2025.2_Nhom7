@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter; // Bổ sung: Cần import lớp này
 
@@ -37,7 +39,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/payments/vnpay/return", "/api/payments/vnpay/ipn").permitAll()
 
                         // Bổ sung: Chỉ định rõ API duyệt tài khoản yêu cầu quyền ADMIN
-                        .requestMatchers("/api/users/*/approve").hasRole("ADMIN")
+                        .requestMatchers("/api/users/*/approve").hasAuthority("ROLE_ADMIN")
 
                         // Tất cả các request khác (quản lý user, hộ dân, khoản thu...) đều bắt buộc phải đăng nhập
                         .anyRequest().authenticated()
@@ -50,5 +52,10 @@ public class SecurityConfig {
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

@@ -2,7 +2,8 @@ package org.example.backend.service;
 
 import org.example.backend.entity.EmailOtp;
 import org.example.backend.repository.EmailOtpRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,92 +13,89 @@ import java.util.Random;
 
 @Service
 public class OtpService {
-    private final EmailOtpRepository otpRepo;
-    private final EmailService emailService;
-    private final BCryptPasswordEncoder passwordEncoder;
-    private final Random random = new Random();
 
-    private static final int OTP_LENGTH = 6;
-    private static final int OTP_EXP_MINUTES = 5;
-    private static final int RATE_LIMIT_COUNT = 5; // max sends per window
-    private static final int RATE_LIMIT_MINUTES = 15;
+    private final EmailOtpRepository emailOtpRepo;
+    private final PasswordEncoder passwordEncoder;
 
-    public OtpService(EmailOtpRepository otpRepo, EmailService emailService, BCryptPasswordEncoder passwordEncoder) {
-        this.otpRepo = otpRepo;
-        this.emailService = emailService;
+    @Autowired
+    public OtpService(EmailOtpRepository emailOtpRepo, PasswordEncoder passwordEncoder) {
+        this.emailOtpRepo = emailOtpRepo;
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Sinh và lưu mã OTP mới vào cơ sở dữ liệu
+     */
     @Transactional
-    public void sendOtp(String email, String purpose) {
-        LocalDateTime window = LocalDateTime.now().minusMinutes(RATE_LIMIT_MINUTES);
-        long sentCount = otpRepo.countByEmailCreatedAfter(email, window);
-        if (sentCount >= RATE_LIMIT_COUNT) {
-            // Thay đổi thông báo ngoại lệ chuẩn theo tài liệu thiết kế (NFR-11)
-            throw new IllegalStateException("Vui lòng thử lại sau");
+    public String generateAndSaveOtp(String email, String purpose) {
+        // Áp dụng rate-limit: Tối đa 5 lần gửi trong 15 phút
+        int recentRequests = emailOtpRepo.countRecentOtps(email);
+        if (recentRequests >= 5) {
+            throw new RuntimeException("Vui lòng thử lại sau. Bạn đã vượt quá số lần yêu cầu OTP cho phép.");
         }
 
-        String otp = generateNumericOtp(OTP_LENGTH);
-        String otpHash = passwordEncoder.encode(otp);
+        // Tạo hàm sinh mã OTP ngẫu nhiên gồm 6 chữ số
+        String plainOtp = String.format("%06d", new Random().nextInt(999999));
 
-        EmailOtp e = new EmailOtp();
-        e.setEmail(email);
-        e.setOtpHash(otpHash);
-        e.setPurpose(purpose);
-        e.setExpiredAt(LocalDateTime.now().plusMinutes(OTP_EXP_MINUTES));
-        e.setUsed(false);
-        e.setFailedAttempts(0);
-        e.setCreatedAt(LocalDateTime.now());
-        otpRepo.save(e);
+        // Băm mã OTP bằng BCrypt trước khi lưu vào cơ sở dữ liệu
+        String hashedOtp = passwordEncoder.encode(plainOtp);
 
-        emailService.sendOtpEmail(email, otp);
+        // Lưu thông tin xuống DB
+        EmailOtp emailOtp = EmailOtp.builder()
+                .email(email)
+                .otpHash(hashedOtp)
+                .purpose(purpose)
+                .expiredAt(LocalDateTime.now().plusMinutes(5))
+                .used(false)
+                .failedAttempts(0)
+                .build();
+
+        emailOtpRepo.save(emailOtp);
+
+        // Trả về mã gốc để AuthController chuyển cho EmailService gửi đi (không trả về cho client)
+        return plainOtp;
     }
 
-    private String generateNumericOtp(int len) {
-        int bound = (int) Math.pow(10, len - 1);
-        int num = bound + random.nextInt(9 * bound);
-        return String.valueOf(num);
-    }
-
+    /**
+     * Xác thực mã OTP người dùng nhập vào
+     */
     @Transactional
-    public boolean verifyOtp(String email, String otp, String purpose) {
-        Optional<EmailOtp> maybe = otpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);
-        if (maybe.isEmpty()) {
-            throw new IllegalArgumentException("Mã OTP không tồn tại");
-        }
-        EmailOtp e = maybe.get();
+    public boolean verifyOtp(String email, String plainOtp, String purpose) {
+        // Lấy mã OTP mới nhất theo email và mục đích sử dụng
+        Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);
 
-        // 1. Kiểm tra OTP đã sử dụng chưa
-        if (e.isUsed()) {
-            throw new IllegalArgumentException("Mã OTP đã dùng, vui lòng yêu cầu mã mới");
+        if (optionalOtp.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy mã OTP cho email này.");
         }
 
-        // 2. Kiểm tra thời gian hết hạn
-        if (e.getExpiredAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Mã OTP đã hết hạn");
+        EmailOtp otp = optionalOtp.get();
+
+        // Kiểm tra xem OTP đã được sử dụng chưa
+        if (Boolean.TRUE.equals(otp.getUsed())) {
+            throw new RuntimeException("Mã OTP đã dùng, vui lòng yêu cầu mã mới.");
         }
 
-        // 3. Kiểm tra xem mã đã bị khóa từ trước chưa
-        if (e.getFailedAttempts() >= 5) {
-            throw new IllegalArgumentException("Mã OTP đã bị khóa do nhập sai quá 5 lần. Vui lòng yêu cầu mã mới");
+        // Kiểm tra số lần nhập sai
+        if (otp.getFailedAttempts() >= 5) {
+            throw new RuntimeException("Mã OTP này đã bị khoá do nhập sai quá nhiều lần. Vui lòng yêu cầu mã mới.");
         }
 
-        // 4. Đối chiếu mã OTP người dùng nhập với mã Hash trong CSDL
-        if (!passwordEncoder.matches(otp, e.getOtpHash())) {
-            e.setFailedAttempts(e.getFailedAttempts() + 1);
-            otpRepo.save(e); // Lưu ngay trạng thái số lần sai
-
-            // UX Tinh chỉnh: Ném ngoại lệ khóa mã NGAY LẬP TỨC khi chạm mốc 5 lần
-            if (e.getFailedAttempts() >= 5) {
-                throw new IllegalArgumentException("Mã OTP đã bị khóa do nhập sai quá 5 lần. Vui lòng yêu cầu mã mới");
-            }
-            throw new IllegalArgumentException("Mã OTP không đúng");
+        // Kiểm tra xem OTP đã hết hạn chưa
+        if (LocalDateTime.now().isAfter(otp.getExpiredAt())) {
+            throw new RuntimeException("Mã OTP đã hết hạn.");
         }
 
-        // 5. Thành công: Đánh dấu mã đã sử dụng và lưu lại
-        e.setUsed(true);
-        otpRepo.save(e);
-
-        return true;
+        // Kiểm tra chuỗi băm
+        if (passwordEncoder.matches(plainOtp, otp.getOtpHash())) {
+            // Nếu hợp lệ -> đánh dấu đã sử dụng
+            otp.setUsed(true);
+            emailOtpRepo.save(otp);
+            return true;
+        } else {
+            // Nếu sai -> tăng số lần nhập sai
+            otp.setFailedAttempts(otp.getFailedAttempts() + 1);
+            emailOtpRepo.save(otp);
+            return false;
+        }
     }
 }
