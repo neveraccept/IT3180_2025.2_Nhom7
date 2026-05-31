@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,13 +26,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // 1. Tắt CSRF vì hệ thống sử dụng JWT (Stateless)
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
 
                 // (Tuỳ chọn) Tắt CORS nếu bạn bị lỗi gọi từ trình duyệt React
                 // .cors(cors -> cors.disable())
 
                 // 2. Cấu hình phân quyền các endpoint
                 .authorizeHttpRequests(auth -> auth
+                        // Chỉ cho phép admin tạo tài khoản nội bộ hoặc cư dân
                         .requestMatchers("/api/auth/createAccount").hasAuthority("ROLE_ADMIN")
 
                         // Cho phép tất cả mọi người truy cập vào các API thuộc nhóm auth (Login, Register, OTP...)

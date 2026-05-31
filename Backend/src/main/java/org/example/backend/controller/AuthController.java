@@ -28,16 +28,13 @@ public class AuthController {
 
 	// 1. API Gửi mã OTP
 	@PostMapping("/send-otp")
-	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest request) {
+	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequestDTO request) {
 		try {
-			String email = request.getEmail();
-			String purpose = request.getPurpose(); // Nhận purpose: "REGISTER" từ body DTO
-
 			// Sinh mã OTP và băm lưu vào DB
-			String plainOtp = otpService.generateAndSaveOtp(email, purpose);
+			String plainOtp = otpService.generateAndSaveOtp(request);
 
 			// Gửi email chứa mã OTP nguyên bản
-			emailService.sendOtpEmail(email, plainOtp, purpose);
+			emailService.sendOtpEmail(request.getEmail(), plainOtp, request.getPurpose());
 
 			return ResponseEntity.ok(Map.of("message", "Mã OTP đã được gửi đến email của bạn."));
 		} catch (RuntimeException e) {
@@ -47,13 +44,9 @@ public class AuthController {
 
 	// 2. API Xác thực mã OTP
 	@PostMapping("/verify-otp")
-	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequestDTO request) {
 		try {
-			String email = request.getEmail();
-			String otp = request.getOtp();
-			String purpose = request.getPurpose();
-
-			boolean isValid = otpService.verifyOtp(email, otp, purpose);
+			boolean isValid = otpService.verifyOtp(request);
 			if (isValid) {
 				return ResponseEntity.ok(Map.of("message", "Xác thực OTP thành công."));
 			} else {
@@ -135,34 +128,21 @@ public class AuthController {
 
 	@PostMapping("/login")
 	public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDTO req) {
-		// --- CÁC DÒNG LOG DEBUG DÀNH CHO CONTROLLER ---
-		System.out.println("\n[AuthController] BẮT ĐẦU LUỒNG ĐĂNG NHẬP");
-		System.out.println("[AuthController] Username client gửi lên: [" + req.getUsername() + "]");
-		System.out.println("[AuthController] Password client gửi lên: [" + req.getPassword() + "]");
-
 		try {
-			System.out.println("[AuthController] Đang truyền xuống AuthService.login()...");
-
 			// AuthService sẽ chịu trách nhiệm kiểm tra thông tin và sinh ra token
 			LoginResponseDTO tokenResponse = authService.login(req);
 
-			System.out.println("[AuthController] => THÀNH CÔNG: Mật khẩu đúng. Đang trả về token!");
 			return ResponseEntity.ok(ApiResponse.ok(tokenResponse, "Đăng nhập thành công"));
 
 		} catch (org.springframework.security.authentication.BadCredentialsException ex) {
-			System.out.println("[AuthController] => BẮT ĐƯỢC LỖI 401: Ném ra BadCredentialsException (Sai mật khẩu hoặc Username)");
 			// Lỗi sai username hoặc password (thường do Spring Security ném ra)
 			return ResponseEntity.status(401).body(ApiResponse.error("UNAUTHORIZED", "Tên đăng nhập hoặc mật khẩu không chính xác"));
 
 		} catch (org.springframework.security.authentication.DisabledException ex) {
-			System.out.println("[AuthController] => BẮT ĐƯỢC LỖI 403: Ném ra DisabledException (Tài khoản chưa duyệt)");
 			// Lỗi tài khoản chưa được kích hoạt (cờ active = false / chưa được BQT duyệt)
 			return ResponseEntity.status(403).body(ApiResponse.error("ACCOUNT_DISABLED", "Tài khoản của bạn chưa được duyệt hoặc đã bị khóa"));
 
 		} catch (Exception ex) {
-			System.out.println("[AuthController] => BẮT ĐƯỢC LỖI 500: Lỗi hệ thống bất ngờ!");
-			ex.printStackTrace(); // In toàn bộ chi tiết lỗi màu đỏ ra Console để tra cứu
-
 			// Các lỗi hệ thống khác
 			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"));
 		}
