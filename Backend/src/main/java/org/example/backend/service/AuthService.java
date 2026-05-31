@@ -1,12 +1,11 @@
 package org.example.backend.service;
 
-import org.example.backend.dto.AdminRegisterRequestDTO;
-import org.example.backend.dto.RegisterRequestDTO;
-import org.example.backend.dto.LoginRequestDTO;
+import org.example.backend.dto.request.AdminRegisterRequest;
+import org.example.backend.dto.request.RegisterRequest;
+import org.example.backend.dto.request.LoginRequest;
 import org.example.backend.dto.LoginResponseDTO;
 //import org.example.backend.entity.Apartment;
 //import org.example.backend.entity.Household;
-import org.example.backend.entity.EmailOtp;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
 //import org.example.backend.repository.ApartmentRepository;
@@ -45,32 +44,31 @@ public class AuthService {
 		this.jwtTokenProvider = jwtTokenProvider;
 	}
 
-	// Cập nhật Constructor: Tiêm thêm các Repository cần thiết
 	@Transactional
-	public void registerResident(RegisterRequestDTO request) {
-		// Kiểm tra xác nhận lại mật khẩu đã đúng chưa
-		if (!request.getPassword().equals(request.getConfirmPassword())) {
-			throw new RuntimeException("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!");
-		}
+	public User registerResident(RegisterRequest request) {
 
 		// Kiểm tra username đã tồn tại chưa
 		if (userRepo.existsByUsername(request.getUsername())) {
-			throw new RuntimeException("Tên đăng nhập đã tồn tại!");
+			throw new IllegalArgumentException("Tên đăng nhập đã tồn tại!");
+		}
+
+		// Kiểm tra xác nhận lại mật khẩu đã đúng chưa
+		if (!request.getPassword().equals(request.getConfirmPassword())) {
+			throw new IllegalArgumentException("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!");
 		}
 
 		// Kiểm tra email đã tồn tại chưa
 		if (userRepo.existsByEmail(request.getEmail())) {
-			throw new RuntimeException("Email đã được sử dụng!");
+			throw new IllegalArgumentException("Email đã được sử dụng!");
 		}
 
 		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-		EmailOtp verifiedOtp = emailOtpRepo
-				.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.getEmail(), "REGISTER")
-				.orElseThrow(() -> new RuntimeException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.getEmail(), "REGISTER")
+					.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
 
 		// Lấy Role RESIDENT từ Database
 		Role residentRole = roleRepo.findByName("RESIDENT")
-				.orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy quyền cư dân (RESIDENT) trong hệ thống."));
+				.orElseThrow(() -> new IllegalArgumentException("Lỗi: Không tìm thấy quyền cư dân (RESIDENT) trong hệ thống."));
 
 		// 4. Tạo đối tượng User mới
 		User newUser = User.builder()
@@ -90,13 +88,13 @@ public class AuthService {
 				.build();
 
 		// 5. Lưu vào database
-		userRepo.save(newUser);
+		return userRepo.saveAndFlush(newUser);
 	}
 
 	 //Admin tạo tài khoản nội bộ
 
 	@Transactional
-	public User createInternalAccount(AdminRegisterRequestDTO req) {
+	public User createInternalAccount(AdminRegisterRequest req) {
 		if (userRepo.existsByUsername(req.getUsername())) {
 			throw new IllegalArgumentException("Username đã được sử dụng");
 		}
@@ -112,9 +110,8 @@ public class AuthService {
 		}
 
 		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-		EmailOtp verifiedOtp = emailOtpRepo
-				.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.getEmail(), "REGISTER")
-				.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.getEmail(), "REGISTER")
+					.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
 
 		Role role = roleRepo.findByName(req.getRole())
 				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.getRole()));
@@ -162,23 +159,15 @@ public class AuthService {
 	}
 
 	// Đăng nhập hệ thống và cấp phát JWT
-	public LoginResponseDTO login(LoginRequestDTO req) {
-		System.out.println("Dang thu dang nhap voi username: [" + req.getUsername() + "]");
-		System.out.println("Mat khau client gui len: [" + req.getPassword() + "]");
-
+	public LoginResponseDTO login(LoginRequest req) {
 		// 1. Tìm user
 		User user = userRepo.findByUsername(req.getUsername())
-				.orElseThrow(() -> {
-					System.out.println("LỖI 1: Không tìm thấy username trong DB!");
-					return new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác");
-				});
+				.orElseThrow(() -> new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác"));
 
 		// 2. So khớp mật khẩu
 		boolean isMatch = passwordEncoder.matches(req.getPassword(), user.getPasswordHash());
-		System.out.println("Ket qua so khop BCrypt: " + isMatch);
 
 		if (!isMatch) {
-			System.out.println("LỖI 2: Mật khẩu băm không khớp!");
 			throw new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác");
 		}
 

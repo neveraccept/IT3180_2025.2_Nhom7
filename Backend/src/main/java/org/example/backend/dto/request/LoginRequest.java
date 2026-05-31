@@ -1,10 +1,10 @@
-package org.example.backend.dto;
+package org.example.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Data
-public class LoginRequestDTO {
+public class LoginRequest {
 
     @NotBlank(message = "Tên đăng nhập không được để trống")
     private String username;
