@@ -4,9 +4,6 @@ import lombok.*;
 
 @Setter
 @Getter
-/**
- * DTO trả về cho client sau khi đăng nhập thành công.
- */
 public class LoginResponse {
 
     private String accessToken;

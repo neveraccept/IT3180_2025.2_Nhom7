@@ -27,7 +27,6 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         // Lấy tên Role từ Entity (ví dụ: "ADMIN" hoặc "RESIDENT")
-        // Spring Security thường khuyến nghị dùng tiền tố "ROLE_" để phân quyền dễ dàng hơn
         return Collections.singleton(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
     }
 

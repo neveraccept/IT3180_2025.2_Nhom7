@@ -1,7 +1,7 @@
 package org.example.backend.service;
 
 import jakarta.validation.Valid;
-import org.example.backend.dto.CreateUserRequest; // Import DTO chuẩn
+import org.example.backend.dto.CreateUserRequest;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
 import org.example.backend.repository.RoleRepository;
