@@ -27,8 +27,12 @@ public interface ApartmentRepository extends JpaRepository<Apartment, Long> {
             WHERE (:code IS NULL OR LOWER(a.code) LIKE LOWER(CONCAT('%', :code, '%')))
               AND (:floor IS NULL OR a.floor = :floor)
               AND (:status IS NULL OR a.status = :status)
-              AND (:headName IS NULL OR LOWER(r.fullName) LIKE LOWER(CONCAT('%', :headName, '%')))
-            """)
+              AND (:headName IS NULL 
+               OR LOWER(r.fullName) = LOWER(:headName) 
+               OR LOWER(r.fullName) LIKE LOWER(CONCAT(:headName, ' %')) 
+               OR LOWER(r.fullName) LIKE LOWER(CONCAT('% ', :headName, ' %')) 
+               OR LOWER(r.fullName) LIKE LOWER(CONCAT('% ', :headName)))
+        """)
     Page<Apartment> search(@Param("code") String code,
                            @Param("floor") Integer floor,
                            @Param("status") ApartmentStatus status,
