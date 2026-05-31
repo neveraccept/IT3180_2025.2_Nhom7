@@ -14,12 +14,12 @@ import java.util.Random;
 @Service
 public class OtpService {
 
-    private final EmailOtpRepository emailOtpRepository;
+    private final EmailOtpRepository emailOtpRepo;
     private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public OtpService(EmailOtpRepository emailOtpRepository, PasswordEncoder passwordEncoder) {
-        this.emailOtpRepository = emailOtpRepository;
+    public OtpService(EmailOtpRepository emailOtpRepo, PasswordEncoder passwordEncoder) {
+        this.emailOtpRepo = emailOtpRepo;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -29,7 +29,7 @@ public class OtpService {
     @Transactional
     public String generateAndSaveOtp(String email, String purpose) {
         // Áp dụng rate-limit: Tối đa 5 lần gửi trong 15 phút
-        int recentRequests = emailOtpRepository.countRecentOtps(email);
+        int recentRequests = emailOtpRepo.countRecentOtps(email);
         if (recentRequests >= 5) {
             throw new RuntimeException("Vui lòng thử lại sau. Bạn đã vượt quá số lần yêu cầu OTP cho phép.");
         }
@@ -50,7 +50,7 @@ public class OtpService {
                 .failedAttempts(0)
                 .build();
 
-        emailOtpRepository.save(emailOtp);
+        emailOtpRepo.save(emailOtp);
 
         // Trả về mã gốc để AuthController chuyển cho EmailService gửi đi (không trả về cho client)
         return plainOtp;
@@ -62,7 +62,7 @@ public class OtpService {
     @Transactional
     public boolean verifyOtp(String email, String plainOtp, String purpose) {
         // Lấy mã OTP mới nhất theo email và mục đích sử dụng
-        Optional<EmailOtp> optionalOtp = emailOtpRepository.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);
+        Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);
 
         if (optionalOtp.isEmpty()) {
             throw new RuntimeException("Không tìm thấy mã OTP cho email này.");
@@ -89,12 +89,12 @@ public class OtpService {
         if (passwordEncoder.matches(plainOtp, otp.getOtpHash())) {
             // Nếu hợp lệ -> đánh dấu đã sử dụng
             otp.setUsed(true);
-            emailOtpRepository.save(otp);
+            emailOtpRepo.save(otp);
             return true;
         } else {
             // Nếu sai -> tăng số lần nhập sai
             otp.setFailedAttempts(otp.getFailedAttempts() + 1);
-            emailOtpRepository.save(otp);
+            emailOtpRepo.save(otp);
             return false;
         }
     }
