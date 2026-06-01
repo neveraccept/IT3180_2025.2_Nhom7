@@ -27,6 +27,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	// Phục vụ màn hình Admin lấy danh sách tài khoản chờ duyệt
 	// (Tài khoản có active = false và chưa được gán household_id)
 	// List<User> findByActiveFalseAndHouseholdIsNull();
+
+	@Query("""
+            SELECT u FROM User u
+            WHERE u.active = true AND u.household IS NOT NULL
+            """)
+	List<User> findActiveResidents();
+
+	@Query("""
+            SELECT u FROM User u
+            WHERE u.active = true AND u.household IS NOT NULL
+              AND u.household.apartment.floor IN :floors
+            """)
+	List<User> findActiveResidentsByFloors(@Param("floors") List<Integer> floors);
+
+	@Query("""
+            SELECT u FROM User u
+            WHERE u.active = true AND u.household IS NOT NULL
+              AND u.household.id IN :householdIds
+            """)
+	List<User> findActiveResidentsByHouseholdIds(@Param("householdIds") List<Long> householdIds);
 }
 
 
