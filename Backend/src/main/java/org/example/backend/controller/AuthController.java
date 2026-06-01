@@ -4,11 +4,13 @@ import jakarta.validation.Valid;
 import org.example.backend.dto.*;
 import org.example.backend.dto.request.*;
 import org.example.backend.entity.User;
+import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.AuthService;
 import org.example.backend.service.EmailService;
 import org.example.backend.service.OtpService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -96,7 +98,8 @@ public class AuthController {
 		}
 	}
 
-	@PostMapping("createAccount")
+	// 4. API tạo tài khoản nội bộ
+	@PostMapping("/createAccount")
 	public ResponseEntity<?> createInternalAccount(@Valid @RequestBody AdminRegisterRequest req) {
 		try {
 			// 1. Gọi Service để tạo tài khoản
@@ -133,10 +136,7 @@ public class AuthController {
 		}
 	}
 
-	/**
-	 * PUT /api/users/{id}/approve
-	 * Mục đích: Admin duyệt tài khoản cư dân đăng ký
-	 */
+	// API duyệt tài khoản
 	@PutMapping("/{id}/approve")
 	public ResponseEntity<?> approveResidentAccount(@PathVariable Long id) {
 		try {
@@ -154,6 +154,7 @@ public class AuthController {
 		}
 	}
 
+	// API đăng nhập tài khoản
 	@PostMapping("/login")
 	public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
 		try {
@@ -174,5 +175,25 @@ public class AuthController {
 			// Các lỗi hệ thống khác
 			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"));
 		}
+	}
+
+	// API đổi mật khẩu
+	@PutMapping("/me/password")
+	public ResponseEntity<ApiResponse<Void>> changePassword(
+			@AuthenticationPrincipal CustomUserDetails currentUser,
+			@Valid @RequestBody ChangePasswordRequest request) {
+
+		// 1. Gọi Service Layer xử lý logic đổi mật khẩu
+		authService.changePassword(currentUser.getId(), request);
+
+		// 2. Bọc kết quả vào cấu trúc ApiResponse chuẩn hóa của dự án
+		ApiResponse<Void> response = new ApiResponse<>(
+				true,
+				null,
+				"Đổi mật khẩu thành công.",
+				"200"
+		);
+
+		return ResponseEntity.ok(response);
 	}
 }

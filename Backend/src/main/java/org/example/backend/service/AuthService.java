@@ -1,6 +1,7 @@
 package org.example.backend.service;
 
 import org.example.backend.dto.request.AdminRegisterRequest;
+import org.example.backend.dto.request.ChangePasswordRequest;
 import org.example.backend.dto.request.RegisterRequest;
 import org.example.backend.dto.request.LoginRequest;
 import org.example.backend.dto.LoginResponseDTO;
@@ -194,5 +195,26 @@ public class AuthService {
 				user.getRole().getName(),
 				householdId
 		);
+	}
+
+	@Transactional
+	public void changePassword(Long userId, ChangePasswordRequest request) {
+		// 1. Tìm tài khoản trong CSDL
+		User user = userRepo.findById(userId)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+		// 2. Xác thực mật khẩu cũ
+		if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+			throw new BadCredentialsException("Mật khẩu cũ không chính xác");
+		}
+
+		// 3. Xác nhận mật khẩu mới
+		if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
+			throw new IllegalArgumentException("Mật khẩu mới và xác nhận mật khẩu không khớp");
+		}
+
+		// 4. Mã hóa và lưu trữ mật khẩu mới
+		user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+		userRepo.save(user);
 	}
 }

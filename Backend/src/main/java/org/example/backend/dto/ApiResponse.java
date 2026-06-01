@@ -7,11 +7,11 @@ public record ApiResponse<T>(
         String errorCode
 ) {
     public static <T> ApiResponse<T> ok(T data) {
-        return new ApiResponse<>(true, data, null, null);
+        return new ApiResponse<>(true, data, null, "200");
     }
 
     public static <T> ApiResponse<T> ok(T data, String message) {
-        return new ApiResponse<>(true, data, message, null);
+        return new ApiResponse<>(true, data, message, "200");
     }
 
     public static <T> ApiResponse<T> error(String errorCode, String message) {
