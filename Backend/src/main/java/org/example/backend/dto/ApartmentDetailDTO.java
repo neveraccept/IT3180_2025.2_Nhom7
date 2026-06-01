@@ -2,15 +2,14 @@ package org.example.backend.dto;
 
 import java.math.BigDecimal;
 
-public record ApartmentDTO(
+public record ApartmentDetailDTO(
         Long id,
         String code,
         Integer floor,
         BigDecimal area,
         String status,
         String note,
-        String currentHouseholdCode,
-        String headOfHouseholdName
+        HouseholdSummaryDTO currentHousehold
 ) {
 }
 

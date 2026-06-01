@@ -48,6 +48,10 @@ public class User {
 
 //	@Column(name = "household", length = 20)
 //	private Household household = null;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "household_id")
+	private Household household;
 }
 
 
