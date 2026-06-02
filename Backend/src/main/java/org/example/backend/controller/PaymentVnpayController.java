@@ -2,8 +2,8 @@ package org.example.backend.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.example.backend.dto.ApiResponse;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.ApiResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentTransactionDTO;
 import org.example.backend.dto.request.VnpayPaymentUrlRequest;
 import org.example.backend.dto.VnpayPaymentUrlResponse;
