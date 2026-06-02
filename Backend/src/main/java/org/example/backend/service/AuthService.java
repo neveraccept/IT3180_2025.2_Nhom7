@@ -1,9 +1,6 @@
 package org.example.backend.service;
 
-import org.example.backend.dto.request.AdminRegisterRequest;
-import org.example.backend.dto.request.ChangePasswordRequest;
-import org.example.backend.dto.request.RegisterRequest;
-import org.example.backend.dto.request.LoginRequest;
+import org.example.backend.dto.request.*;
 import org.example.backend.dto.LoginResponseDTO;
 import org.example.backend.entity.Apartment;
 import org.example.backend.entity.Household;
@@ -29,6 +26,8 @@ public class AuthService {
 	private final HouseholdRepository householdRepo;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtUtil jwtTokenProvider;
+	private final OtpService otpService;
+	private final EmailService emailService;
 
 	@Autowired
 	public AuthService(UserRepository userRepo,
@@ -37,7 +36,9 @@ public class AuthService {
 					   HouseholdRepository householdRepo,
 	                   PasswordEncoder passwordEncoder,
 					   EmailOtpRepository emailOtpRepo,
-	                   JwtUtil jwtTokenProvider) {
+	                   JwtUtil jwtTokenProvider,
+					   OtpService otpService,
+					   EmailService emailService) {
 		this.userRepo = userRepo;
 		this.roleRepo = roleRepo;
 		this.apartmentRepo = apartmentRepo;
@@ -45,13 +46,15 @@ public class AuthService {
 		this.passwordEncoder = passwordEncoder;
 		this.emailOtpRepo = emailOtpRepo;
 		this.jwtTokenProvider = jwtTokenProvider;
+		this.otpService = otpService;
+		this.emailService = emailService;
 	}
 
 	@Transactional
 	public User registerResident(RegisterRequest request) {
 
 		// Kiểm tra username đã tồn tại chưa
-		if (userRepo.existsByUsername(request.getUsername())) {
+		if (userRepo.existsByUsername(request.username())) {
 			throw new IllegalArgumentException("Tên đăng nhập đã tồn tại!");
 		}
 
@@ -181,7 +184,7 @@ public class AuthService {
 		// 4. Sinh JWT Token thông qua Provider
 		String accessToken = jwtTokenProvider.generateToken(user);
 
-		// 5. Trích xuất Household ID (nếu có)
+		// TODO (5. Trích xuất Household ID (nếu có))
 		Long householdId = null;
 		// Giả sử Entity User của bạn có quan hệ với Household qua biến household
 		// Nếu bạn đang đóng comment phần Household, hãy điều chỉnh lại logic này sau khi mở comment
@@ -216,6 +219,45 @@ public class AuthService {
 
 		// 4. Mã hóa và lưu trữ mật khẩu mới
 		user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+		userRepo.save(user);
+	}
+
+	// Xử lý gửi OTP Quên mật khẩu
+	public void processForgotPasswordOtp(String email) {
+		// Theo SDD: Kiểm tra xem email có tồn tại không
+		boolean emailExists = userRepo.existsByEmail(email);
+
+		if (emailExists) {
+			// Nếu có, sinh OTP và gửi mail
+			OtpRequest otpRequest = new OtpRequest(email); //, "FORGOT_PASSWORD");
+			String plainOtp = otpService.generateAndSaveOtp(otpRequest, "FORGOT_PASSWORD");
+			emailService.sendOtpEmail(email, plainOtp, "FORGOT_PASSWORD");
+		}
+		// Nếu không tồn tại: không làm gì cả để tránh bị dò quét email.
+		// Controller vẫn sẽ trả về thông báo thành công chung chung.
+	}
+
+	// Đặt lại mật khẩu
+	@Transactional
+	public void resetPassword(ResetPasswordRequest request) {
+		// 1. Kiểm tra mật khẩu mới và xác nhận
+		if (!request.newPassword().equals(request.confirmNewPassword())) {
+			throw new IllegalArgumentException("Mật khẩu mới và xác nhận mật khẩu không khớp!");
+		}
+
+		// 2. Xác thực OTP (OtpService sẽ tự động đánh dấu used = true nếu hợp lệ)
+		VerifyOtpRequest verifyReq = new VerifyOtpRequest(request.email(), request.otp());
+		boolean isOtpValid = otpService.verifyOtp(verifyReq, "FORGOT_PASSWORD");
+		if (!isOtpValid) {
+			throw new IllegalArgumentException("Mã OTP không hợp lệ.");
+		}
+
+		// 3. Tìm tài khoản
+		User user = userRepo.findByEmail(request.email())
+				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với email này."));
+
+		// 4. Mã hoá và lưu mật khẩu mới
+		user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
 		userRepo.save(user);
 	}
 }

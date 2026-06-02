@@ -1,7 +1,7 @@
 package org.example.backend.controller;
 
 import jakarta.validation.Valid;
-import org.example.backend.dto.ApiResponse;
+import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.request.UpdateProfileRequest;
 import org.example.backend.dto.UserProfileDTO;
 // Đảm bảo import đúng đường dẫn của CustomUserDetails dự án bạn
