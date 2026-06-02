@@ -1,7 +1,7 @@
 package org.example.backend.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.ResidentSummaryDTO;
 import org.example.backend.dto.ResidentDetailDTO;
 import org.example.backend.dto.request.CreateResidentRequest;

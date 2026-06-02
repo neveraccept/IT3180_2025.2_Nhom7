@@ -2,9 +2,9 @@ package org.example.backend.controller;
 
 import org.example.backend.dto.ApartmentDTO;
 import org.example.backend.dto.ApartmentDetailDTO;
-import org.example.backend.dto.ApiResponse;
+import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.HouseholdSummaryDTO;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.request.ApartmentUpdateRequest;
 import org.example.backend.dto.request.AssignHouseholdRequest;
 import org.example.backend.dto.request.UpdateHouseholdRequest;

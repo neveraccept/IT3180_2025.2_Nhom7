@@ -1,4 +1,4 @@
-package org.example.backend.dto;
+package org.example.backend.dto.response;
 
 import org.springframework.data.domain.Page;
 

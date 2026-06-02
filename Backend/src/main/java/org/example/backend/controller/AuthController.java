@@ -3,6 +3,7 @@ package org.example.backend.controller;
 import jakarta.validation.Valid;
 import org.example.backend.dto.*;
 import org.example.backend.dto.request.*;
+import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.AuthService;
@@ -37,7 +38,7 @@ public class AuthController {
 			String plainOtp = otpService.generateAndSaveOtp(request);
 
 			// Gửi email chứa mã OTP nguyên bản
-			emailService.sendOtpEmail(request.getEmail(), plainOtp, request.getPurpose());
+			emailService.sendOtpEmail(request.email(), plainOtp, request.purpose());
 
 			return ResponseEntity.ok(Map.of("message", "Mã OTP đã được gửi đến email của bạn."));
 		} catch (RuntimeException e) {

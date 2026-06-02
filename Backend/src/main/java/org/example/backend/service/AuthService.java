@@ -56,17 +56,17 @@ public class AuthService {
 		}
 
 		// Kiểm tra xác nhận lại mật khẩu đã đúng chưa
-		if (!request.getPassword().equals(request.getConfirmPassword())) {
+		if (!request.password().equals(request.confirmPassword())) {
 			throw new IllegalArgumentException("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!");
 		}
 
 		// Kiểm tra email đã tồn tại chưa
-		if (userRepo.existsByEmail(request.getEmail())) {
+		if (userRepo.existsByEmail(request.email())) {
 			throw new IllegalArgumentException("Email đã được sử dụng!");
 		}
 
 		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.getEmail(), "REGISTER")
+		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.email(), "REGISTER")
 					.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
 
 		// Lấy Role RESIDENT từ Database
@@ -75,18 +75,18 @@ public class AuthService {
 
 		// 4. Tạo đối tượng User mới
 		User newUser = User.builder()
-				.username(request.getUsername())
-				.passwordHash(passwordEncoder.encode(request.getPassword())) // Băm mật khẩu bằng BCrypt
-				.fullName(request.getFullName())
-				.email(request.getEmail())
-				.phone(request.getPhone())
+				.username(request.username())
+				.passwordHash(passwordEncoder.encode(request.password())) // Băm mật khẩu bằng BCrypt
+				.fullName(request.fullName())
+				.email(request.email())
+				.phone(request.phone())
 				.role(residentRole)
 				.active(false) //Tài khoản mới tạo mặc định chờ duyệt
 				.emailVerified(true)
-				 .household(null)
+				.household(null)
 
 				// Lưu lại mã căn hộ yêu cầu để Admin đối soát ở dashboard
-				.requestedApartmentCode(request.getRequestedApartmentCode())
+				.requestedApartmentCode(request.requestedApartmentCode())
 				.build();
 
 		// 5. Lưu vào database
@@ -97,36 +97,36 @@ public class AuthService {
 
 	@Transactional
 	public User createInternalAccount(AdminRegisterRequest req) {
-		if (userRepo.existsByUsername(req.getUsername())) {
+		if (userRepo.existsByUsername(req.username())) {
 			throw new IllegalArgumentException("Username đã được sử dụng");
 		}
 
 		// Kiểm tra xác nhận lại mật khẩu đã đúng chưa
-		if (!req.getPassword().equals(req.getConfirmPassword())) {
+		if (!req.password().equals(req.confirmPassword())) {
 			throw new IllegalArgumentException("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!");
 		}
 
 		// Kiểm tra email đã tồn tại chưa
-		if (userRepo.existsByEmail(req.getEmail())) {
+		if (userRepo.existsByEmail(req.email())) {
 			throw new IllegalArgumentException("Email đã được sử dụng!");
 		}
 
 		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.getEmail(), "REGISTER")
-				.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.email(), "REGISTER")
+					.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
 
-
-		Role role = roleRepo.findByName(req.getRole())
-				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.getRole()));
+		Role role = roleRepo.findByName(req.role())
+				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.role()));
 
 		User newUser = new User();
-		newUser.setUsername(req.getUsername());
-		newUser.setFullName(req.getFullName());
-		newUser.setPhone(req.getPhone());
-		newUser.setRequestedApartmentCode(req.getRequestedApartmentCode());
+		newUser.setUsername(req.username());
+		newUser.setFullName(req.fullName());
+		newUser.setEmail(req.email());
+		newUser.setPhone(req.phone());
+		newUser.setRequestedApartmentCode(req.requestedApartmentCode());
 
 		// Mã hóa mật khẩu từ DTO
-		newUser.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+		newUser.setPasswordHash(passwordEncoder.encode(req.password()));
 
 		// Tìm và set Role
 		newUser.setRole(role);
@@ -163,11 +163,11 @@ public class AuthService {
 	// Đăng nhập hệ thống và cấp phát JWT
 	public LoginResponseDTO login(LoginRequest req) {
 		// 1. Tìm user
-		User user = userRepo.findByUsername(req.getUsername())
+		User user = userRepo.findByUsername(req.username())
 				.orElseThrow(() -> new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác"));
 
 		// 2. So khớp mật khẩu
-		boolean isMatch = passwordEncoder.matches(req.getPassword(), user.getPasswordHash());
+		boolean isMatch = passwordEncoder.matches(req.password(), user.getPasswordHash());
 
 		if (!isMatch) {
 			throw new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác");

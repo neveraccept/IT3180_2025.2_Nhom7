@@ -31,8 +31,8 @@ public class OtpService {
     @Transactional
     public String generateAndSaveOtp(OtpRequest request) {
         // Trích xuất dữ liệu trực tiếp từ DTO
-        String email = request.getEmail();
-        String purpose = request.getPurpose();
+        String email = request.email();
+        String purpose = request.purpose();
 
         // Áp dụng rate-limit: Tối đa 5 lần gửi trong 15 phút
         int recentRequests = emailOtpRepo.countRecentOtps(email);
@@ -68,9 +68,9 @@ public class OtpService {
     @Transactional
     public boolean verifyOtp(VerifyOtpRequest request) {
         // Trích xuất dữ liệu trực tiếp từ DTO
-        String email = request.getEmail();
-        String plainOtp = request.getOtp();
-        String purpose = request.getPurpose();
+        String email = request.email();
+        String plainOtp = request.otp();
+        String purpose = request.purpose();
 
         // Lấy mã OTP mới nhất theo email và mục đích sử dụng
         Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);

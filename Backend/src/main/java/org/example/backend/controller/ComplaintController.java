@@ -1,8 +1,8 @@
 package org.example.backend.controller;
 
-import org.example.backend.dto.ApiResponse;
+import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.ComplaintDTO;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.request.ComplaintCreateRequest;
 import org.example.backend.dto.request.ComplaintResponseRequest;
 import org.example.backend.entity.enums.ComplaintCategory;

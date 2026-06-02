@@ -1,7 +1,7 @@
 package org.example.backend.service;
 
 import org.example.backend.dto.ComplaintDTO;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.request.ComplaintCreateRequest;
 import org.example.backend.dto.request.ComplaintResponseRequest;
 import org.example.backend.entity.Complaint;

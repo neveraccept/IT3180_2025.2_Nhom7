@@ -5,7 +5,6 @@ import lombok.*;
 @Setter
 @Getter
 public class LoginResponseDTO {
-
     private String accessToken;
     private String tokenType = "Bearer";
     private Long userId;
