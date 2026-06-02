@@ -5,15 +5,13 @@ import org.example.backend.dto.request.ChangePasswordRequest;
 import org.example.backend.dto.request.RegisterRequest;
 import org.example.backend.dto.request.LoginRequest;
 import org.example.backend.dto.LoginResponseDTO;
-//import org.example.backend.entity.Apartment;
-//import org.example.backend.entity.Household;
+import org.example.backend.entity.Apartment;
+import org.example.backend.entity.Household;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
-//import org.example.backend.repository.ApartmentRepository;
-//import org.example.backend.repository.HouseholdRepository;
-import org.example.backend.repository.EmailOtpRepository;
-import org.example.backend.repository.RoleRepository;
-import org.example.backend.repository.UserRepository;
+import org.example.backend.repository.ApartmentRepository;
+import org.example.backend.repository.HouseholdRepository;
+import org.example.backend.repository.*;
 import org.example.backend.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,19 +25,23 @@ public class AuthService {
 	private final UserRepository userRepo;
 	private final RoleRepository roleRepo;
 	private final EmailOtpRepository emailOtpRepo;
-//	private final ApartmentRepository apartmentRepo;
-//	private final HouseholdRepository householdRepo;
+	private final ApartmentRepository apartmentRepo;
+	private final HouseholdRepository householdRepo;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtUtil jwtTokenProvider;
 
 	@Autowired
 	public AuthService(UserRepository userRepo,
 	                   RoleRepository roleRepo,
+					   ApartmentRepository apartmentRepo,
+					   HouseholdRepository householdRepo,
 	                   PasswordEncoder passwordEncoder,
 					   EmailOtpRepository emailOtpRepo,
 	                   JwtUtil jwtTokenProvider) {
 		this.userRepo = userRepo;
 		this.roleRepo = roleRepo;
+		this.apartmentRepo = apartmentRepo;
+		this.householdRepo = householdRepo;
 		this.passwordEncoder = passwordEncoder;
 		this.emailOtpRepo = emailOtpRepo;
 		this.jwtTokenProvider = jwtTokenProvider;
@@ -81,9 +83,8 @@ public class AuthService {
 				.role(residentRole)
 				.active(false) //Tài khoản mới tạo mặc định chờ duyệt
 				.emailVerified(true)
-				// Cư dân tự đăng ký chưa có household_id chính thức
-				// TODO
-				// .household(null)
+				 .household(null)
+
 				// Lưu lại mã căn hộ yêu cầu để Admin đối soát ở dashboard
 				.requestedApartmentCode(request.getRequestedApartmentCode())
 				.build();
@@ -112,7 +113,8 @@ public class AuthService {
 
 		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
 		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.getEmail(), "REGISTER")
-					.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+				.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+
 
 		Role role = roleRepo.findByName(req.getRole())
 				.orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.getRole()));
@@ -120,7 +122,6 @@ public class AuthService {
 		User newUser = new User();
 		newUser.setUsername(req.getUsername());
 		newUser.setFullName(req.getFullName());
-		newUser.setEmail(req.getEmail());
 		newUser.setPhone(req.getPhone());
 		newUser.setRequestedApartmentCode(req.getRequestedApartmentCode());
 

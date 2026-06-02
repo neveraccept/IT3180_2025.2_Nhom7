@@ -46,9 +46,6 @@ public class User {
 	@JoinColumn(name = "role_id", nullable = false)
 	private Role role;
 
-//	@Column(name = "household", length = 20)
-//	private Household household = null;
-
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "household_id")
 	private Household household;
