@@ -1,4 +1,4 @@
-package org.example.backend.dto;
+package org.example.backend.dto.response;
 
 public record ApiResponse<T>(
         boolean success,
