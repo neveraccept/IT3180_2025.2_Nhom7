@@ -3,6 +3,9 @@ package org.example.backend.controller;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
+import org.example.backend.entity.Household;
+import org.example.backend.exception.BadRequestException;
+import org.example.backend.security.CurrentUserService;
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.PaymentService;
 import org.springframework.data.domain.Pageable;
@@ -17,9 +20,12 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final CurrentUserService currentUserService;
 
-    public PaymentController(PaymentService paymentService) {
+    public PaymentController(PaymentService paymentService,
+                            CurrentUserService currentUserService) {
         this.paymentService = paymentService;
+        this.currentUserService = currentUserService;
     }
 
     //  Cư dân xem phiếu nộp của hộ mình
@@ -27,11 +33,23 @@ public class PaymentController {
     @GetMapping("/api/payments/my-household")
     @PreAuthorize("hasRole('RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<PaymentDetailDTO>>> myHousehold(
-            @AuthenticationPrincipal CustomUserDetails me,
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.ok(
-                paymentService.listMyHousehold(me.getUser().getHousehold().getId(), pageable)));
+                paymentService.listMyHousehold(currentHouseholdId(), pageable)));
+    }
+
+    /**
+     * Lấy householdId của cư dân đang đăng nhập từ DB (User trong JWT là bản "ảo", không có household).
+     * Ném 400 nếu tài khoản chưa được gán vào hộ dân.
+     */
+    private Long currentHouseholdId() {
+        Household h = currentUserService.getCurrentUser().getHousehold();
+        if (h == null) {
+            throw new BadRequestException("RESIDENT_NO_HOUSEHOLD",
+                    "Tài khoản chưa được gán vào hộ dân nào");
+        }
+        return h.getId();
     }
 
     //  Admin xem / lọc phiếu nộp (theo householdId, status)
