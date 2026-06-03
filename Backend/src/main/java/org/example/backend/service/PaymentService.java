@@ -8,7 +8,9 @@ import org.example.backend.dto.request.VnpayPaymentUrlRequest;
 import org.example.backend.dto.VnpayPaymentUrlResponse;
 import org.example.backend.entity.Payment;
 import org.example.backend.entity.PaymentTransaction;
-// import org.example.backend.entity.UtilityBill; // TODO: bật lại khi Module UtilityBill được định nghĩa
+import org.example.backend.entity.UtilityBill;
+import org.example.backend.entity.enums.PaymentMethod;
+import org.example.backend.entity.enums.UtilityBillStatus;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.exception.NotFoundException;
 import org.example.backend.service.VnpayService;
@@ -35,7 +37,7 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentTransactionRepository txRepository;
-    // private final UtilityBillRepository utilityBillRepository; // TODO: bật lại khi Module UtilityBill được định nghĩa
+    private final UtilityBillRepository utilityBillRepository;
     private final HouseholdRepository householdRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
@@ -43,14 +45,14 @@ public class PaymentService {
 
     public PaymentService(PaymentRepository paymentRepository,
                           PaymentTransactionRepository txRepository,
-                          // UtilityBillRepository utilityBillRepository, // TODO: bật lại khi Module UtilityBill được định nghĩa
+                          UtilityBillRepository utilityBillRepository,
                           HouseholdRepository householdRepository,
                           UserRepository userRepository,
                           AuditLogService auditLogService,
                           VnpayService vnpayService) {
         this.paymentRepository = paymentRepository;
         this.txRepository = txRepository;
-        // this.utilityBillRepository = utilityBillRepository; // TODO: bật lại khi Module UtilityBill được định nghĩa
+        this.utilityBillRepository = utilityBillRepository;
         this.householdRepository = householdRepository;
         this.userRepository = userRepository;
         this.auditLogService = auditLogService;
@@ -110,16 +112,17 @@ public class PaymentService {
         final String targetType = req.targetType();
         final Long targetId = req.targetId();
 
-        // TODO: bổ sung TARGET_UTILITY_BILL khi Module UtilityBill được định nghĩa
-        if (!PaymentTransaction.TARGET_FEE_PAYMENT.equals(targetType)) {
+        boolean isFee = PaymentTransaction.TARGET_FEE_PAYMENT.equals(targetType);
+        boolean isUtility = PaymentTransaction.TARGET_UTILITY_BILL.equals(targetType);
+        if (!isFee && !isUtility) {
             throw new BadRequestException("INVALID_TARGET_TYPE",
                     "targetType không hợp lệ: " + targetType);
         }
 
-        // 1) Resolve khoản phí → số tiền + hộ sở hữu + kiểm tra đã thanh toán chưa
+        // 1) Resolve đối tượng cần thanh toán → số tiền + hộ sở hữu + kiểm tra đã thanh toán chưa
         BigDecimal amount;
         Long ownerHouseholdId;
-        if (PaymentTransaction.TARGET_FEE_PAYMENT.equals(targetType)) {
+        if (isFee) {
             Payment p = paymentRepository.findById(targetId)
                     .orElseThrow(() -> new NotFoundException(
                             "PAYMENT_NOT_FOUND", "Không tìm thấy phiếu nộp id=" + targetId));
@@ -129,17 +132,14 @@ public class PaymentService {
             amount = p.getAmountDue();
             ownerHouseholdId = p.getHousehold().getId();
         } else {
-            // TODO: bật lại khi Module UtilityBill được định nghĩa
-            // UtilityBill b = utilityBillRepository.findById(targetId)
-            //         .orElseThrow(() -> new NotFoundException(
-            //                 "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hoá đơn id=" + targetId));
-            // if (Payment.STATUS_PAID.equals(b.getStatus())) {
-            //     throw new BadRequestException("TARGET_ALREADY_PAID", "Hoá đơn đã được thanh toán");
-            // }
-            // amount = b.getAmount();
-            // ownerHouseholdId = b.getHousehold().getId();
-            throw new BadRequestException("INVALID_TARGET_TYPE",
-                    "targetType chưa được hỗ trợ: " + targetType);
+            UtilityBill b = utilityBillRepository.findById(targetId)
+                    .orElseThrow(() -> new NotFoundException(
+                            "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hoá đơn id=" + targetId));
+            if (b.getStatus() == UtilityBillStatus.PAID) {
+                throw new BadRequestException("TARGET_ALREADY_PAID", "Hoá đơn đã được thanh toán");
+            }
+            amount = b.getAmount();
+            ownerHouseholdId = b.getHousehold().getId();
         }
 
         // 2) Cư dân chỉ được thanh toán cho hộ mình → 403
@@ -259,19 +259,17 @@ public class PaymentService {
             p.setPaidAt(now);
             p.setPaidDate(today);
             paymentRepository.save(p);
+        } else if (PaymentTransaction.TARGET_UTILITY_BILL.equals(tx.getTargetType())) {
+            UtilityBill b = utilityBillRepository.findById(tx.getTargetId())
+                    .orElseThrow(() -> new NotFoundException(
+                            "UTILITY_BILL_NOT_FOUND", "Hoá đơn không tồn tại id=" + tx.getTargetId()));
+            b.setStatus(UtilityBillStatus.PAID);
+            b.setPaymentMethod(PaymentMethod.ONLINE);
+            b.setTransactionCode(tx.getTransactionCode());
+            b.setPaidAt(now);
+            b.setPaidDate(today);
+            utilityBillRepository.save(b);
         }
-        // TODO: bật lại khi Module UtilityBill được định nghĩa
-        // else {
-        //     UtilityBill b = utilityBillRepository.findById(tx.getTargetId())
-        //             .orElseThrow(() -> new NotFoundException(
-        //                     "UTILITY_BILL_NOT_FOUND", "Hoá đơn không tồn tại id=" + tx.getTargetId()));
-        //     b.setStatus("PAID");
-        //     b.setPaymentMethod("ONLINE");
-        //     b.setTransactionCode(tx.getTransactionCode());
-        //     b.setPaidAt(now);
-        //     b.setPaidDate(today);
-        //     utilityBillRepository.save(b);
-        // }
     }
 
     // ==================== TRA CỨU GIAO DỊCH (Return / history / admin) =======

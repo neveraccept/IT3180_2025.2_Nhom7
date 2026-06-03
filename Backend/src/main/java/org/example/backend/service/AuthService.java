@@ -6,6 +6,7 @@ import org.example.backend.entity.Apartment;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
+import org.example.backend.entity.enums.HouseholdStatus;
 import org.example.backend.repository.ApartmentRepository;
 import org.example.backend.repository.HouseholdRepository;
 import org.example.backend.repository.*;
@@ -151,15 +152,39 @@ public class AuthService {
 			throw new IllegalArgumentException("Tài khoản này đã được kích hoạt từ trước!");
 		}
 
-		// 3. Duyệt tài khoản
+		// 3. Gán hộ dân dựa trên mã căn hộ mà cư dân đã yêu cầu khi đăng ký.
+		//    Nhờ vậy luồng thanh toán/tra cứu theo hộ của cư dân mới hoạt động được.
+		linkHouseholdByRequestedApartment(user);
+
+		// 4. Duyệt tài khoản
 		user.setActive(true);
 
-		// TODO (Sau này khi làm module Căn Hộ/Hộ Khẩu):
-		// Lấy mã user.getRequestedApartmentCode() để tìm Căn hộ,
-		// lấy Household tương ứng và gán vào user.setHousehold(...)
-
-		// 4. Lưu thay đổi
+		// 5. Lưu thay đổi
 		return userRepo.saveAndFlush(user);
+	}
+
+	/**
+	 * Tìm căn hộ theo requestedApartmentCode → lấy hộ dân ACTIVE đang ở căn hộ đó → gán vào user.
+	 * Ném lỗi rõ ràng nếu không xác định được hộ, để Admin xử lý thay vì duyệt một tài khoản "mồ côi hộ".
+	 */
+	private void linkHouseholdByRequestedApartment(User user) {
+		String code = user.getRequestedApartmentCode();
+		if (code == null || code.isBlank()) {
+			throw new IllegalArgumentException(
+					"Tài khoản chưa khai báo mã căn hộ. Không thể gán hộ dân khi duyệt.");
+		}
+
+		Apartment apartment = apartmentRepo.findByCode(code.trim())
+				.orElseThrow(() -> new IllegalArgumentException(
+						"Không tìm thấy căn hộ với mã '" + code + "' mà cư dân đã yêu cầu."));
+
+		Household household = householdRepo
+				.findByApartmentIdAndStatus(apartment.getId(), HouseholdStatus.ACTIVE)
+				.orElseThrow(() -> new IllegalArgumentException(
+						"Căn hộ '" + code + "' chưa có hộ dân đang cư trú (ACTIVE). "
+								+ "Hãy gán hộ vào căn hộ trước khi duyệt tài khoản."));
+
+		user.setHousehold(household);
 	}
 
 	// Đăng nhập hệ thống và cấp phát JWT
@@ -183,13 +208,8 @@ public class AuthService {
 		// 4. Sinh JWT Token thông qua Provider
 		String accessToken = jwtTokenProvider.generateToken(user);
 
-		// TODO (5. Trích xuất Household ID (nếu có))
-		Long householdId = null;
-		// Giả sử Entity User của bạn có quan hệ với Household qua biến household
-		// Nếu bạn đang đóng comment phần Household, hãy điều chỉnh lại logic này sau khi mở comment
-		// if (user.getHousehold() != null) {
-		//     householdId = user.getHousehold().getId();
-		// }
+		// 5. Trích xuất Household ID (nếu tài khoản đã được gán vào hộ dân)
+		Long householdId = user.getHousehold() != null ? user.getHousehold().getId() : null;
 
 		// 6. Đóng gói và trả về DTO
 		return new LoginResponseDTO(

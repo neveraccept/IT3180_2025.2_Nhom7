@@ -18,6 +18,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 @Service
 public class ApartmentService {
 
@@ -41,9 +46,7 @@ public class ApartmentService {
 
     @Transactional(readOnly = true)
     public PageResponse<ApartmentDTO> list(Pageable pageable) {
-        Page<ApartmentDTO> page = apartmentRepository.findAll(pageable)
-                .map(this::toListDtoWithActiveHousehold);
-        return PageResponse.of(page);
+        return PageResponse.of(toListDtoPage(apartmentRepository.findAll(pageable)));
     }
 
     // Tìm kiếm căn hộ (code, floor, status, headName)
@@ -58,11 +61,8 @@ public class ApartmentService {
         String c = isBlank(code) ? null : code.trim();
         String h = isBlank(headName) ? null : headName.trim();
 
-        Page<ApartmentDTO> page = apartmentRepository
-                .search(c, floor, status, h, pageable)
-                .map(this::toListDtoWithActiveHousehold);
-
-        return PageResponse.of(page);
+        return PageResponse.of(toListDtoPage(
+                apartmentRepository.search(c, floor, status, h, pageable)));
     }
 
     // Xem chi tiết căn hộ kèm hộ dân đang ở
@@ -144,11 +144,26 @@ public class ApartmentService {
         ap.setStatus(newStatus);
     }
 
-    private ApartmentDTO toListDtoWithActiveHousehold(Apartment ap) {
-        Household active = householdRepository
-                .findByApartmentIdAndStatus(ap.getId(), HouseholdStatus.ACTIVE)
-                .orElse(null);
-        return mapper.toListDto(ap, active);
+    /**
+     * Map cả trang căn hộ sang DTO mà chỉ tốn 1 truy vấn để nạp hộ dân ACTIVE cho toàn bộ trang
+     * (thay vì 1 truy vấn / căn hộ → tránh N+1).
+     */
+    private Page<ApartmentDTO> toListDtoPage(Page<Apartment> apartments) {
+        List<Long> apartmentIds = apartments.getContent().stream()
+                .map(Apartment::getId)
+                .toList();
+
+        Map<Long, Household> activeByApartmentId = apartmentIds.isEmpty()
+                ? Map.of()
+                : householdRepository
+                        .findByApartmentIdInAndStatus(apartmentIds, HouseholdStatus.ACTIVE)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                h -> h.getApartment().getId(),
+                                Function.identity(),
+                                (a, b) -> a)); // mỗi căn hộ chỉ có tối đa 1 hộ ACTIVE
+
+        return apartments.map(ap -> mapper.toListDto(ap, activeByApartmentId.get(ap.getId())));
     }
 
     private static boolean isBlank(String s) {

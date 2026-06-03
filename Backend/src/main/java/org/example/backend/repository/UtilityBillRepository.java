@@ -5,6 +5,7 @@ import org.example.backend.entity.enums.UtilityBillStatus;
 import org.example.backend.entity.enums.UtilityType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +21,8 @@ public interface UtilityBillRepository extends JpaRepository<UtilityBill, Long> 
      * Tra cứu hoá đơn có lọc động (F7.4). Tham số null → bỏ qua điều kiện tương ứng.
      * Dùng chung cho cả Admin (truyền householdId) và Cư dân (Service ép householdId của hộ mình).
      */
+    // Fetch-join household mà UtilityBillMapper.toDto(...) sẽ đọc → tránh N+1.
+    @EntityGraph(attributePaths = {"household"})
     @Query("""
             SELECT b FROM UtilityBill b
             WHERE (:householdId IS NULL OR b.household.id = :householdId)

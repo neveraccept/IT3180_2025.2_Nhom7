@@ -4,6 +4,7 @@ import jakarta.persistence.LockModeType;
 import org.example.backend.entity.PaymentTransaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -29,8 +30,11 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     Optional<PaymentTransaction> findFirstByTargetTypeAndTargetIdAndStatus(
             String targetType, Long targetId, String status);
 
+    // Fetch-join household + user mà PaymentTransactionDTO.from(...) sẽ đọc → tránh N+1.
+    @EntityGraph(attributePaths = {"household", "user"})
     Page<PaymentTransaction> findByHousehold_Id(Long householdId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"household", "user"})
     @Query("""
             SELECT t FROM PaymentTransaction t
             WHERE (:status IS NULL OR t.status = :status)
