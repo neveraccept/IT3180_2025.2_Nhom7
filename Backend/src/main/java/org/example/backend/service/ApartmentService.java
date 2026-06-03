@@ -2,7 +2,7 @@ package org.example.backend.service;
 
 import org.example.backend.dto.ApartmentDTO;
 import org.example.backend.dto.ApartmentDetailDTO;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.request.ApartmentUpdateRequest;
 import org.example.backend.entity.Apartment;
 import org.example.backend.entity.Household;
