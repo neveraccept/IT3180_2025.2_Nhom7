@@ -1,7 +1,11 @@
 package org.example.backend.config;
 
+import org.example.backend.entity.ParkingSlot;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
+import org.example.backend.entity.enums.ParkingSlotStatus;
+import org.example.backend.entity.enums.VehicleType;
+import org.example.backend.repository.ParkingSlotRepository;
 import org.example.backend.repository.RoleRepository;
 import org.example.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,14 +20,17 @@ public class DatabaseInitializerConfig implements CommandLineRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ParkingSlotRepository parkingSlotRepository;
 
     @Autowired
     public DatabaseInitializerConfig(UserRepository userRepository,
-                               RoleRepository roleRepository,
-                               PasswordEncoder passwordEncoder) {
+                                     RoleRepository roleRepository,
+                                     PasswordEncoder passwordEncoder,
+                                     ParkingSlotRepository parkingSlotRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.parkingSlotRepository = parkingSlotRepository;
     }
 
     @Override
@@ -70,6 +77,31 @@ public class DatabaseInitializerConfig implements CommandLineRunner {
 
             userRepository.save(resident);
             System.out.println("Đã tự động tạo tài khoản Resident (user / user123)");
+        }
+
+        // 4. Tự động khởi tạo chỗ gửi xe nếu bãi xe đang trống
+        if (parkingSlotRepository.count() == 0) {
+            System.out.println("Bãi gửi xe đang trống, tiến hành khởi tạo chỗ đỗ xe...");
+
+            // Tạo 50 chỗ đỗ xe máy
+            for (int i = 1; i <= 50; i++) {
+                ParkingSlot slot = new ParkingSlot();
+                slot.setCode("M-" + String.format("%03d", i)); // VD: M-001
+                slot.setType(VehicleType.MOTORBIKE);
+                slot.setStatus(ParkingSlotStatus.EMPTY);
+                parkingSlotRepository.save(slot);
+            }
+
+            // Tạo 20 chỗ đỗ ô tô
+            for (int i = 1; i <= 20; i++) {
+                ParkingSlot slot = new ParkingSlot();
+                slot.setCode("C-" + String.format("%03d", i)); // VD: C-001
+                slot.setType(VehicleType.CAR);
+                slot.setStatus(ParkingSlotStatus.EMPTY);
+                parkingSlotRepository.save(slot);
+            }
+
+            System.out.println("Đã khởi tạo xong 50 chỗ xe máy và 20 chỗ ô tô.");
         }
     }
 }
