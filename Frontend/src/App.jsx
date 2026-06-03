@@ -901,7 +901,7 @@ function Input({ label, className = "", ...props }) {
   return (
     <label className={`block ${className}`}>
       <span className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</span>
-      <input className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100" {...props} />
+      <input style={{ colorScheme: "light" }} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100" {...props} />
     </label>
   );
 }
@@ -910,7 +910,11 @@ function Select({ label, children, value, onChange }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</span>
-      <select className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" value={value} onChange={onChange}>
+      <select
+        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+        value={value}
+        onChange={onChange}
+      >
         {children}
       </select>
     </label>
@@ -3264,7 +3268,6 @@ function Vehicles() {
       <SectionHeader
         title="Sơ đồ bãi đỗ xe"
         desc="Chọn một chỗ trống trên sơ đồ để đăng ký xe. Chỗ đã đặt có thể bấm để xem chi tiết hoặc chỉnh sửa."
-        action={<Button onClick={() => openCreateForm()}><Plus className="h-4 w-4" /> Đăng ký xe</Button>}
       />
 
       <div className="mb-5 grid gap-4 md:grid-cols-4">
@@ -3343,7 +3346,7 @@ function Vehicles() {
           </div>
 
           <div className="overflow-x-auto">
-            <div className="mx-auto flex min-w-[680px] items-stretch justify-center gap-4 rounded-3xl border border-slate-200 bg-slate-900 p-4 sm:gap-5 sm:p-6">
+            <div className="parking-diagram mx-auto flex min-w-[680px] items-stretch justify-center gap-4 rounded-3xl border border-slate-200 bg-white p-4 sm:gap-5 sm:p-6">
               {parkingBlocks.map((block, blockIndex) => (
                 <div key={blockIndex} className="flex flex-1 items-stretch gap-2 sm:gap-3">
                   <div className="flex w-16 flex-col gap-1.5 sm:w-20">
@@ -3351,7 +3354,7 @@ function Vehicles() {
                   </div>
 
                   <div className="flex w-8 items-center justify-center sm:w-10">
-                    <div className="flex h-28 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:h-36 [writing-mode:vertical-rl] [text-orientation:mixed]">
+                    <div className="parking-lane flex h-28 items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:h-36 [writing-mode:vertical-rl] [text-orientation:mixed]">
                       Làn xe
                     </div>
                   </div>
@@ -4663,8 +4666,7 @@ function AppContent() {
     "bluemoon_notifications",
     normalizeNotifications(notifications)
   );
-
-  const syncPaymentsForMandatoryFee = (fee, month = new Date().getMonth() + 1, year = new Date().getFullYear()) => {
+const syncPaymentsForMandatoryFee = (fee, month = new Date().getMonth() + 1, year = new Date().getFullYear()) => {
     if (!fee || fee.type !== "MANDATORY" || fee.status !== "ACTIVE") return;
 
     setPaymentRecords((prev) => {
@@ -4716,7 +4718,7 @@ function AppContent() {
     );
   }
 
-  if (showIntro) {
+    if (showIntro) {
     return (
       <IntroductionPage
         onStartLogin={() => {
