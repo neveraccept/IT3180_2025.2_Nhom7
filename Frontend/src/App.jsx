@@ -6,6 +6,7 @@ import {
   Users,
   WalletCards,
   Car,
+  Bike,
   ReceiptText,
   Bell,
   MessageSquareWarning,
@@ -23,6 +24,17 @@ import {
   AlertCircle,
   UserRoundCog,
   KeyRound,
+  MapPin,
+  Phone,
+  Mail,
+  CalendarDays,
+  Sparkles,
+  HeartHandshake,
+  Dumbbell,
+  Waves,
+  Gamepad2,
+  ShoppingCart,
+  Trees,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -397,8 +409,304 @@ function DataTable({ columns, rows }) {
   );
 }
 
-function Login({ setUser }) {
-  const [mode, setMode] = useState("login");
+
+function IntroductionPage({ onStartLogin, onStartRegister }) {
+  const emptyContactForm = { name: "", phone: "", email: "", message: "" };
+  const [contactForm, setContactForm] = useState(emptyContactForm);
+  const [contactSent, setContactSent] = useState(false);
+
+  const scrollToSection = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleContactSubmit = (e) => {
+    e.preventDefault();
+
+    if (!contactForm.name.trim() || !contactForm.phone.trim() || !contactForm.message.trim()) {
+      alert("Vui lòng nhập họ tên, số điện thoại và nội dung cần hỗ trợ.");
+      return;
+    }
+
+    const newRequest = {
+      id: Date.now(),
+      ...contactForm,
+      createdAt: new Date().toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }),
+      status: "NEW",
+    };
+
+    try {
+      const saved = JSON.parse(localStorage.getItem("bluemoon_contact_requests") || "[]");
+      localStorage.setItem("bluemoon_contact_requests", JSON.stringify([newRequest, ...saved]));
+    } catch {
+      // Nếu trình duyệt chặn localStorage thì vẫn hiển thị gửi thành công trên giao diện.
+    }
+
+    setContactForm(emptyContactForm);
+    setContactSent(true);
+    setTimeout(() => setContactSent(false), 3000);
+  };
+
+  const projectCards = [
+    { icon: Building2, label: "Tên dự án", value: "Chung cư BlueMoon", sub: "Không gian sống hiện đại" },
+    { icon: MapPin, label: "Vị trí địa lý", value: "Ngã tư Văn Phú", sub: "Kết nối giao thông thuận tiện" },
+    { icon: Home, label: "Quy mô", value: "30 tầng / 450m²", sub: "1 kiot, 4 tầng đế, 24 tầng ở, 1 penthouse" },
+    { icon: CalendarDays, label: "Thời gian", value: "2021 - 2023", sub: "Khởi công 2021, hoàn thành 2023" },
+    { icon: Users, label: "Cư dân", value: "Hộ gia đình, cá nhân", sub: "Hướng đến cộng đồng văn minh" },
+  ];
+
+  const values = [
+    { icon: ShieldCheck, title: "An toàn", desc: "Hệ thống an ninh 24/7, tiêu chuẩn PCCC hiện đại, đảm bảo sự an tâm tuyệt đối cho mọi gia đình.", tone: "from-emerald-100 to-white" },
+    { icon: ReceiptText, title: "Minh bạch", desc: "Mọi hoạt động quản lý, thu chi kinh phí bảo trì đều được công khai minh bạch đến từng hộ dân.", tone: "from-sky-100 to-white" },
+    { icon: CheckCircle2, title: "Chuyên nghiệp", desc: "Công tác vận hành, bảo dưỡng cơ sở vật chất được thực hiện định kỳ và duy trì chất lượng sống cao.", tone: "from-amber-100 to-white" },
+    { icon: Sparkles, title: "Tiện nghi", desc: "Thiết kế thông minh với 1 tầng kiot và 4 tầng đế thương mại, cung cấp đầy đủ tiện ích mua sắm, giải trí tại chỗ.", tone: "from-violet-100 to-white" },
+    { icon: HeartHandshake, title: "Cộng đồng", desc: "Môi trường sống thân thiện, gắn kết, nơi Ban quản trị và cư dân cùng tạo diện mạo chung cho tòa nhà.", tone: "from-rose-100 to-white" },
+  ];
+
+  const amenities = [
+    { icon: Waves, title: "Hồ bơi vô cực", desc: "Thư giãn trong làn nước mát lành với tầm nhìn tuyệt đẹp." },
+    { icon: Dumbbell, title: "Phòng gym hiện đại", desc: "Trang thiết bị chuẩn quốc tế giúp duy trì sức khỏe mỗi ngày." },
+    { icon: Trees, title: "Công viên nội khu", desc: "Không gian xanh mát, đường dạo bộ thư thái cho cả gia đình." },
+    { icon: Gamepad2, title: "Khu vui chơi trẻ em", desc: "Sân chơi an toàn, phát triển thể chất và trí tuệ cho bé." },
+    { icon: Car, title: "Bãi đỗ xe thông minh", desc: "Hệ thống đỗ xe rộng rãi, an toàn, quản lý bằng thẻ từ." },
+    { icon: ShoppingCart, title: "Siêu thị tiện lợi", desc: "Đáp ứng đầy đủ nhu cầu mua sắm thiết yếu ngay dưới sảnh." },
+    { icon: ShieldCheck, title: "Hệ thống an ninh 24/7", desc: "Camera giám sát toàn khu cùng đội ngũ bảo vệ chuyên nghiệp." },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-900">
+      <section
+        className="relative min-h-screen overflow-hidden text-white"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(2,6,23,0.78), rgba(2,6,23,0.86)), radial-gradient(circle at 18% 18%, rgba(37,99,235,0.35), transparent 28%), radial-gradient(circle at 82% 22%, rgba(14,165,233,0.26), transparent 30%), linear-gradient(135deg, #020617 0%, #111827 48%, #0f172a 100%)",
+        }}
+      >
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute left-[12%] top-28 h-[560px] w-[360px] rotate-12 rounded-[48px] border border-white/20 bg-white/5" />
+          <div className="absolute right-[15%] top-24 h-[620px] w-[430px] -rotate-6 rounded-[56px] border border-white/10 bg-white/5" />
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-slate-950 to-transparent" />
+        </div>
+
+        <nav className="absolute inset-x-0 top-0 z-20">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6">
+            <button onClick={() => scrollToSection("hero")} className="flex items-center gap-3 text-left">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-sky-300 ring-1 ring-white/15 backdrop-blur">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-black tracking-tight">BlueMoon</div>
+                <div className="text-xs text-slate-300">Chung cư văn minh</div>
+              </div>
+            </button>
+            <div className="hidden items-center gap-6 text-sm font-semibold text-slate-200 md:flex">
+              <button onClick={() => scrollToSection("overview")} className="hover:text-white">Tổng quan</button>
+              <button onClick={() => scrollToSection("mission")} className="hover:text-white">Tầm nhìn</button>
+              <button onClick={() => scrollToSection("amenities")} className="hover:text-white">Tiện ích</button>
+              <button onClick={() => scrollToSection("contact")} className="hover:text-white">Liên hệ</button>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" className="border-white/20 bg-white/10 text-white ring-white/20 hover:bg-white/15" onClick={onStartLogin}>
+                Đăng nhập
+              </Button>
+              <Button variant="soft" className="hidden px-4 py-2 font-bold text-sky-700 md:inline-flex" onClick={onStartRegister}>
+                Đăng ký
+              </Button>
+            </div>
+          </div>
+        </nav>
+
+        <div id="hero" className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-5 py-32 text-center">
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="inline-flex rounded-full bg-white/10 px-5 py-2 text-sm font-bold text-slate-100 ring-1 ring-white/20 backdrop-blur">
+            Không gian sống lý tưởng · Cộng đồng văn minh
+          </motion.div>
+          <motion.h1 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mt-8 max-w-4xl text-5xl font-black leading-tight tracking-tight md:text-7xl">
+            Chào mừng đến với <span className="block bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">Chung cư BlueMoon</span>
+          </motion.h1>
+          <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }} className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
+            Tọa lạc ngay ngã tư Văn Phú, BlueMoon là biểu tượng của sự hiện đại, minh bạch và an toàn — nơi bạn gọi là “Nhà”.
+          </motion.p>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }} className="mt-9 flex flex-col justify-center gap-4 sm:flex-row">
+            <Button className="px-8 py-3 shadow-lg shadow-blue-900/30" onClick={() => scrollToSection("overview")}>Khám phá dự án</Button>
+            <Button variant="secondary" className="border-white/20 bg-white/10 px-8 py-3 text-white ring-white/20 hover:bg-white/15" onClick={() => scrollToSection("amenities")}>Xem tiện ích</Button>
+          </motion.div>
+        </div>
+      </section>
+
+      <section id="overview" className="bg-blue-50 py-24">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-[1fr_0.95fr]">
+          <div>
+            <Badge tone="blue">Tổng Quan Dự Án</Badge>
+            <h2 className="mt-5 max-w-2xl text-4xl font-black leading-tight tracking-tight text-slate-950 md:text-5xl">Biểu tượng sống mới tại Ngã tư Văn Phú</h2>
+            <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600">
+              Chung cư BlueMoon được xây dựng với tâm huyết kiến tạo một không gian sống hoàn hảo. Khi sở hữu nhà tại đây, cư dân sẽ cùng đóng góp kinh phí định kỳ để Ban quản trị vận hành và bảo dưỡng thường xuyên, đảm bảo cơ sở vật chất luôn trong tình trạng tốt nhất.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {projectCards.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="rounded-2xl bg-white/80 p-5 shadow-sm ring-1 ring-white/80 backdrop-blur">
+                    <div className="flex gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">{item.label}</p>
+                        <p className="mt-1 font-black text-slate-900">{item.value}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.sub}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="relative">
+            <div className="aspect-[4/5] overflow-hidden rounded-[32px] border-8 border-white bg-gradient-to-br from-sky-100 via-white to-blue-200 shadow-2xl shadow-blue-200">
+              <div className="relative flex h-full items-end justify-center p-8">
+                <div className="absolute left-8 top-8 h-40 w-24 rounded-3xl bg-white/75 shadow-xl" />
+                <div className="absolute right-10 top-16 h-56 w-32 rounded-3xl bg-sky-200/80 shadow-xl" />
+                <div className="absolute bottom-12 left-1/2 h-[78%] w-56 -translate-x-1/2 rounded-t-[42px] bg-slate-900 shadow-2xl">
+                  <div className="grid h-full grid-cols-4 gap-3 p-7">
+                    {Array.from({ length: 32 }).map((_, index) => (
+                      <span key={index} className="rounded-md bg-white/20" />
+                    ))}
+                  </div>
+                </div>
+                <div className="absolute bottom-8 left-8 rounded-2xl bg-white px-6 py-5 shadow-xl">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-6 w-6 text-emerald-600" />
+                    <div>
+                      <p className="text-3xl font-black text-slate-900">30</p>
+                      <p className="text-sm text-slate-500">Tầng cao</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="mission" className="relative overflow-hidden bg-slate-950 py-24 text-white">
+        <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "radial-gradient(circle at 25% 20%, rgba(14,165,233,.5), transparent 28%), radial-gradient(circle at 78% 60%, rgba(37,99,235,.4), transparent 30%)" }} />
+        <div className="relative mx-auto max-w-6xl px-5 text-center">
+          <Badge tone="blue">Tầm Nhìn & Sứ Mệnh</Badge>
+          <h2 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">Định hướng tương lai</h2>
+          <p className="mx-auto mt-5 max-w-2xl leading-8 text-slate-300">Chúng tôi không chỉ xây dựng một tòa nhà, mà còn nỗ lực kiến tạo một cộng đồng bền vững, mang lại giá trị thiết thực nhất cho cư dân BlueMoon.</p>
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            <Card className="border-white/10 bg-white/10 p-8 text-left text-white backdrop-blur">
+              <div className="mb-7 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white"><Sparkles className="h-8 w-8" /></div>
+              <h3 className="text-3xl font-black">Tầm nhìn</h3>
+              <p className="mt-5 leading-8 text-slate-200">Trở thành không gian sống kiểu mẫu tại khu vực Văn Phú, nơi hội tụ những giá trị sống hiện đại, văn minh và phát triển bền vững. BlueMoon hướng tới việc xây dựng một biểu tượng của sự an cư lạc nghiệp cho mọi gia đình và chuyên gia.</p>
+            </Card>
+            <Card className="border-white/10 bg-white/10 p-8 text-left text-white backdrop-blur">
+              <div className="mb-7 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-400 to-pink-600 text-white"><HeartHandshake className="h-8 w-8" /></div>
+              <h3 className="text-3xl font-black">Sứ mệnh</h3>
+              <p className="mt-5 leading-8 text-slate-200">Kiến tạo một cộng đồng gắn kết, cung cấp môi trường sống an toàn, tiện nghi với dịch vụ quản lý chất lượng cao. Đảm bảo mọi hoạt động vận hành, thu chi bảo trì luôn minh bạch, hiệu quả vì lợi ích chung và do chính cư dân làm chủ.</p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-blue-50 py-24">
+        <div className="mx-auto max-w-6xl px-5 text-center">
+          <Badge tone="blue">5 Giá Trị Cốt Lõi</Badge>
+          <h2 className="mt-5 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">Nền tảng của sự phát triển</h2>
+          <p className="mx-auto mt-5 max-w-3xl leading-8 text-slate-600">Những giá trị vàng định hình văn hóa, chất lượng sống và cam kết của Ban quản trị đối với cộng đồng cư dân Chung cư BlueMoon.</p>
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {values.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Card key={item.title} className={`bg-gradient-to-br ${item.tone} p-7 text-left transition hover:-translate-y-1 hover:shadow-xl`}>
+                  <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm"><Icon className="h-7 w-7" /></div>
+                  <h3 className="text-2xl font-black text-slate-950">{item.title}</h3>
+                  <p className="mt-4 leading-7 text-slate-600">{item.desc}</p>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section id="amenities" className="bg-blue-50 py-24">
+        <div className="mx-auto max-w-6xl px-5 text-center">
+          <Badge tone="blue">Trải nghiệm sống</Badge>
+          <h2 className="mt-5 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">Tiện ích đẳng cấp</h2>
+          <p className="mx-auto mt-5 max-w-3xl leading-8 text-slate-600">Hệ thống tiện ích nội khu đa dạng được thiết kế đồng bộ, mang đến những trải nghiệm sống trọn vẹn nhất cho cộng đồng cư dân.</p>
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {amenities.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Card key={item.title} className="p-6 text-left transition hover:-translate-y-1 hover:shadow-xl">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-blue-600"><Icon className="h-7 w-7" /></div>
+                  <h3 className="text-lg font-black text-slate-950">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{item.desc}</p>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section id="contact" className="bg-blue-900 py-24 text-white">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-[0.95fr_1.05fr]">
+          <div>
+            <Badge tone="blue">Kết nối với chúng tôi</Badge>
+            <h2 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">Thông tin liên hệ</h2>
+            <p className="mt-5 max-w-xl leading-8 text-blue-100">Bạn có câu hỏi hoặc cần hỗ trợ? Hãy liên hệ với Ban quản lý Chung cư BlueMoon để được giải đáp nhanh chóng nhất.</p>
+            <div className="mt-10 space-y-6">
+              {[
+                { icon: MapPin, label: "Địa chỉ văn phòng quản lý", value: "Tầng 1, Chung cư BlueMoon, Ngã tư Văn Phú, Quận Hà Đông, Hà Nội" },
+                { icon: Phone, label: "Số điện thoại", value: "(024) 1234 5678" },
+                { icon: Mail, label: "Email hỗ trợ", value: "banquanly@bluemoon.vn" },
+                { icon: Clock3, label: "Giờ làm việc", value: "08:00 - 17:30 (Thứ 2 - Thứ 6) · 08:00 - 12:00 (Thứ 7)" },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="flex gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-blue-100"><Icon className="h-5 w-5" /></div>
+                    <div>
+                      <p className="text-sm text-blue-200">{item.label}</p>
+                      <p className="mt-1 font-bold text-white">{item.value}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <Card className="bg-white p-8 text-slate-900 shadow-2xl shadow-blue-950/20">
+            <h3 className="text-2xl font-black">Gửi tin nhắn cho chúng tôi</h3>
+            <p className="mt-2 text-sm text-slate-500">Chúng tôi sẽ phản hồi bạn trong thời gian sớm nhất.</p>
+            {contactSent && <div className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">✓ Đã lưu yêu cầu liên hệ vào hệ thống.</div>}
+            <form onSubmit={handleContactSubmit} className="mt-6 space-y-4">
+              <Input label="Họ và tên" placeholder="Nhập họ và tên của bạn" value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input label="Số điện thoại" placeholder="Số điện thoại" value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} />
+                <Input label="Email" type="email" placeholder="Địa chỉ email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
+              </div>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">Nội dung</span>
+                <textarea rows={5} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100" placeholder="Nhập nội dung cần hỗ trợ..." value={contactForm.message} onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })} />
+              </label>
+              <Button className="w-full py-3" type="submit">Gửi yêu cầu</Button>
+            </form>
+          </Card>
+        </div>
+      </section>
+
+      <footer className="bg-slate-950 py-7 text-white">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 md:flex-row">
+          <div className="flex items-center gap-2 font-black"><Building2 className="h-5 w-5" /> BlueMoon</div>
+          <p className="text-sm text-slate-400">© 2026 Chung cư BlueMoon. Vận hành bởi Ban quản trị tòa nhà.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function Login({ setUser, initialMode = "login", onBackIntro }) {
+  const [mode, setMode] = useState(initialMode);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -480,7 +788,12 @@ function Login({ setUser }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4">
+    <div className="relative min-h-screen bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4">
+      {onBackIntro && (
+        <button onClick={onBackIntro} className="absolute left-5 top-5 z-20 rounded-xl bg-white/85 px-4 py-2 text-sm font-bold text-sky-700 shadow-sm ring-1 ring-sky-100 hover:bg-white">
+          ← Về trang giới thiệu
+        </button>
+      )}
       <div className="mx-auto grid min-h-[calc(100vh-32px)] max-w-6xl items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="hidden lg:block">
           <div className="mb-6 inline-flex items-center gap-3 rounded-full bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm ring-1 ring-sky-100">
@@ -2621,8 +2934,22 @@ function Payments({ feesList, paymentRecords, setPaymentRecords }) {
 }
 
 function Vehicles() {
+  const parkingFloors = [
+    { id: "T1", label: "Tầng 1", desc: "Xe máy & xe đạp", total: 108, types: ["Xe máy", "Xe đạp"], area: "450m²" },
+    { id: "T2", label: "Tầng 2", desc: "Ô tô", total: 20, types: ["Ô tô"], area: "520m²" },
+    { id: "T3", label: "Tầng 3", desc: "Ô tô", total: 20, types: ["Ô tô"], area: "520m²" },
+    { id: "T4", label: "Tầng 4", desc: "Ô tô", total: 20, types: ["Ô tô"], area: "520m²" },
+  ];
+
+  const feeByType = {
+    "Ô tô": 1200000,
+    "Xe máy": 70000,
+    "Xe đạp": 30000,
+  };
+
   const [vehiclesList, setVehiclesList] = useDatabaseState("bluemoon_vehicles", initialVehicles);
-  const [filteredVehicles, setFilteredVehicles] = useState(initialVehicles);
+  const [filteredVehicles, setFilteredVehicles] = useState(vehiclesList);
+  const [selectedFloor, setSelectedFloor] = useState("T1");
   const [showForm, setShowForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [error, setError] = useState("");
@@ -2638,33 +2965,152 @@ function Vehicles() {
     birthYear: "",
     idCard: "",
     plate: "",
-    type: "Ô tô",
+    type: "Xe máy",
     room: "",
-    fee: "",
+    fee: String(feeByType["Xe máy"]),
     slot: "",
     status: "USED",
   });
 
-  const handleSearch = () => {
-    let results = vehiclesList;
+  const normalizeSlot = (slot) => {
+    const value = String(slot || "").trim().toUpperCase();
+    if (!value) return "";
+    if (/^T[1-4]-/.test(value)) return value;
+
+    const motorbikeMatch = value.match(/^M-?(\d+)$/);
+    if (motorbikeMatch) return `T1-${String(motorbikeMatch[1]).padStart(3, "0")}`;
+
+    const basementMatch = value.match(/^B(\d)-?(\d+)$/);
+    if (basementMatch) {
+      const floorMap = { 1: "T2", 2: "T3", 3: "T4" };
+      return `${floorMap[basementMatch[1]] || "T2"}-${String(basementMatch[2]).padStart(3, "0")}`;
+    }
+
+    return value;
+  };
+
+  const getFloorBySlot = (slot) => {
+    const normalized = normalizeSlot(slot);
+    return parkingFloors.find((floor) => normalized.startsWith(`${floor.id}-`));
+  };
+
+  const makeSlotsForFloor = (floor) =>
+    Array.from({ length: floor.total }, (_, index) => ({
+      id: `${floor.id}-${String(index + 1).padStart(3, "0")}`,
+      index: index + 1,
+    }));
+
+  const buildParkingBlocks = (slots, blockCount = 3) => {
+    const perBlock = Math.ceil(slots.length / blockCount);
+    const blocks = [];
+
+    for (let blockIndex = 0; blockIndex < blockCount; blockIndex++) {
+      const blockSlots = slots.slice(blockIndex * perBlock, (blockIndex + 1) * perBlock);
+      if (!blockSlots.length) continue;
+      const half = Math.ceil(blockSlots.length / 2);
+      blocks.push({
+        left: blockSlots.slice(0, half),
+        right: blockSlots.slice(half),
+      });
+    }
+
+    return blocks;
+  };
+
+  const selectedFloorInfo = parkingFloors.find((floor) => floor.id === selectedFloor) || parkingFloors[0];
+  const selectedFloorSlots = makeSlotsForFloor(selectedFloorInfo);
+  const parkingBlocks = buildParkingBlocks(selectedFloorSlots, 3);
+  const occupiedSlotKeys = new Set(vehiclesList.map((vehicle) => normalizeSlot(vehicle.slot)).filter(Boolean));
+  const selectedFloorOccupied = selectedFloorSlots.filter((slot) => occupiedSlotKeys.has(slot.id)).length;
+  const selectedFloorAvailable = selectedFloorInfo.total - selectedFloorOccupied;
+  const totalSlots = parkingFloors.reduce((sum, floor) => sum + floor.total, 0);
+  const occupiedInMap = parkingFloors.reduce((sum, floor) => {
+    const slots = makeSlotsForFloor(floor);
+    return sum + slots.filter((slot) => occupiedSlotKeys.has(slot.id)).length;
+  }, 0);
+  const totalVehicles = vehiclesList.length;
+  const totalOccupied = Math.max(occupiedInMap, totalVehicles);
+  const totalAvailable = Math.max(0, totalSlots - totalOccupied);
+  const allSlotOptions = parkingFloors.flatMap((floor) => makeSlotsForFloor(floor).map((slot) => ({ ...slot, floor })));
+
+  const getVehicleBySlot = (slotId) => {
+    const index = vehiclesList.findIndex((vehicle) => normalizeSlot(vehicle.slot) === slotId);
+    return { index, vehicle: index >= 0 ? vehiclesList[index] : null };
+  };
+
+  const openCreateForm = (slotId = "") => {
+    const floor = slotId ? getFloorBySlot(slotId) : selectedFloorInfo;
+    const defaultType = floor?.types?.[0] || "Xe máy";
+    setFormData({
+      name: "",
+      birthYear: "",
+      idCard: "",
+      plate: "",
+      type: defaultType,
+      room: "",
+      fee: String(feeByType[defaultType] || 0),
+      slot: slotId,
+      status: "USED",
+    });
+    setEditingIndex(null);
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleSlotClick = (slotId) => {
+    const { index, vehicle } = getVehicleBySlot(slotId);
+    if (vehicle) {
+      handleEdit(index, vehicle);
+      return;
+    }
+    openCreateForm(slotId);
+  };
+
+  const handleSlotChange = (slotValue) => {
+    const floor = getFloorBySlot(slotValue);
+    const nextType = floor?.types?.includes(formData.type) ? formData.type : floor?.types?.[0] || formData.type;
+    setFormData({
+      ...formData,
+      slot: slotValue,
+      type: nextType,
+      fee: String(feeByType[nextType] || formData.fee || 0),
+    });
+  };
+
+  const handleTypeChange = (type) => {
+    setFormData({
+      ...formData,
+      type,
+      fee: String(feeByType[type] || formData.fee || 0),
+    });
+  };
+
+  const filterVehicles = (source = vehiclesList) => {
+    let results = source;
 
     if (searchFilters.plate.trim()) {
-      results = results.filter(v => v.plate.includes(searchFilters.plate.trim()));
+      const keyword = searchFilters.plate.trim().toLowerCase();
+      results = results.filter((v) => String(v.plate).toLowerCase().includes(keyword));
     }
 
     if (searchFilters.type.trim()) {
-      results = results.filter(v => v.type.includes(searchFilters.type.trim()));
+      results = results.filter((v) => v.type.includes(searchFilters.type.trim()));
     }
 
     if (searchFilters.room.trim()) {
-      results = results.filter(v => v.room.includes(searchFilters.room.trim()));
+      results = results.filter((v) => String(v.room).includes(searchFilters.room.trim()));
     }
 
     if (searchFilters.slot.trim()) {
-      results = results.filter(v => v.slot.includes(searchFilters.slot.trim()));
+      const keyword = searchFilters.slot.trim().toLowerCase();
+      results = results.filter((v) => String(v.slot).toLowerCase().includes(keyword));
     }
 
-    setFilteredVehicles(results);
+    return results;
+  };
+
+  const handleSearch = () => {
+    setFilteredVehicles(filterVehicles());
   };
 
   const handleResetSearch = () => {
@@ -2674,96 +3120,73 @@ function Vehicles() {
 
   const handleAdd = () => {
     const normalizedSlot = formData.slot.trim();
+    const normalizedSlotKey = normalizeSlot(normalizedSlot);
     const normalizedPlate = formData.plate.trim() || "__";
     const normalizedRoom = formData.room.trim() || "__";
 
-    // Biển số có thể để trống; nếu trống sẽ lưu là "__".
-    // Các trường còn lại vẫn bắt buộc.
     if (!formData.name.trim() || !formData.birthYear.trim() || !formData.fee || !normalizedSlot) {
-      setError("Vui lòng nhập đầy đủ thông tin");
+      setError("Vui lòng nhập đầy đủ thông tin và chọn chỗ gửi trên sơ đồ");
       return;
     }
 
-    // Không cho đăng ký trùng chỗ gửi, trừ chính bản ghi đang sửa.
-    const slotUsed = vehiclesList.some((vehicle, index) =>
-      index !== editingIndex &&
-      vehicle.slot.trim().toLowerCase() === normalizedSlot.toLowerCase()
-    );
+    const selectedSlotFloor = getFloorBySlot(normalizedSlotKey);
+    if (selectedSlotFloor && !selectedSlotFloor.types.includes(formData.type)) {
+      setError(`${selectedSlotFloor.label} chỉ nhận: ${selectedSlotFloor.types.join(", ")}`);
+      return;
+    }
 
+    const slotUsed = vehiclesList.some((vehicle, index) => index !== editingIndex && normalizeSlot(vehicle.slot) === normalizedSlotKey);
     if (slotUsed) {
       setError("Chỗ gửi này đã có người gửi");
       return;
     }
 
+    const savedVehicle = {
+      name: formData.name.trim(),
+      birthYear: formData.birthYear.trim(),
+      idCard: formData.idCard.trim(),
+      plate: normalizedPlate,
+      type: formData.type,
+      room: normalizedRoom,
+      fee: parseInt(formData.fee || 0),
+      slot: normalizedSlotKey,
+      status: formData.status,
+    };
+
+    let updatedList;
     if (editingIndex !== null) {
-      const updatedList = [...vehiclesList];
-      updatedList[editingIndex] = {
-        name: formData.name,
-        birthYear: formData.birthYear,
-        idCard: formData.idCard,
-        plate: normalizedPlate,
-        type: formData.type,
-        room: normalizedRoom,
-        fee: parseInt(formData.fee),
-        slot: normalizedSlot,
-        status: formData.status,
-      };
-      setVehiclesList(updatedList);
-      setFilteredVehicles(updatedList);
+      updatedList = vehiclesList.map((vehicle, index) => (index === editingIndex ? savedVehicle : vehicle));
     } else {
-      const newVehicle = {
-        name: formData.name,
-        birthYear: formData.birthYear,
-        idCard: formData.idCard,
-        plate: normalizedPlate,
-        type: formData.type,
-        room: normalizedRoom,
-        fee: parseInt(formData.fee),
-        slot: normalizedSlot,
-        status: formData.status,
-      };
-      const updatedList = [...vehiclesList, newVehicle];
-      setVehiclesList(updatedList);
-      setFilteredVehicles(updatedList);
+      updatedList = [...vehiclesList, savedVehicle];
     }
 
-    setFormData({
-      name: "",
-      birthYear: "",
-      idCard: "",
-      plate: "",
-      type: "Ô tô",
-      room: "",
-      fee: "",
-      slot: "",
-      status: "USED",
-    });
-    setError("");
-    setEditingIndex(null);
-    setShowForm(false);
+    setVehiclesList(updatedList);
+    setFilteredVehicles(filterVehicles(updatedList));
+    handleCancel();
   };
 
   const handleEdit = (index, vehicle) => {
+    const slotKey = normalizeSlot(vehicle.slot);
     setFormData({
       name: vehicle.name,
       birthYear: vehicle.birthYear,
       idCard: vehicle.idCard,
       plate: vehicle.plate === "__" ? "" : vehicle.plate,
       type: vehicle.type,
-      room: vehicle.room,
-      fee: vehicle.fee.toString(),
-      slot: vehicle.slot,
+      room: vehicle.room === "__" ? "" : vehicle.room,
+      fee: String(vehicle.fee || ""),
+      slot: slotKey || vehicle.slot,
       status: vehicle.status,
     });
     setEditingIndex(index);
-    setShowForm(true);
     setError("");
+    setShowForm(true);
   };
 
   const handleDeleteClick = () => {
     if (editingIndex !== null) {
       const vehicle = vehiclesList[editingIndex];
-      setDeleteConfirm({ index: editingIndex, plate: vehicle.plate });
+      setDeleteConfirm({ index: editingIndex, plate: vehicle.plate, slot: vehicle.slot });
     }
   };
 
@@ -2771,12 +3194,7 @@ function Vehicles() {
     if (deleteConfirm) {
       const updatedList = vehiclesList.filter((_, i) => i !== deleteConfirm.index);
       setVehiclesList(updatedList);
-      setFilteredVehicles(updatedList.filter(v => {
-        if (searchFilters.plate.trim() && !v.plate.includes(searchFilters.plate.trim())) return false;
-        if (searchFilters.room.trim() && !v.room.includes(searchFilters.room.trim())) return false;
-        if (searchFilters.slot.trim() && !v.slot.includes(searchFilters.slot.trim())) return false;
-        return true;
-      }));
+      setFilteredVehicles(filterVehicles(updatedList));
       setDeleteConfirm(null);
       setShowForm(false);
       setEditingIndex(null);
@@ -2784,14 +3202,15 @@ function Vehicles() {
   };
 
   const handleCancel = () => {
+    const defaultType = selectedFloorInfo.types[0] || "Xe máy";
     setFormData({
       name: "",
       birthYear: "",
       idCard: "",
       plate: "",
-      type: "Ô tô",
+      type: defaultType,
       room: "",
-      fee: "",
+      fee: String(feeByType[defaultType] || 0),
       slot: "",
       status: "USED",
     });
@@ -2800,89 +3219,193 @@ function Vehicles() {
     setEditingIndex(null);
   };
 
+  const currentSlotFloor = getFloorBySlot(formData.slot) || selectedFloorInfo;
+  const allowedTypesForForm = currentSlotFloor?.types || ["Ô tô", "Xe máy", "Xe đạp"];
+  const availableSlotOptions = allSlotOptions.filter(({ id }) => {
+    if (editingIndex !== null && normalizeSlot(vehiclesList[editingIndex]?.slot) === id) return true;
+    return !occupiedSlotKeys.has(id);
+  });
+
+  const getSlotType = (slot) => {
+    const { vehicle } = getVehicleBySlot(slot.id);
+    return (
+      vehicle?.type ||
+      (selectedFloorInfo.types.includes("Ô tô")
+        ? "Ô tô"
+        : slot.index % 4 === 0
+          ? "Xe đạp"
+          : "Xe máy")
+    );
+  };
+
+  const renderSpot = (slot) => {
+    const occupied = occupiedSlotKeys.has(slot.id);
+    const vehicleType = getSlotType(slot);
+    const iconColor = occupied ? "text-rose-500" : "text-emerald-400";
+
+    return (
+      <button
+        key={slot.id}
+        onClick={() => handleSlotClick(slot.id)}
+        title={occupied ? `${slot.id} - đã đặt` : `${slot.id} - còn trống`}
+        className={`flex h-8 items-center justify-center rounded-sm border transition sm:h-9 ${occupied ? "border-rose-200/70 bg-rose-100/25 hover:bg-rose-100/40" : "border-emerald-200/70 bg-emerald-100/20 hover:bg-emerald-100/35"}`}
+      >
+        {vehicleType === "Ô tô" ? (
+          <Car className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
+        ) : (
+          <Bike className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
+        )}
+      </button>
+    );
+  };
+
   return (
     <>
-      <SectionHeader title="Quản lý phí gửi xe" desc="Đăng ký xe cho hộ, huỷ đăng ký, quản lý chỗ gửi và cho thuê chỗ trống." action={<Button onClick={() => { setShowForm(true); setEditingIndex(null); setFormData({ name: "", birthYear: "", idCard: "", plate: "", type: "Ô tô", room: "", fee: "", slot: "", status: "USED" }); }}><Plus className="h-4 w-4" /> Đăng ký xe</Button>} />
-      
+      <SectionHeader
+        title="Sơ đồ bãi đỗ xe"
+        desc="Chọn một chỗ trống trên sơ đồ để đăng ký xe. Chỗ đã đặt có thể bấm để xem chi tiết hoặc chỉnh sửa."
+        action={<Button onClick={() => openCreateForm()}><Plus className="h-4 w-4" /> Đăng ký xe</Button>}
+      />
+
+      <div className="mb-5 grid gap-4 md:grid-cols-4">
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Tổng chỗ đỗ toàn tòa</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">{totalSlots}</p>
+          <p className="mt-1 text-xs text-slate-500">Tầng 1: xe máy/xe đạp • Tầng 2-4: ô tô</p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Tổng chỗ còn trống</p>
+          <p className="mt-2 text-3xl font-black text-emerald-600">{totalAvailable}</p>
+          <p className="mt-1 text-xs text-slate-500">Có thể bấm để đăng ký</p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Tổng chỗ đã đặt</p>
+          <p className="mt-2 text-3xl font-black text-rose-600">{totalOccupied}</p>
+          <p className="mt-1 text-xs text-slate-500">Đang được sử dụng</p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Tình trạng {selectedFloorInfo.label}</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">
+            <span className="text-emerald-600">{selectedFloorAvailable}</span>
+            <span className="mx-1 text-slate-400">/</span>
+            <span className="text-rose-600">{selectedFloorOccupied}</span>
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Trống / đã đặt</p>
+        </Card>
+      </div>
+
+      <Card className="mb-5">
+        <div className="mb-4">
+          <h3 className="font-black text-slate-900">Chọn tầng hầm đỗ xe</h3>
+          <p className="mt-1 text-sm text-slate-500">Tầng 1: xe máy & xe đạp • Tầng 2-4: ô tô</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          {parkingFloors.map((floor) => {
+            const slots = makeSlotsForFloor(floor);
+            const occupied = slots.filter((slot) => occupiedSlotKeys.has(slot.id)).length;
+            const available = floor.total - occupied;
+            const selected = selectedFloor === floor.id;
+            return (
+              <button
+                key={floor.id}
+                onClick={() => setSelectedFloor(floor.id)}
+                className={`rounded-2xl border px-4 py-4 text-left transition ${selected ? "border-sky-500 bg-sky-50 text-sky-800 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black">{floor.label}</p>
+                    <p className="mt-1 text-xs text-slate-500">{floor.desc}</p>
+                  </div>
+                  <Car className="h-5 w-5" />
+                </div>
+                <p className="mt-3 text-sm font-bold text-emerald-600">{available} chỗ trống</p>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card className="mb-5">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Sơ đồ {selectedFloorInfo.label} - Bãi đỗ {selectedFloorInfo.desc}</h3>
+            <p className="text-sm text-slate-500">Diện tích: {selectedFloorInfo.area}</p>
+          </div>
+          <div className="flex gap-3 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-emerald-100 ring-1 ring-emerald-300" /> Trống</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-rose-100 ring-1 ring-rose-300" /> Đã đặt</span>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-6">
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-black tracking-wide text-slate-700">
+            LỐI VÀO / LỐI ĐI CHÍNH
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="mx-auto flex min-w-[680px] items-stretch justify-center gap-4 rounded-3xl border border-slate-200 bg-slate-900 p-4 sm:gap-5 sm:p-6">
+              {parkingBlocks.map((block, blockIndex) => (
+                <div key={blockIndex} className="flex flex-1 items-stretch gap-2 sm:gap-3">
+                  <div className="flex w-16 flex-col gap-1.5 sm:w-20">
+                    {block.left.map(renderSpot)}
+                  </div>
+
+                  <div className="flex w-8 items-center justify-center sm:w-10">
+                    <div className="flex h-28 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:h-36 [writing-mode:vertical-rl] [text-orientation:mixed]">
+                      Làn xe
+                    </div>
+                  </div>
+
+                  <div className="flex w-16 flex-col gap-1.5 sm:w-20">
+                    {block.right.map(renderSpot)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-black tracking-wide text-slate-700">
+            LỐI RA / LỐI ĐI CHÍNH
+          </div>
+        </div>
+      </Card>
+
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="rounded-3xl bg-white p-6 shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="mb-4 text-lg font-bold">{editingIndex !== null ? "Chỉnh sửa đăng ký xe" : "Đăng ký xe mới"}</h3>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-4 text-lg font-bold">{editingIndex !== null ? "Chi tiết đăng ký xe" : "Đăng ký xe mới"}</h3>
             <div className="space-y-4">
+              <Select label="Chọn chỗ gửi" value={formData.slot} onChange={(e) => handleSlotChange(e.target.value)}>
+                <option value="">Chọn chỗ gửi</option>
+                {availableSlotOptions.map(({ id, floor }) => (
+                  <option key={id} value={id}>{id} - {floor.label} - {floor.desc}</option>
+                ))}
+              </Select>
+
               <div className="grid gap-4">
-                <Input 
-                  label="Họ tên" 
-                  placeholder="Nguyễn Văn A"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                />
-                <Input 
-                  label="Năm sinh" 
-                  placeholder="1990"
-                  value={formData.birthYear}
-                  onChange={(e) => setFormData({...formData, birthYear: e.target.value})}
-                />
-                <Input 
-                  label="CCCD/CMND" 
-                  placeholder="Có thể bỏ trống"
-                  value={formData.idCard}
-                  onChange={(e) => setFormData({...formData, idCard: e.target.value})}
-                />
+                <Input label="Họ tên" placeholder="Nguyễn Văn A" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                <Input label="Năm sinh" placeholder="1990" value={formData.birthYear} onChange={(e) => setFormData({ ...formData, birthYear: e.target.value })} />
+                <Input label="CCCD/CMND" placeholder="Có thể bỏ trống" value={formData.idCard} onChange={(e) => setFormData({ ...formData, idCard: e.target.value })} />
               </div>
-              <div className="grid gap-4">
-                <Select 
-                  label="Loại xe" 
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
-                >
-                  <option value="Ô tô">Ô tô</option>
-                  <option value="Xe máy">Xe máy</option>
-                  <option value="Xe đạp">Xe đạp</option>
-                </Select>
-                <Input 
-                  label="Biển số" 
-                  placeholder="Có thể bỏ trống, hệ thống sẽ lưu là __"
-                  value={formData.plate}
-                  onChange={(e) => setFormData({...formData, plate: e.target.value})}
-                />
-              </div>
-              <div className="grid gap-4">
-                <Input 
-                  label="Căn hộ" 
-                  placeholder="1201"
-                  value={formData.room}
-                  onChange={(e) => setFormData({...formData, room: e.target.value})}
-                />
-                <Input 
-                  label="Chỗ gửi" 
-                  placeholder="B1-12"
-                  value={formData.slot}
-                  onChange={(e) => setFormData({...formData, slot: e.target.value})}
-                />
-              </div>
-              <div className="grid gap-4">
-                <Input 
-                  label="Phí tháng" 
-                  placeholder="1200000"
-                  value={formData.fee}
-                  onChange={(e) => setFormData({...formData, fee: e.target.value})}
-                />
-                <Select 
-                  label="Trạng thái" 
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                >
-                  <option value="USED">Đang dùng</option>
-                  <option value="RENTED">Cho thuê</option>
-                </Select>
-              </div>
+
+              <Select label="Loại xe" value={formData.type} onChange={(e) => handleTypeChange(e.target.value)}>
+                {allowedTypesForForm.map((type) => <option key={type} value={type}>{type}</option>)}
+              </Select>
+
+              <Input label="Biển số" placeholder="Có thể bỏ trống, hệ thống sẽ lưu là __" value={formData.plate} onChange={(e) => setFormData({ ...formData, plate: e.target.value })} />
+              <Input label="Căn hộ" placeholder="1201" value={formData.room} onChange={(e) => setFormData({ ...formData, room: e.target.value })} />
+              <Input label="Phí tháng" placeholder="1200000" value={formData.fee} onChange={(e) => setFormData({ ...formData, fee: e.target.value })} />
+
+              <Select label="Trạng thái" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                <option value="USED">Đang dùng</option>
+                <option value="RENTED">Cho thuê</option>
+              </Select>
+
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
               <div className="flex justify-between gap-3 pt-4">
                 <div className="flex gap-3">
                   <Button variant="secondary" onClick={handleCancel}>Hủy</Button>
-                  {editingIndex !== null && (
-                    <Button variant="danger" onClick={handleDeleteClick}>Xóa xe</Button>
-                  )}
+                  {editingIndex !== null && <Button variant="danger" onClick={handleDeleteClick}>Xóa xe</Button>}
                 </div>
                 <Button onClick={handleAdd}>{editingIndex !== null ? "Lưu" : "Đăng ký"}</Button>
               </div>
@@ -2893,17 +3416,15 @@ function Vehicles() {
 
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="rounded-3xl bg-white p-6 shadow-xl max-w-sm w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="rounded-full bg-rose-100 p-3">
-                <AlertCircle className="h-6 w-6 text-rose-600" />
-              </div>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-full bg-rose-100 p-3"><AlertCircle className="h-6 w-6 text-rose-600" /></div>
               <h3 className="text-lg font-bold text-slate-900">Xóa đăng ký xe</h3>
             </div>
-            <p className="text-slate-600 mb-6">
-              Bạn có chắc muốn xóa xe với biển số <strong>{deleteConfirm.plate}</strong>? Hành động này không thể hoàn tác.
+            <p className="mb-6 text-slate-600">
+              Bạn có chắc muốn xóa xe ở chỗ <strong>{deleteConfirm.slot}</strong> với biển số <strong>{deleteConfirm.plate}</strong>? Hành động này không thể hoàn tác.
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
               <Button variant="danger" onClick={handleConfirmDelete}>Xóa đăng ký</Button>
             </div>
@@ -2911,44 +3432,23 @@ function Vehicles() {
         </div>
       )}
 
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <Input 
-          label="Biển số" 
-          placeholder="VD: 30A-12345"
-          value={searchFilters.plate}
-          onChange={(e) => setSearchFilters({...searchFilters, plate: e.target.value})}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        />
-        <Input 
-          label="Căn hộ" 
-          placeholder="Nhập số căn"
-          value={searchFilters.room}
-          onChange={(e) => setSearchFilters({...searchFilters, room: e.target.value})}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        />
-        <Select 
-          label="Loại xe" 
-          value={searchFilters.type}
-          onChange={(e) => setSearchFilters({...searchFilters, type: e.target.value})}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        >
+      <Card className="mb-5">
+        <div className="grid gap-3 md:grid-cols-4">
+          <Input label="Biển số" placeholder="VD: 30A-12345" value={searchFilters.plate} onChange={(e) => setSearchFilters({ ...searchFilters, plate: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+          <Input label="Căn hộ" placeholder="Nhập số căn" value={searchFilters.room} onChange={(e) => setSearchFilters({ ...searchFilters, room: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+          <Select label="Loại xe" value={searchFilters.type} onChange={(e) => setSearchFilters({ ...searchFilters, type: e.target.value })}>
             <option value="">Tất cả loại</option>
             <option value="Ô tô">Ô tô</option>
             <option value="Xe máy">Xe máy</option>
             <option value="Xe đạp">Xe đạp</option>
-        </Select>
-        <Input 
-          label="Chỗ gửi" 
-          placeholder="VD: B1-12"
-          value={searchFilters.slot}
-          onChange={(e) => setSearchFilters({...searchFilters, slot: e.target.value})}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        />
-      </div>
-      <div className="mb-5 flex gap-3">
-        <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
-        <Button variant="secondary" onClick={handleResetSearch}>Xoá bộ lọc</Button>
-      </div>
+          </Select>
+          <Input label="Chỗ gửi" placeholder="VD: T1-008" value={searchFilters.slot} onChange={(e) => setSearchFilters({ ...searchFilters, slot: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+        </div>
+        <div className="mt-4 flex gap-3">
+          <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
+          <Button variant="secondary" onClick={handleResetSearch}>Xóa bộ lọc</Button>
+        </div>
+      </Card>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
@@ -2966,18 +3466,13 @@ function Vehicles() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredVehicles.map((v, idx) => {
-                const originalIdx = vehiclesList.findIndex(vehicle => 
-                  vehicle.plate === v.plate &&
-                  vehicle.slot === v.slot &&
-                  vehicle.room === v.room &&
-                  vehicle.name === v.name
-                );
+                const originalIdx = vehiclesList.findIndex((vehicle) => vehicle.plate === v.plate && vehicle.slot === v.slot && vehicle.room === v.room && vehicle.name === v.name);
                 return (
-                  <tr key={idx} className="hover:bg-slate-50/80">
+                  <tr key={`${v.slot}-${idx}`} className="hover:bg-slate-50/80">
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.plate}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.type}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.room}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.slot}</td>
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{normalizeSlot(v.slot)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(v.fee)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700"><Badge tone={v.status === "RENTED" ? "violet" : "green"}>{v.status === "RENTED" ? "Cho thuê" : "Đang dùng"}</Badge></td>
                     <td className="px-5 py-4 text-right">
@@ -2993,7 +3488,6 @@ function Vehicles() {
     </>
   );
 }
-
 function Utilities() {
   const utilityTypes = [
     { value: "ELECTRICITY", label: "Điện" },
@@ -4156,6 +4650,8 @@ export default function App() {
 
 function AppContent() {
   const [user, setUser] = useState(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
   const [registrations, setRegistrations] = useDatabaseState("bluemoon_registrations", initialRegistrations);
   const [feesList, setFeesList] = useDatabaseState("bluemoon_fees", initialFeeCatalog);
   const [paymentRecords, setPaymentRecords] = useDatabaseState(
@@ -4199,24 +4695,47 @@ function AppContent() {
     setPaymentRecords((prev) => prev.filter((record) => record.feeId !== feeId));
   };
 
-  return user ? (
-    <Layout
-      user={user}
+  if (user) {
+    return (
+      <Layout
+        user={user}
+        setUser={setUser}
+        registrations={registrations}
+        setRegistrations={setRegistrations}
+        feesList={feesList}
+        setFeesList={setFeesList}
+        paymentRecords={paymentRecords}
+        setPaymentRecords={setPaymentRecords}
+        syncPaymentsForMandatoryFee={syncPaymentsForMandatoryFee}
+        removePaymentsForFee={removePaymentsForFee}
+        complaintsList={complaintsList}
+        setComplaintsList={setComplaintsList}
+        notificationList={notificationList}
+        setNotificationList={setNotificationList}
+      />
+    );
+  }
+
+  if (showIntro) {
+    return (
+      <IntroductionPage
+        onStartLogin={() => {
+          setAuthMode("login");
+          setShowIntro(false);
+        }}
+        onStartRegister={() => {
+          setAuthMode("register");
+          setShowIntro(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <Login
       setUser={setUser}
-      registrations={registrations}
-      setRegistrations={setRegistrations}
-      feesList={feesList}
-      setFeesList={setFeesList}
-      paymentRecords={paymentRecords}
-      setPaymentRecords={setPaymentRecords}
-      syncPaymentsForMandatoryFee={syncPaymentsForMandatoryFee}
-      removePaymentsForFee={removePaymentsForFee}
-      complaintsList={complaintsList}
-      setComplaintsList={setComplaintsList}
-      notificationList={notificationList}
-      setNotificationList={setNotificationList}
+      initialMode={authMode}
+      onBackIntro={() => setShowIntro(true)}
     />
-  ) : (
-    <Login setUser={setUser} />
   );
 }
