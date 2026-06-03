@@ -9,6 +9,7 @@ import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.AuthService;
 import org.example.backend.service.EmailService;
 import org.example.backend.service.OtpService;
+import org.example.backend.service.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,12 +23,14 @@ public class AuthController {
 	private final OtpService otpService;
 	private final EmailService emailService;
 	private final AuthService authService;
+	private final UserMapper mapper;
 
 	@Autowired
-	public AuthController(OtpService otpService, EmailService emailService, AuthService authService) {
+	public AuthController(OtpService otpService, EmailService emailService, AuthService authService, UserMapper mapper) {
 		this.otpService = otpService;
 		this.emailService = emailService;
 		this.authService = authService;
+		this.mapper = mapper;
 	}
 
 	// 1. API Gửi mã OTP
@@ -69,7 +72,7 @@ public class AuthController {
 			User createdUser = authService.registerResident(request);
 
 			// Chuyển Entity sang DTO để ẩn thông tin nhạy cảm (như passwordHash)
-			UserDTO responseDto = UserDTO.fromEntity(createdUser);
+			UserDTO responseDto = mapper.toDto(createdUser);
 
 			return ResponseEntity.status(201).body(ApiResponse.ok(responseDto, "Đăng ký thành công, vui lòng chờ Ban quản trị duyệt."));
 
@@ -107,7 +110,7 @@ public class AuthController {
 			User createdUser = authService.createInternalAccount(req);
 
 			// 2. Ép kiểu sang DTO để ẩn thông tin nhạy cảm
-			UserDTO responseDto = UserDTO.fromEntity(createdUser);
+			UserDTO responseDto = mapper.toDto(createdUser);
 
 			return ResponseEntity.status(201).body(ApiResponse.ok(responseDto, "Tạo tài khoản nội bộ thành công"));
 
@@ -145,7 +148,7 @@ public class AuthController {
 			User approvedUser = authService.approveResidentAccount(id);
 
 			// Ép sang UserDTO trước khi trả về
-			UserDTO responseDto = UserDTO.fromEntity(approvedUser);
+			UserDTO responseDto = mapper.toDto(approvedUser);
 
 			return ResponseEntity.ok(ApiResponse.ok(responseDto, "Duyệt tài khoản cư dân thành công"));
 		} catch (IllegalArgumentException ex) {
