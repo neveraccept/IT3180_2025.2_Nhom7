@@ -40,7 +40,6 @@ public class PaymentService {
     private final UtilityBillRepository utilityBillRepository;
     private final HouseholdRepository householdRepository;
     private final UserRepository userRepository;
-    private final AuditLogService auditLogService;
     private final VnpayService vnpayService;
 
     public PaymentService(PaymentRepository paymentRepository,
@@ -48,14 +47,12 @@ public class PaymentService {
                           UtilityBillRepository utilityBillRepository,
                           HouseholdRepository householdRepository,
                           UserRepository userRepository,
-                          AuditLogService auditLogService,
                           VnpayService vnpayService) {
         this.paymentRepository = paymentRepository;
         this.txRepository = txRepository;
         this.utilityBillRepository = utilityBillRepository;
         this.householdRepository = householdRepository;
         this.userRepository = userRepository;
-        this.auditLogService = auditLogService;
         this.vnpayService = vnpayService;
     }
 
@@ -96,10 +93,6 @@ public class PaymentService {
         p.setPaidAt(LocalDateTime.now());
         p.setCollectedBy(userRepository.getReferenceById(adminUserId));
         paymentRepository.save(p);
-
-        auditLogService.log("CONFIRM_CASH_PAYMENT", "PAYMENT", p.getId(),
-                "Admin xác nhận thu tiền mặt phiếu nộp #" + p.getId()
-                        + " số tiền " + p.getAmountDue());
 
         return PaymentDetailDTO.from(p);
     }
@@ -174,9 +167,6 @@ public class PaymentService {
         tx.setPaymentUrl(paymentUrl);
         txRepository.save(tx);
 
-        auditLogService.log("CREATE_VNPAY_TRANSACTION", "PAYMENT_TRANSACTION", tx.getId(),
-                "Cư dân tạo giao dịch VNPay " + code + " số tiền " + amount);
-
         return new VnpayPaymentUrlResponse(paymentUrl, code);
     }
 
@@ -235,10 +225,6 @@ public class PaymentService {
             tx.setStatus(PaymentTransaction.STATUS_FAILED);        // thất bại
         }
         txRepository.save(tx);
-
-        auditLogService.log("UPDATE_VNPAY_TRANSACTION", "PAYMENT_TRANSACTION", tx.getId(),
-                "IPN cập nhật giao dịch " + txnRef + " → " + tx.getStatus()
-                        + " (vnp_ResponseCode=" + responseCode + ")");
 
         return new IpnResponse("00", "Confirm Success");
     }

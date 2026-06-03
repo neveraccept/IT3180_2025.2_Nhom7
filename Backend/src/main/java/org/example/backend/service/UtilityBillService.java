@@ -37,18 +37,15 @@ public class UtilityBillService {
     private final HouseholdRepository householdRepository;
     private final UtilityBillMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public UtilityBillService(UtilityBillRepository billRepository,
                               HouseholdRepository householdRepository,
                               UtilityBillMapper mapper,
-                              CurrentUserService currentUserService,
-                              AuditLogService auditLogService) {
+                              CurrentUserService currentUserService) {
         this.billRepository = billRepository;
         this.householdRepository = householdRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
     // F7.1 â€“ Nháº­p hoÃ¡ Ä‘Æ¡n.
@@ -73,9 +70,6 @@ public class UtilityBillService {
         b.setStatus(UtilityBillStatus.UNPAID);
         billRepository.save(b);
 
-        auditLogService.log("UTILITY_BILL_CREATE", "UTILITY_BILL", b.getId(),
-                "Táº¡o hoÃ¡ Ä‘Æ¡n " + req.type() + " " + req.month() + "/" + req.year()
-                        + " cho há»™ " + household.getCode());
         return mapper.toDto(b);
     }
 
@@ -104,8 +98,6 @@ public class UtilityBillService {
         if (req.amount() != null) b.setAmount(req.amount());
         billRepository.save(b);
 
-        auditLogService.log("UTILITY_BILL_UPDATE", "UTILITY_BILL", b.getId(),
-                "Cáº­p nháº­t hoÃ¡ Ä‘Æ¡n id=" + b.getId());
         return mapper.toDto(b);
     }
 
@@ -116,8 +108,6 @@ public class UtilityBillService {
         requireUnpaid(b, "xoÃ¡");
         billRepository.delete(b);
 
-        auditLogService.log("UTILITY_BILL_DELETE", "UTILITY_BILL", id,
-                "XoÃ¡ hoÃ¡ Ä‘Æ¡n id=" + id);
     }
 
     // F7.3 â€“ Ghi nháº­n há»™ Ä‘Ã£ ná»™p tiá»n máº·t.
@@ -134,9 +124,6 @@ public class UtilityBillService {
         b.setPaidAt(LocalDateTime.now());
         billRepository.save(b);
 
-        auditLogService.log("UTILITY_BILL_CONFIRM_CASH", "UTILITY_BILL", b.getId(),
-                "XÃ¡c nháº­n há»™ " + b.getHousehold().getCode()
-                        + " Ä‘Ã£ ná»™p tiá»n máº·t hoÃ¡ Ä‘Æ¡n id=" + b.getId());
         return mapper.toDto(b);
     }
 

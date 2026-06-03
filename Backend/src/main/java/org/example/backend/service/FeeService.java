@@ -18,8 +18,6 @@ public class FeeService {
     @Autowired
     private FeePeriodRepository feePeriodRepository;
 
-    // ... Khai báo thêm AuditLogService nếu cần (AuditLog) ...
-
     @Transactional
     public FeeDTO createFee(FeeDTO dto) {
         if(feeRepository.existsByName(dto.getName())) {
@@ -58,10 +56,8 @@ public class FeeService {
         if(hasPeriods) {
             fee.setActive(false);
             feeRepository.save(fee);
-            // Ghi audit log: DEACTIVATE_FEE
         } else {
             feeRepository.delete(fee);
-            // Ghi audit log: DELETE_FEE
         }
     }
 

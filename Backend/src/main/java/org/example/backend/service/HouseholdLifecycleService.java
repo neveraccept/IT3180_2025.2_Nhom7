@@ -27,18 +27,15 @@ public class HouseholdLifecycleService {
     private final HouseholdRepository householdRepository;
     private final ResidentRepository residentRepository;
     private final ApartmentMapper mapper;
-    private final AuditLogService auditLogService;
 
     public HouseholdLifecycleService(ApartmentRepository apartmentRepository,
                                      HouseholdRepository householdRepository,
                                      ResidentRepository residentRepository,
-                                     ApartmentMapper mapper,
-                                     AuditLogService auditLogService) {
+                                     ApartmentMapper mapper) {
         this.apartmentRepository = apartmentRepository;
         this.householdRepository = householdRepository;
         this.residentRepository = residentRepository;
         this.mapper = mapper;
-        this.auditLogService = auditLogService;
     }
 
 
@@ -110,9 +107,6 @@ public class HouseholdLifecycleService {
         ap.setStatus(ApartmentStatus.OCCUPIED);
         apartmentRepository.save(ap);
 
-        auditLogService.log("HOUSEHOLD_ASSIGN", "HOUSEHOLD", h.getId(),
-                "Gán hộ " + h.getCode() + " vào căn hộ " + ap.getCode());
-
         return mapper.toHouseholdSummary(h);
     }
 
@@ -170,9 +164,6 @@ public class HouseholdLifecycleService {
         }
         h = householdRepository.save(h);
 
-        auditLogService.log("HOUSEHOLD_UPDATE", "HOUSEHOLD", h.getId(),
-                "Cập nhật thông tin hộ " + h.getCode());
-
         return mapper.toHouseholdSummary(h);
     }
 
@@ -182,15 +173,11 @@ public class HouseholdLifecycleService {
         householdRepository.save(h);
 
         // Đồng thời đánh dấu toàn bộ nhân khẩu ACTIVE trong hộ là MOVED_OUT
-        int affected = residentRepository.markAllResidentsMovedOut(h.getId(),
+        residentRepository.markAllResidentsMovedOut(h.getId(),
                 ResidentStatus.MOVED_OUT);
 
         ap.setStatus(ApartmentStatus.AVAILABLE);
         apartmentRepository.save(ap);
-
-        auditLogService.log("HOUSEHOLD_MOVE_OUT", "HOUSEHOLD", h.getId(),
-                "Chuyển hộ " + h.getCode() + " khỏi căn hộ " + ap.getCode()
-                        + " (cập nhật " + affected + " nhân khẩu sang MOVED_OUT)");
 
         // Trả về snapshot trạng thái sau khi move out để FE refresh
         return mapper.toHouseholdSummary(h);

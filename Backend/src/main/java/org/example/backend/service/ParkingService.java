@@ -46,20 +46,17 @@ public class ParkingService {
     private final VehicleRepository vehicleRepository;
     private final ParkingMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public ParkingService(ParkingSlotRepository slotRepository,
                           ParkingRegistrationRepository registrationRepository,
                           VehicleRepository vehicleRepository,
                           ParkingMapper mapper,
-                          CurrentUserService currentUserService,
-                          AuditLogService auditLogService) {
+                          CurrentUserService currentUserService) {
         this.slotRepository = slotRepository;
         this.registrationRepository = registrationRepository;
         this.vehicleRepository = vehicleRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
     // F6.4 â€“ Danh sÃ¡ch chá»— gá»­i (cÃ³ phÃ¢n trang).
@@ -105,8 +102,6 @@ public class ParkingService {
         reg.setEndDate(req.endDate());
         reg.setStatus(ParkingRegistrationStatus.ACTIVE);
 
-        String action;
-        String description;
 
         if (assignVehicle) {
             Vehicle vehicle = vehicleRepository.findById(req.vehicleId())
@@ -132,8 +127,6 @@ public class ParkingService {
                     ? req.monthlyFee() : defaultFee(vehicle.getType()));
             slot.setStatus(ParkingSlotStatus.USED);
 
-            action = "PARKING_ASSIGN";
-            description = "GÃ¡n chá»— " + slot.getCode() + " cho xe " + vehicle.getLicensePlate();
         } else {
             if (req.monthlyFee() == null || req.monthlyFee().signum() <= 0) {
                 throw new BadRequestException("PARKING_FEE_REQUIRED",
@@ -144,14 +137,11 @@ public class ParkingService {
             reg.setMonthlyFee(req.monthlyFee());
             slot.setStatus(ParkingSlotStatus.RENTED);
 
-            action = "PARKING_RENT";
-            description = "Cho thuÃª chá»— " + slot.getCode() + " cho " + reg.getRenterName();
         }
 
         registrationRepository.save(reg);
         slotRepository.save(slot);
 
-        auditLogService.log(action, "PARKING_REGISTRATION", reg.getId(), description);
         return mapper.toRegistrationDto(reg);
     }
 
@@ -177,8 +167,6 @@ public class ParkingService {
         }
         registrationRepository.save(reg);
 
-        auditLogService.log("PARKING_END", "PARKING_REGISTRATION", reg.getId(),
-                "Káº¿t thÃºc lÆ°á»£t gá»­i xe táº¡i chá»— " + (slot != null ? slot.getCode() : "?"));
         return mapper.toRegistrationDto(reg);
     }
 

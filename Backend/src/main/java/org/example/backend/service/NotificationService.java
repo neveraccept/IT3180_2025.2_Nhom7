@@ -31,20 +31,17 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final NotificationMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public NotificationService(NotificationRepository notificationRepository,
                                NotificationRecipientRepository recipientRepository,
                                UserRepository userRepository,
                                NotificationMapper mapper,
-                               CurrentUserService currentUserService,
-                               AuditLogService auditLogService) {
+                               CurrentUserService currentUserService) {
         this.notificationRepository = notificationRepository;
         this.recipientRepository = recipientRepository;
         this.userRepository = userRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
     // F9.1 + F9.2 â€“ Admin soáº¡n, chá»n pháº¡m vi vÃ  gá»­i thÃ´ng bÃ¡o
@@ -79,10 +76,6 @@ public class NotificationService {
         }
         recipientRepository.saveAll(rows);
 
-        auditLogService.log("NOTIFICATION_SEND", "NOTIFICATION", savedNoti.getId(),
-                "Admin " + admin.getFullName() + " gá»­i thÃ´ng bÃ¡o \"" + savedNoti.getTitle()
-                        + "\" (scope=" + savedNoti.getScope() + ", " + rows.size() + " ngÆ°á»i nháº­n)");
-
         return mapper.toSentDto(savedNoti, rows.size());
     }
 
@@ -114,9 +107,6 @@ public class NotificationService {
             nr.setIsRead(true);
             nr.setReadAt(LocalDateTime.now());
             recipientRepository.save(nr);
-
-            auditLogService.log("NOTIFICATION_READ", "NOTIFICATION", notificationId,
-                    "User " + me.getFullName() + " Ä‘Ã£ Ä‘á»c thÃ´ng bÃ¡o #" + notificationId);
         }
         return mapper.toRecipientDto(nr);
     }

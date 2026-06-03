@@ -31,7 +31,7 @@ import java.util.Locale;
  * Nghiệp vụ Module 10 – Tra cứu, thống kê và xuất báo cáo.
  *
  * - Các method *Statistics(...) trả về DTO để Controller bọc trong ApiResponse.ok(...).
- * - Các method export*(...) trả về byte[] (Excel/PDF) và ghi audit log "EXPORT_REPORT".
+ * - Các method export*(...) trả về byte[] (Excel/PDF).
  */
 @Service
 public class ReportService {
@@ -48,7 +48,6 @@ public class ReportService {
     private final ReportTransactionRepository transactionRepository;
     private final ExcelReportExporter excelExporter;
     private final PdfReportExporter pdfExporter;
-    private final AuditLogService auditLogService;
 
     public ReportService(ReportPaymentRepository paymentRepository,
                          ReportFeePeriodRepository feePeriodRepository,
@@ -56,8 +55,7 @@ public class ReportService {
                          ReportHouseholdRepository householdRepository,
                          ReportTransactionRepository transactionRepository,
                          ExcelReportExporter excelExporter,
-                         PdfReportExporter pdfExporter,
-                         AuditLogService auditLogService) {
+                         PdfReportExporter pdfExporter) {
         this.paymentRepository = paymentRepository;
         this.feePeriodRepository = feePeriodRepository;
         this.residentRepository = residentRepository;
@@ -65,7 +63,6 @@ public class ReportService {
         this.transactionRepository = transactionRepository;
         this.excelExporter = excelExporter;
         this.pdfExporter = pdfExporter;
-        this.auditLogService = auditLogService;
     }
 
     // ============================================================
@@ -187,8 +184,6 @@ public class ReportService {
         FeePeriodStatisticsDTO s = getFeePeriodStatistics(feePeriodId);
         ReportData data = buildFeePeriodReport(s);
         byte[] file = excelExporter.export("Tinh trang dot thu", data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", feePeriodId,
-                "Admin xuất Excel báo cáo tình trạng đợt thu #" + feePeriodId);
         return file;
     }
 
@@ -197,8 +192,6 @@ public class ReportService {
         FeePeriodStatisticsDTO s = getFeePeriodStatistics(feePeriodId);
         ReportData data = buildFeePeriodReport(s);
         byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", feePeriodId,
-                "Admin xuất PDF báo cáo tình trạng đợt thu #" + feePeriodId);
         return file;
     }
 
@@ -207,8 +200,6 @@ public class ReportService {
         DonationStatisticsDTO s = getDonationStatistics(feePeriodId);
         ReportData data = buildDonationReport(s);
         byte[] file = excelExporter.export("Bao cao dong gop", data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", feePeriodId,
-                "Admin xuất Excel báo cáo đóng góp đợt #" + feePeriodId);
         return file;
     }
 
@@ -217,8 +208,6 @@ public class ReportService {
         DonationStatisticsDTO s = getDonationStatistics(feePeriodId);
         ReportData data = buildDonationReport(s);
         byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", feePeriodId,
-                "Admin xuất PDF báo cáo đóng góp đợt #" + feePeriodId);
         return file;
     }
 
@@ -226,7 +215,6 @@ public class ReportService {
     public byte[] exportHouseholdExcel() {
         ReportData data = buildHouseholdReport(getHouseholdStatistics());
         byte[] file = excelExporter.export("Thong ke theo ho", data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", null, "Admin xuất Excel báo cáo thống kê theo hộ gia đình");
         return file;
     }
 
@@ -234,7 +222,6 @@ public class ReportService {
     public byte[] exportHouseholdPdf() {
         ReportData data = buildHouseholdReport(getHouseholdStatistics());
         byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", null, "Admin xuất PDF báo cáo thống kê theo hộ gia đình");
         return file;
     }
 
@@ -242,7 +229,6 @@ public class ReportService {
     public byte[] exportResidentExcel() {
         ReportData data = buildResidentReport(getResidentStatistics());
         byte[] file = excelExporter.export("Thong ke dan cu", data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", null, "Admin xuất Excel báo cáo thống kê dân cư");
         return file;
     }
 
@@ -250,7 +236,6 @@ public class ReportService {
     public byte[] exportResidentPdf() {
         ReportData data = buildResidentReport(getResidentStatistics());
         byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", null, "Admin xuất PDF báo cáo thống kê dân cư");
         return file;
     }
 
@@ -258,7 +243,6 @@ public class ReportService {
     public byte[] exportTransactionExcel(String status, LocalDateTime from, LocalDateTime to) {
         ReportData data = buildTransactionReport(status, from, to);
         byte[] file = excelExporter.export("Giao dich online", data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", null, "Admin xuất Excel báo cáo giao dịch online");
         return file;
     }
 
@@ -266,7 +250,6 @@ public class ReportService {
     public byte[] exportTransactionPdf(String status, LocalDateTime from, LocalDateTime to) {
         ReportData data = buildTransactionReport(status, from, to);
         byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
-        audit("EXPORT_REPORT", "REPORT", null, "Admin xuất PDF báo cáo giao dịch online");
         return file;
     }
 
@@ -398,10 +381,6 @@ public class ReportService {
                 .orElseThrow(() -> new NotFoundException(
                         "FEE_PERIOD_NOT_FOUND",
                         "Không tìm thấy đợt thu id=" + id));
-    }
-
-    private void audit(String action, String entityType, Long entityId, String description) {
-        auditLogService.log(action, entityType, entityId, description);
     }
 
     private static BigDecimal nz(BigDecimal v) {

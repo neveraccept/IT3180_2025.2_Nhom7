@@ -36,20 +36,17 @@ public class VehicleService {
     private final ParkingRegistrationRepository registrationRepository;
     private final VehicleMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public VehicleService(VehicleRepository vehicleRepository,
                           HouseholdRepository householdRepository,
                           ParkingRegistrationRepository registrationRepository,
                           VehicleMapper mapper,
-                          CurrentUserService currentUserService,
-                          AuditLogService auditLogService) {
+                          CurrentUserService currentUserService) {
         this.vehicleRepository = vehicleRepository;
         this.householdRepository = householdRepository;
         this.registrationRepository = registrationRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
     // F6.1 â€“ ÄÄƒng kÃ½ xe cho há»™.
@@ -72,8 +69,6 @@ public class VehicleService {
         v.setActive(true);
         vehicleRepository.save(v);
 
-        auditLogService.log("VEHICLE_REGISTER", "VEHICLE", v.getId(),
-                "ÄÄƒng kÃ½ xe " + plate + " (" + req.type() + ") cho há»™ " + household.getCode());
         return mapper.toDto(v);
     }
 
@@ -95,8 +90,6 @@ public class VehicleService {
         if (req.active() != null) v.setActive(req.active());
 
         vehicleRepository.save(v);
-        auditLogService.log("VEHICLE_UPDATE", "VEHICLE", v.getId(),
-                "Cáº­p nháº­t thÃ´ng tin xe " + v.getLicensePlate());
         return mapper.toDto(v);
     }
 
@@ -116,8 +109,6 @@ public class VehicleService {
                     registrationRepository.save(reg);
                 });
 
-        auditLogService.log("VEHICLE_CANCEL", "VEHICLE", v.getId(),
-                "Huá»· Ä‘Äƒng kÃ½ gá»­i xe " + v.getLicensePlate());
     }
 
     // F6.3 â€“ Admin tra cá»©u xe theo há»™.

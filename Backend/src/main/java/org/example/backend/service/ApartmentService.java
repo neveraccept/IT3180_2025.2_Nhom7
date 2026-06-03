@@ -29,16 +29,13 @@ public class ApartmentService {
     private final ApartmentRepository apartmentRepository;
     private final HouseholdRepository householdRepository;
     private final ApartmentMapper mapper;
-    private final AuditLogService auditLogService;
 
     public ApartmentService(ApartmentRepository apartmentRepository,
                             HouseholdRepository householdRepository,
-                            ApartmentMapper mapper,
-                            AuditLogService auditLogService) {
+                            ApartmentMapper mapper) {
         this.apartmentRepository = apartmentRepository;
         this.householdRepository = householdRepository;
         this.mapper = mapper;
-        this.auditLogService = auditLogService;
     }
 
 
@@ -91,9 +88,6 @@ public class ApartmentService {
         }
 
         apartmentRepository.save(ap);
-
-        auditLogService.log("APARTMENT_UPDATE", "APARTMENT", ap.getId(),
-                "Admin cập nhật thông tin căn hộ " + ap.getCode());
 
         Household active = householdRepository
                 .findByApartmentIdAndStatus(id, HouseholdStatus.ACTIVE)
