@@ -14,32 +14,32 @@ public class FeeController {
     @Autowired
     private FeeService feeService;
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<?> createFee(@RequestBody FeeDTO feeDTO) {
         return ResponseEntity.ok(feeService.createFee(feeDTO));
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateFee(@PathVariable Long id, @RequestBody FeeDTO feeDTO) {
         return ResponseEntity.ok(feeService.updateFee(id, feeDTO));
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteFee(@PathVariable Long id) {
         feeService.deleteOrDeactivateFee(id);
         return ResponseEntity.ok().build();
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<?> getAllFees(org.springframework.data.domain.Pageable pageable) {
         return ResponseEntity.ok(feeService.getAllFees(pageable));
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/search")
     public ResponseEntity<?> searchFees(@RequestParam(required = false) String keyword,
                                         @RequestParam(required = false) String type,
@@ -48,7 +48,7 @@ public class FeeController {
         return ResponseEntity.ok(feeService.searchFees(keyword, type, active, pageable));
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<?> getFeeById(@PathVariable Long id) {
         return ResponseEntity.ok(feeService.getFeeById(id));

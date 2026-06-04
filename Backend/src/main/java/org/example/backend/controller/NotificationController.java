@@ -23,9 +23,9 @@ public class NotificationController {
         this.notificationService = notificationService;
     }
 
-    // F9.1 + F9.2 – Admin soạn và gửi thông báo
+    // F9.1 + F9.2 - Admin soạn và gửi thông báo
     @PostMapping
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<NotificationDTO>> create(
             @Valid @RequestBody NotificationCreateRequest req) {
         NotificationDTO created = notificationService.create(req);
@@ -33,19 +33,19 @@ public class NotificationController {
                 "Đã gửi thông báo tới " + created.recipientCount() + " người nhận"));
     }
 
-    // F9.3 – Xem thông báo gửi cho user hiện tại
+    // F9.3 - Xem thông báo gửi cho user hiện tại
     @GetMapping("/my")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'RESIDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<NotificationDTO>>> myNotifications(
-            @PageableDefault(size = 20, sort = "notification.sentAt", direction = Sort.Direction.DESC)
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.ok(
                 notificationService.getMyNotifications(pageable)));
     }
 
-    // F9.4 – Đánh dấu thông báo đã đọc
+    // F9.4 - Đánh dấu thông báo đã đọc
     @PutMapping("/{id}/read")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'RESIDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
     public ResponseEntity<ApiResponse<NotificationDTO>> markAsRead(@PathVariable Long id) {
         NotificationDTO dto = notificationService.markAsRead(id);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đã đánh dấu đã đọc"));

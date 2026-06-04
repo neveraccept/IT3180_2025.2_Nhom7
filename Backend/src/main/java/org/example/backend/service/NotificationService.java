@@ -31,23 +31,20 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final NotificationMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public NotificationService(NotificationRepository notificationRepository,
                                NotificationRecipientRepository recipientRepository,
                                UserRepository userRepository,
                                NotificationMapper mapper,
-                               CurrentUserService currentUserService,
-                               AuditLogService auditLogService) {
+                               CurrentUserService currentUserService) {
         this.notificationRepository = notificationRepository;
         this.recipientRepository = recipientRepository;
         this.userRepository = userRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
-    // F9.1 + F9.2 – Admin soạn, chọn phạm vi và gửi thông báo
+    // F9.1 + F9.2 - Admin soạn, chọn phạm vi và gửi thông báo
 
     @Transactional
     public NotificationDTO create(NotificationCreateRequest req) {
@@ -58,7 +55,7 @@ public class NotificationService {
         if (recipients.isEmpty()) {
             throw new BadRequestException(
                     "NO_RECIPIENTS",
-                    "Không có người nhận nào khớp với phạm vi đã chọn.");
+                    "Không có người nhận nào phù hợp với phạm vi đã chọn.");
         }
 
         Notification n = new Notification();
@@ -72,21 +69,17 @@ public class NotificationService {
         List<NotificationRecipient> rows = new ArrayList<>(recipients.size());
         for (User u : recipients) {
             NotificationRecipient nr = new NotificationRecipient();
-            nr.setNotificationId(savedNoti);
-            nr.setRecipientId(u);
+            nr.setNotification(savedNoti);
+            nr.setRecipient(u);
             nr.setIsRead(false);
             rows.add(nr);
         }
         recipientRepository.saveAll(rows);
 
-        auditLogService.log("NOTIFICATION_SEND", "NOTIFICATION", savedNoti.getId(),
-                "Admin " + admin.getFullName() + " gửi thông báo \"" + savedNoti.getTitle()
-                        + "\" (scope=" + savedNoti.getScope() + ", " + rows.size() + " người nhận)");
-
         return mapper.toSentDto(savedNoti, rows.size());
     }
 
-    // F9.3 – Cư dân/Admin xem thông báo gửi cho mình (filter theo recipient_id)
+    // F9.3 - Cư dân/Admin xem thông báo gửi cho mình (filter theo recipient_id)
 
     @Transactional(readOnly = true)
     public PageResponse<NotificationDTO> getMyNotifications(Pageable pageable) {
@@ -97,7 +90,7 @@ public class NotificationService {
         return PageResponse.of(page);
     }
 
-    // F9.4 – Đánh dấu thông báo đã đọc
+    // F9.4 - Đánh dấu thông báo đã đọc
 
     @Transactional
     public NotificationDTO markAsRead(Long notificationId) {
@@ -114,9 +107,6 @@ public class NotificationService {
             nr.setIsRead(true);
             nr.setReadAt(LocalDateTime.now());
             recipientRepository.save(nr);
-
-            auditLogService.log("NOTIFICATION_READ", "NOTIFICATION", notificationId,
-                    "User " + me.getFullName() + " đã đọc thông báo #" + notificationId);
         }
         return mapper.toRecipientDto(nr);
     }

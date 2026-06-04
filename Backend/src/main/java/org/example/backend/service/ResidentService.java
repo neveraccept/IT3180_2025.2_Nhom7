@@ -33,7 +33,6 @@ public class ResidentService {
     private final HouseholdRepository householdRepository;
     private final ResidentMapper residentMapper;
     private final ApartmentMapper apartmentMapper;
-    private final AuditLogService auditLogService;
 
     //Thêm nhân khẩu vào hộ khẩu
     public ResidentDetailDTO createResident(CreateResidentRequest req) {
@@ -69,9 +68,6 @@ public class ResidentService {
 
         Resident saved = residentRepository.save(r);
 
-        auditLogService.log("CREATE_RESIDENT", "RESIDENT", saved.getId(),
-                "Thêm nhân khẩu " + saved.getFullName() + " vào hộ khẩu " + household.getCode());
-
         return residentMapper.toDetail(saved);
     }
 
@@ -94,9 +90,6 @@ public class ResidentService {
 
         Resident saved = residentRepository.save(r);
 
-        auditLogService.log("UPDATE_RESIDENT", "RESIDENT", saved.getId(),
-                "Cập nhật thông tin nhân khẩu " + saved.getFullName());
-
         return residentMapper.toDetail(saved);
     }
 
@@ -107,21 +100,15 @@ public class ResidentService {
         r.setStatus(ResidentStatus.MOVED_OUT);
         Resident saved = residentRepository.save(r);
 
-        auditLogService.log("MOVE_OUT_RESIDENT", "RESIDENT", saved.getId(),
-                "Chuyển nhân khẩu " + saved.getFullName() + " khỏi hộ khẩu "
-                        + (saved.getHousehold() != null ? saved.getHousehold().getCode() : ""));
-
         return residentMapper.toDetail(saved);
     }
 
     //  Đăng ký tạm trú
     public ResidentDetailDTO registerTemporaryResidence(Long id) {
-        return changeResidencyStatus(id, ResidencyStatus.TEMPORARY,
-                "REGISTER_TEMPORARY_RESIDENCE", "Đăng ký tạm trú cho nhân khẩu ");
+        return changeResidencyStatus(id, ResidencyStatus.TEMPORARY);
     }
 
-    private ResidentDetailDTO changeResidencyStatus(
-            Long id, ResidencyStatus newResidency, String action, String descPrefix) {
+    private ResidentDetailDTO changeResidencyStatus(Long id, ResidencyStatus newResidency) {
 
         Resident r = findActiveResidentOrThrow(id);
 
@@ -133,9 +120,6 @@ public class ResidentService {
 
         r.setResidencyStatus(newResidency);
         Resident saved = residentRepository.save(r);
-
-        auditLogService.log(action, "RESIDENT", saved.getId(),
-                descPrefix + saved.getFullName());
 
         return residentMapper.toDetail(saved);
     }

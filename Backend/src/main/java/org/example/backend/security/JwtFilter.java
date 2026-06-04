@@ -7,7 +7,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
-import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -19,6 +20,8 @@ import java.io.IOException;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
 
     private final JwtUtil tokenProvider;
 
@@ -39,8 +42,16 @@ public class JwtFilter extends OncePerRequestFilter {
                 Claims claims = tokenProvider.getClaimsFromJWT(jwt);
                 String username = claims.getSubject();
                 // JJWT có thể parse số thành Integer hoặc Long, dùng Number.class để an toàn ép kiểu
-                Long userId = claims.get("userId", Number.class).longValue();
+                Number userIdClaim = claims.get("userId", Number.class);
                 String roleName = claims.get("role", String.class);
+
+                // Token thiếu claim bắt buộc → coi như không hợp lệ, bỏ qua xác thực
+                if (userIdClaim == null || roleName == null) {
+                    log.warn("JWT thiếu claim userId/role, bỏ qua thiết lập xác thực");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                Long userId = userIdClaim.longValue();
 
                 // 2. Tạo đối tượng User "ảo" chỉ chứa các thông tin định danh
                 Role role = new Role(roleName);
@@ -60,10 +71,14 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                System.out.println("Xác thực thành công. Quyền trong Context: " + authentication.getAuthorities());
+                if (log.isDebugEnabled()) {
+                    log.debug("Xác thực thành công cho user '{}' với quyền {}",
+                            username, authentication.getAuthorities());
+                }
             }
         } catch (Exception ex) {
-            System.out.println("Không thể thiết lập xác thực người dùng trong Security Context: " + ex.getMessage());
+            // Không lộ chi tiết token/stacktrace; chỉ ghi log ở mức debug để phục vụ chẩn đoán
+            log.debug("Không thể thiết lập xác thực người dùng trong Security Context: {}", ex.getMessage());
         }
 
         // Chuyển request đi tiếp

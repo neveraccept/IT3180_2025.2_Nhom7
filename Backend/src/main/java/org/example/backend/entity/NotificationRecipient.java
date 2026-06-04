@@ -26,12 +26,12 @@ public class NotificationRecipient {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "notification_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_nr_notification"))
-    private Notification notificationId;
+    private Notification notification;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "recipient_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_nr_recipient"))
-    private User recipientId;
+    private User recipient;
 
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;

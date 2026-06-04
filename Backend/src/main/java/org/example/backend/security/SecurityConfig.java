@@ -28,12 +28,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Tắt CSRF vì hệ thống sử dụng JWT
+                // 1. Tắt CSRF vì hệ thống sử dụng JWT (stateless, không dùng cookie session)
                 .csrf(AbstractHttpConfigurer::disable)
-                .csrf(csrf -> csrf.disable())
 
-                // Bật CORS cho trình duyệt React 18 gọi API
-                .cors(cors -> cors.configure(http))
+                // Bật CORS cho trình duyệt React 18 gọi API.
+                // Sử dụng CorsConfigurationSource bean (xem config/CorsConfig) thay vì cors.configure(http).
+                .cors(org.springframework.security.config.Customizer.withDefaults())
 
                 // 2. Cấu hình session thành Stateless
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -73,14 +73,11 @@ public class SecurityConfig {
                                 "/api/fees/**",             // Quản lý danh mục khoản thu
                                 "/api/fee-periods/**",      // Quản lý đợt thu
                                 "/api/admin/**"             // Các API tra cứu / audit riêng cho admin
-                        ).hasAuthority("ADMIN")
+                        ).hasRole("ADMIN")
 
                         // Bắt buộc xác thực với mọi request khác (nếu có) mà chưa được liệt kê ở trên
                         .anyRequest().authenticated()
-                )
-
-                // 3. Đặt session management thành Stateless (Không lưu trạng thái session trên server)
-                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                );
 
         // Bổ sung QUAN TRỌNG NHẤT: Đặt "người gác cổng" của chúng ta lên trước bộ lọc đăng nhập mặc định của Spring Security
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -11,12 +11,32 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-    Page<Payment> findByHousehold_Id(Long householdId, Pageable pageable);
+    // Fetch-join các quan hệ to-one mà PaymentDetailDTO.from(...) sẽ đọc
+    // (feePeriod, feePeriod.fee, household, collectedBy) để tránh N+1 khi map sang DTO.
+    @Query(value = """
+            SELECT p FROM Payment p
+            LEFT JOIN FETCH p.feePeriod fp
+            LEFT JOIN FETCH fp.fee
+            LEFT JOIN FETCH p.household
+            LEFT JOIN FETCH p.collectedBy
+            WHERE p.household.id = :householdId
+            """,
+            countQuery = "SELECT COUNT(p) FROM Payment p WHERE p.household.id = :householdId")
+    Page<Payment> findByHousehold_Id(@Param("householdId") Long householdId, Pageable pageable);
 
     Page<Payment> findByFeePeriod_Id(Long feePeriodId, Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT p FROM Payment p
+            LEFT JOIN FETCH p.feePeriod fp
+            LEFT JOIN FETCH fp.fee
+            LEFT JOIN FETCH p.household
+            LEFT JOIN FETCH p.collectedBy
+            WHERE (:householdId IS NULL OR p.household.id = :householdId)
+              AND (:status IS NULL OR p.status = :status)
+            """,
+            countQuery = """
+            SELECT COUNT(p) FROM Payment p
             WHERE (:householdId IS NULL OR p.household.id = :householdId)
               AND (:status IS NULL OR p.status = :status)
             """)

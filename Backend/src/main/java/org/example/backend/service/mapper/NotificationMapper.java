@@ -10,7 +10,7 @@ public class NotificationMapper {
 
     /** Góc nhìn người nhận (F9.3/F9.4): kèm trạng thái đã đọc. */
     public NotificationDTO toRecipientDto(NotificationRecipient nr) {
-        Notification n = nr.getNotificationId();
+        Notification n = nr.getNotification();
         return new NotificationDTO(
                 n.getId(),
                 n.getTitle(),

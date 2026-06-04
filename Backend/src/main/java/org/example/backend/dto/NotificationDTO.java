@@ -17,10 +17,8 @@ public record NotificationDTO(
         NotificationScope scope,
         String senderName,
         LocalDateTime sentAt,
-
         Boolean isRead,
         LocalDateTime readAt,
-        
         Integer recipientCount
 ) {
 }
