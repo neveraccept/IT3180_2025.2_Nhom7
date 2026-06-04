@@ -10,6 +10,7 @@ import { LoginPage } from "../pages/LoginPage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
 import { OtpVerifyPage } from "../pages/OtpVerifyPage";
+import { VnpayReturnPage } from "../pages/VnpayReturnPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { AppShell } from "./AppShell";
 
@@ -43,6 +44,9 @@ export function AppRoutes() {
       <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
       <Route path="/forgot-password" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
       <Route path="/verify-otp" element={<PublicOnly><OtpVerifyPage /></PublicOnly>} />
+
+      {/* Trang VNPay redirect về sau thanh toán (backend frontend-return-url). */}
+      <Route path="/payment-result" element={<VnpayReturnPage />} />
 
       <Route
         path="/app/*"
