@@ -130,6 +130,13 @@
             <artifactId>openpdf</artifactId>
             <version>1.4.2</version>
         </dependency>
+
+        <!-- Sinh dữ liệu mẫu (seed data) giống thật: tên, SĐT, CCCD... locale "vi" -->
+        <dependency>
+            <groupId>net.datafaker</groupId>
+            <artifactId>datafaker</artifactId>
+            <version>2.4.2</version>
+        </dependency>
     </dependencies>
 
     <build>

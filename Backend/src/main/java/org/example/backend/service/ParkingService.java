@@ -28,12 +28,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * M6 â€“ F6.4 (quáº£n lÃ½ chá»— gá»­i), F6.1 gÃ¡n chá»— cho xe há»™ vÃ  F6.5 cho thuÃª chá»— thá»«a.
+ * M6 - F6.4 (quản lý chỗ gửi), F6.1 gán chỗ cho xe hộ và F6.5 cho thuê chỗ thừa.
  *
- * Quy táº¯c phÃ­ gá»­i xe (monthlyFee) theo SDD:
- *   - MOTORBIKE: 70.000Ä‘/thÃ¡ng (máº·c Ä‘á»‹nh khi gÃ¡n xe há»™).
- *   - CAR      : 1.200.000Ä‘/thÃ¡ng (máº·c Ä‘á»‹nh khi gÃ¡n xe há»™).
- *   - Cho thuÃª ngoÃ i: phÃ­ nháº­p tay theo thoáº£ thuáº­n.
+ * Quy tắc phí gửi xe (monthlyFee) theo SDD:
+ *   - MOTORBIKE: 70.000đ/tháng (mặc định khi gán xe hộ).
+ *   - CAR      : 1.200.000đ/tháng (mặc định khi gán xe hộ).
+ *   - Cho thuê ngoài: phí nhập tay theo thoả thuận.
  */
 @Service
 public class ParkingService {
@@ -59,14 +59,14 @@ public class ParkingService {
         this.currentUserService = currentUserService;
     }
 
-    // F6.4 â€“ Danh sÃ¡ch chá»— gá»­i (cÃ³ phÃ¢n trang).
+    // F6.4 - Danh sách chỗ gửi (có phân trang).
     @Transactional(readOnly = true)
     public PageResponse<ParkingSlotDTO> listSlots(Pageable pageable) {
         Page<ParkingSlotDTO> page = slotRepository.findAll(pageable).map(mapper::toSlotDto);
         return PageResponse.of(page);
     }
 
-    // F6.4 â€“ TÃ¬nh tráº¡ng tá»•ng quan: tá»•ng / Ä‘Ã£ dÃ¹ng / cho thuÃª / cÃ²n trá»‘ng.
+    // F6.4 - Tình trạng tổng quan: tổng / đã dùng / cho thuê / còn trống.
     @Transactional(readOnly = true)
     public ParkingSummaryDTO summary() {
         long total = slotRepository.count();
@@ -76,24 +76,24 @@ public class ParkingService {
         return new ParkingSummaryDTO(total, used, rented, empty);
     }
 
-    // F6.1 (gÃ¡n xe há»™) + F6.5 (cho thuÃª chá»— thá»«a).
+    // F6.1 (gán xe hộ) + F6.5 (cho thuê chỗ thừa).
     @Transactional
     public ParkingRegistrationDTO createRegistration(CreateParkingRegistrationRequest req) {
         ParkingSlot slot = slotRepository.findById(req.slotId())
                 .orElseThrow(() -> new NotFoundException(
-                        "PARKING_SLOT_NOT_FOUND", "KhÃ´ng tÃ¬m tháº¥y chá»— gá»­i id=" + req.slotId()));
+                        "PARKING_SLOT_NOT_FOUND", "Không tìm thấy chỗ gửi id=" + req.slotId()));
 
         if (slot.getStatus() != ParkingSlotStatus.EMPTY) {
             throw new BadRequestException("PARKING_SLOT_NOT_EMPTY",
-                    "Chá»— gá»­i " + slot.getCode() + " Ä‘ang Ä‘Æ°á»£c sá»­ dá»¥ng, khÃ´ng thá»ƒ gÃ¡n má»›i");
+                    "Chỗ gửi " + slot.getCode() + " đang được sử dụng, không thể gán mới");
         }
 
         boolean assignVehicle = req.vehicleId() != null;
         boolean rentOut = req.renterName() != null && !req.renterName().isBlank();
         if (assignVehicle == rentOut) {
             throw new BadRequestException("PARKING_INVALID_MODE",
-                    "Pháº£i chá»n Ä‘Ãºng má»™t trong hai: gÃ¡n xe cá»§a há»™ (vehicleId) " +
-                            "hoáº·c cho ngÆ°á»i ngoÃ i thuÃª (renterName)");
+                    "Phải chọn đúng một trong hai: gán xe của hộ (vehicleId) " +
+                            "hoặc cho người ngoài thuê (renterName)");
         }
 
         ParkingRegistration reg = new ParkingRegistration();
@@ -105,21 +105,21 @@ public class ParkingService {
 
         if (assignVehicle) {
             Vehicle vehicle = vehicleRepository.findById(req.vehicleId())
-                    .orElseThrow(() -> new NotFoundException(
-                            "VEHICLE_NOT_FOUND", "KhÃ´ng tÃ¬m tháº¥y xe id=" + req.vehicleId()));
+                        .orElseThrow(() -> new NotFoundException(
+                                    "VEHICLE_NOT_FOUND", "Không tìm thấy xe id=" + req.vehicleId()));
             if (!Boolean.TRUE.equals(vehicle.getActive())) {
                 throw new BadRequestException("VEHICLE_INACTIVE",
-                        "Xe " + vehicle.getLicensePlate() + " Ä‘Ã£ huá»· Ä‘Äƒng kÃ½, khÃ´ng thá»ƒ gÃ¡n chá»—");
+                        "Xe " + vehicle.getLicensePlate() + " đã huỷ đăng ký, không thể gán chỗ");
             }
             if (vehicle.getType() != slot.getType()) {
                 throw new BadRequestException("PARKING_TYPE_MISMATCH",
-                        "Loáº¡i xe (" + vehicle.getType() + ") khÃ´ng khá»›p loáº¡i chá»— gá»­i ("
+                        "Loại xe (" + vehicle.getType() + ") không khớp loại chỗ gửi ("
                                 + slot.getType() + ")");
             }
             if (registrationRepository.findByVehicleIdAndStatus(
                     vehicle.getId(), ParkingRegistrationStatus.ACTIVE).isPresent()) {
                 throw new BadRequestException("VEHICLE_ALREADY_PARKED",
-                        "Xe " + vehicle.getLicensePlate() + " Ä‘Ã£ cÃ³ chá»— gá»­i Ä‘ang hiá»‡u lá»±c");
+                        "Xe " + vehicle.getLicensePlate() + " đã có chỗ gửi đang hiệu lực");
             }
 
             reg.setVehicle(vehicle);
@@ -130,7 +130,7 @@ public class ParkingService {
         } else {
             if (req.monthlyFee() == null || req.monthlyFee().signum() <= 0) {
                 throw new BadRequestException("PARKING_FEE_REQUIRED",
-                        "Cho thuÃª chá»— thá»«a pháº£i nháº­p phÃ­ thuÃª (monthlyFee) > 0");
+                        "Cho thuê chỗ thừa phải nhập phí thuê (monthlyFee) > 0");
             }
             reg.setRenterName(req.renterName().trim());
             reg.setRenterPhone(req.renterPhone() != null ? req.renterPhone().trim() : null);
@@ -145,17 +145,17 @@ public class ParkingService {
         return mapper.toRegistrationDto(reg);
     }
 
-    // F6.2 / F6.5 â€“ Káº¿t thÃºc má»™t lÆ°á»£t Ä‘Äƒng kÃ½/cho thuÃª, tráº£ chá»— vá» EMPTY.
+    // F6.2 / F6.5 - Kết thúc một lượt đăng ký/cho thuê, trả chỗ về EMPTY.
     @Transactional
     public ParkingRegistrationDTO endRegistration(Long id) {
         ParkingRegistration reg = registrationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(
                         "PARKING_REGISTRATION_NOT_FOUND",
-                        "KhÃ´ng tÃ¬m tháº¥y lÆ°á»£t Ä‘Äƒng kÃ½ id=" + id));
+                        "Không tìm thấy lượt đăng ký id=" + id));
 
         if (reg.getStatus() == ParkingRegistrationStatus.ENDED) {
             throw new BadRequestException("PARKING_REGISTRATION_ENDED",
-                    "LÆ°á»£t Ä‘Äƒng kÃ½ nÃ y Ä‘Ã£ káº¿t thÃºc");
+                    "Lượt đăng ký này đã kết thúc");
         }
 
         reg.setStatus(ParkingRegistrationStatus.ENDED);
@@ -170,13 +170,13 @@ public class ParkingService {
         return mapper.toRegistrationDto(reg);
     }
 
-    // CÆ° dÃ¢n xem cÃ¡c lÆ°á»£t gá»­i xe ACTIVE cá»§a há»™ mÃ¬nh.
+    // Cư dân xem các lượt gửi xe ACTIVE của hộ mình.
     @Transactional(readOnly = true)
     public PageResponse<ParkingRegistrationDTO> listMyHousehold(Pageable pageable) {
         Household h = currentUserService.getCurrentUser().getHousehold();
         if (h == null) {
             throw new BadRequestException("RESIDENT_NO_HOUSEHOLD",
-                    "TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c gÃ¡n vÃ o há»™ dÃ¢n nÃ o");
+                    "Tài khoản chưa được gán vào hộ dân nào");
         }
         Page<ParkingRegistrationDTO> page = registrationRepository
                 .findByVehicleHouseholdIdAndStatus(

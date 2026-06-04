@@ -17,12 +17,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * M7 â€“ Quáº£n lÃ½ hoÃ¡ Ä‘Æ¡n Ä‘iá»‡n/nÆ°á»›c/internet.
- * Admin: nháº­p (F7.1), sá»­a/xoÃ¡ (F7.2), xÃ¡c nháº­n Ä‘Ã£ ná»™p tiá»n máº·t (F7.3), tra cá»©u (F7.4).
- * CÆ° dÃ¢n: chá»‰ tra cá»©u hoÃ¡ Ä‘Æ¡n cá»§a há»™ mÃ¬nh.
+ * M7 - Quản lý hoá đơn điện/nước/internet.
+ * Admin: nhập (F7.1), sửa/xoá (F7.2), xác nhận đã nộp tiền mặt (F7.3), tra cứu (F7.4).
+ * Cư dân: chỉ tra cứu hoá đơn của hộ mình.
  *
- * LÆ°u Ã½ route: endpoint xÃ¡c nháº­n tiá»n máº·t náº±m dÆ°á»›i /api/admin/... theo SDD,
- * nÃªn controller dÃ¹ng /api lÃ m prefix vÃ  chá»‰ Ä‘á»‹nh path tuyá»‡t Ä‘á»‘i á»Ÿ tá»«ng method.
+ * Lưu ý route: endpoint xác nhận tiền mặt nằm dưới /api/admin/... theo SDD,
+ * nên controller dùng /api làm prefix và chỉ định path tuyệt đối ở từng method.
  */
 @RestController
 @RequestMapping("/api")
@@ -34,42 +34,42 @@ public class UtilityBillController {
         this.utilityBillService = utilityBillService;
     }
 
-    // F7.1 â€“ Nháº­p hoÃ¡ Ä‘Æ¡n. POST /api/utility-bills
+    // F7.1 - Nhập hoá đơn. POST /api/utility-bills
     @PostMapping("/utility-bills")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> create(
             @Valid @RequestBody CreateUtilityBillRequest req) {
         UtilityBillDTO dto = utilityBillService.create(req);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "Táº¡o hoÃ¡ Ä‘Æ¡n thÃ nh cÃ´ng"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Tạo hoá đơn thành công"));
     }
 
-    // F7.2 â€“ Sá»­a hoÃ¡ Ä‘Æ¡n. PUT /api/utility-bills/{id}
+    // F7.2 - Sửa hoá đơn. PUT /api/utility-bills/{id}
     @PutMapping("/utility-bills/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUtilityBillRequest req) {
         UtilityBillDTO dto = utilityBillService.update(id, req);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "Cáº­p nháº­t hoÃ¡ Ä‘Æ¡n thÃ nh cÃ´ng"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Cập nhật hoá đơn thành công"));
     }
 
-    // F7.2 â€“ XoÃ¡ hoÃ¡ Ä‘Æ¡n. DELETE /api/utility-bills/{id}
+    // F7.2 - Xoá hoá đơn. DELETE /api/utility-bills/{id}
     @DeleteMapping("/utility-bills/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         utilityBillService.delete(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "ÄÃ£ xoÃ¡ hoÃ¡ Ä‘Æ¡n"));
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã xoá hoá đơn"));
     }
 
-    // F7.3 â€“ Ghi nháº­n Ä‘Ã£ ná»™p tiá»n máº·t. PUT /api/admin/utility-bills/{id}/confirm-cash
+    // F7.3 - Ghi nhận đã nộp tiền mặt. PUT /api/admin/utility-bills/{id}/confirm-cash
     @PutMapping("/admin/utility-bills/{id}/confirm-cash")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> confirmCash(@PathVariable Long id) {
         UtilityBillDTO dto = utilityBillService.confirmCash(id);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "ÄÃ£ ghi nháº­n ná»™p tiá»n máº·t"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Đã ghi nhận nộp tiền mặt"));
     }
 
-    // F7.4 â€“ Admin tra cá»©u hoÃ¡ Ä‘Æ¡n (lá»c theo há»™/loáº¡i/thÃ¡ng/nÄƒm/tráº¡ng thÃ¡i).
+    // F7.4 - Admin tra cứu hoá đơn (lọc theo hộ/loại/tháng/năm/trạng thái).
     // GET /api/utility-bills?householdId=&type=&month=&year=&status=
     @GetMapping("/utility-bills")
     @PreAuthorize("hasRole('ADMIN')")
@@ -85,14 +85,14 @@ public class UtilityBillController {
                 utilityBillService.search(householdId, type, month, year, status, pageable)));
     }
 
-    // F7.4 â€“ Admin xem chi tiáº¿t hoÃ¡ Ä‘Æ¡n. GET /api/utility-bills/{id}
+    // F7.4 - Admin xem chi tiết hoá đơn. GET /api/utility-bills/{id}
     @GetMapping("/utility-bills/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(utilityBillService.getDetail(id)));
     }
 
-    // F7.4 â€“ CÆ° dÃ¢n xem hoÃ¡ Ä‘Æ¡n cá»§a há»™ mÃ¬nh. GET /api/utility-bills/my-household
+    // F7.4 - Cư dân xem hoá đơn của hộ mình. GET /api/utility-bills/my-household
     @GetMapping("/utility-bills/my-household")
     @PreAuthorize("hasRole('RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<UtilityBillDTO>>> myHousehold(

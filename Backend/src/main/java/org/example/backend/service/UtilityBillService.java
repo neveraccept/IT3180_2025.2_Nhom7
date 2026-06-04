@@ -24,11 +24,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * M7 â€“ Quáº£n lÃ½ hoÃ¡ Ä‘Æ¡n Ä‘iá»‡n/nÆ°á»›c/internet.
- *  F7.1 nháº­p hoÃ¡ Ä‘Æ¡n, F7.2 sá»­a/xoÃ¡, F7.3 ghi nháº­n Ä‘Ã£ ná»™p tiá»n máº·t, F7.4 tra cá»©u theo há»™.
+ * M7 - Quản lý hoá đơn điện/nước/internet.
+ * F7.1 nhập hoá đơn, F7.2 sửa/xoá, F7.3 ghi nhận đã nộp tiền mặt, F7.4 tra cứu theo hộ.
  *
- * Quy Æ°á»›c: chá»‰ thao tÃ¡c trÃªn hoÃ¡ Ä‘Æ¡n cÃ²n UNPAID khi sá»­a/xoÃ¡ Ä‘á»ƒ giá»¯ tÃ­nh toÃ n váº¹n Ä‘á»‘i soÃ¡t.
- * HoÃ¡ Ä‘Æ¡n Ä‘Ã£ PAID (tiá»n máº·t hoáº·c online qua VNPay) khÃ´ng Ä‘Æ°á»£c sá»­a/xoÃ¡.
+ * Quy ước: chỉ thao tác trên hoá đơn còn UNPAID khi sửa/xoá để giữ tính toàn vẹn đối soát.
+ * Hoá đơn đã PAID (tiền mặt hoặc online qua VNPay) không được sửa/xoá.
  */
 @Service
 public class UtilityBillService {
@@ -48,17 +48,17 @@ public class UtilityBillService {
         this.currentUserService = currentUserService;
     }
 
-    // F7.1 â€“ Nháº­p hoÃ¡ Ä‘Æ¡n.
+    // F7.1 - Nhập hoá đơn.
     @Transactional
     public UtilityBillDTO create(CreateUtilityBillRequest req) {
         Household household = householdRepository.findById(req.householdId())
                 .orElseThrow(() -> new NotFoundException(
-                        "HOUSEHOLD_NOT_FOUND", "KhÃ´ng tÃ¬m tháº¥y há»™ id=" + req.householdId()));
+                        "HOUSEHOLD_NOT_FOUND", "Không tìm thấy hộ id=" + req.householdId()));
 
         if (billRepository.existsByHouseholdIdAndTypeAndMonthAndYear(
                 req.householdId(), req.type(), req.month(), req.year())) {
             throw new BadRequestException("UTILITY_BILL_DUPLICATE",
-                    "Há»™ Ä‘Ã£ cÃ³ hoÃ¡ Ä‘Æ¡n " + req.type() + " thÃ¡ng " + req.month() + "/" + req.year());
+                    "Hộ đã có hoá đơn " + req.type() + " tháng " + req.month() + "/" + req.year());
         }
 
         UtilityBill b = new UtilityBill();
@@ -73,11 +73,11 @@ public class UtilityBillService {
         return mapper.toDto(b);
     }
 
-    // F7.2 â€“ Sá»­a hoÃ¡ Ä‘Æ¡n (chá»‰ khi UNPAID).
+    // F7.2 - Sửa hoá đơn (chỉ khi UNPAID).
     @Transactional
     public UtilityBillDTO update(Long id, UpdateUtilityBillRequest req) {
         UtilityBill b = requireBill(id);
-        requireUnpaid(b, "sá»­a");
+        requireUnpaid(b, "sửa");
 
         UtilityType newType = req.type() != null ? req.type() : b.getType();
         Integer newMonth = req.month() != null ? req.month() : b.getMonth();
@@ -89,7 +89,7 @@ public class UtilityBillService {
         if (keyChanged && billRepository.existsByHouseholdIdAndTypeAndMonthAndYear(
                 b.getHousehold().getId(), newType, newMonth, newYear)) {
             throw new BadRequestException("UTILITY_BILL_DUPLICATE",
-                    "Há»™ Ä‘Ã£ cÃ³ hoÃ¡ Ä‘Æ¡n " + newType + " thÃ¡ng " + newMonth + "/" + newYear);
+                    "Hộ đã có hoá đơn " + newType + " tháng " + newMonth + "/" + newYear);
         }
 
         b.setType(newType);
@@ -101,22 +101,22 @@ public class UtilityBillService {
         return mapper.toDto(b);
     }
 
-    // F7.2 â€“ XoÃ¡ hoÃ¡ Ä‘Æ¡n (chá»‰ khi UNPAID).
+    // F7.2 - Xoá hoá đơn (chỉ khi UNPAID).
     @Transactional
     public void delete(Long id) {
         UtilityBill b = requireBill(id);
-        requireUnpaid(b, "xoÃ¡");
+        requireUnpaid(b, "xoá");
         billRepository.delete(b);
 
     }
 
-    // F7.3 â€“ Ghi nháº­n há»™ Ä‘Ã£ ná»™p tiá»n máº·t.
+    // F7.3 - Ghi nhận hộ đã nộp tiền mặt.
     @Transactional
     public UtilityBillDTO confirmCash(Long id) {
         UtilityBill b = requireBill(id);
         if (b.getStatus() == UtilityBillStatus.PAID) {
             throw new BadRequestException("UTILITY_BILL_ALREADY_PAID",
-                    "HoÃ¡ Ä‘Æ¡n Ä‘Ã£ Ä‘Æ°á»£c thanh toÃ¡n trÆ°á»›c Ä‘Ã³");
+                    "Hoá đơn đã được thanh toán trước đó");
         }
         b.setStatus(UtilityBillStatus.PAID);
         b.setPaymentMethod(PaymentMethod.CASH);
@@ -127,7 +127,7 @@ public class UtilityBillService {
         return mapper.toDto(b);
     }
 
-    // F7.4 â€“ Admin tra cá»©u/lá»c hoÃ¡ Ä‘Æ¡n (cÃ³ thá»ƒ lá»c theo há»™).
+    // F7.4 - Admin tra cứu/lọc hoá đơn (có thể lọc theo hộ).
     @Transactional(readOnly = true)
     public PageResponse<UtilityBillDTO> search(Long householdId,
                                                UtilityType type,
@@ -141,7 +141,7 @@ public class UtilityBillService {
         return PageResponse.of(page);
     }
 
-    // F7.4 â€“ CÆ° dÃ¢n tra cá»©u hoÃ¡ Ä‘Æ¡n cá»§a há»™ mÃ¬nh.
+    // F7.4 - Cư dân tra cứu hoá đơn của hộ mình.
     @Transactional(readOnly = true)
     public PageResponse<UtilityBillDTO> listMyHousehold(UtilityType type,
                                                         Integer month,
@@ -151,7 +151,7 @@ public class UtilityBillService {
         Household h = currentUserService.getCurrentUser().getHousehold();
         if (h == null) {
             throw new BadRequestException("RESIDENT_NO_HOUSEHOLD",
-                    "TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c gÃ¡n vÃ o há»™ dÃ¢n nÃ o");
+                    "Tài khoản chưa được gán vào hộ dân nào");
         }
         Page<UtilityBillDTO> page = billRepository
                 .search(h.getId(), type, month, year, status, pageable)
@@ -159,7 +159,7 @@ public class UtilityBillService {
         return PageResponse.of(page);
     }
 
-    // Admin xem chi tiáº¿t má»™t hoÃ¡ Ä‘Æ¡n.
+    // Admin xem chi tiết một hoá đơn.
     @Transactional(readOnly = true)
     public UtilityBillDTO getDetail(Long id) {
         return mapper.toDto(requireBill(id));
@@ -170,13 +170,13 @@ public class UtilityBillService {
     private UtilityBill requireBill(Long id) {
         return billRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(
-                        "UTILITY_BILL_NOT_FOUND", "KhÃ´ng tÃ¬m tháº¥y hoÃ¡ Ä‘Æ¡n id=" + id));
+                        "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hoá đơn id=" + id));
     }
 
     private void requireUnpaid(UtilityBill b, String actionLabel) {
         if (b.getStatus() == UtilityBillStatus.PAID) {
             throw new BadRequestException("UTILITY_BILL_PAID_LOCKED",
-                    "HoÃ¡ Ä‘Æ¡n Ä‘Ã£ thanh toÃ¡n, khÃ´ng thá»ƒ " + actionLabel);
+                    "Hoá đơn đã thanh toán, không thể " + actionLabel);
         }
     }
 }

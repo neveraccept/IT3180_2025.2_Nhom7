@@ -21,11 +21,11 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * M10 â€“ Tra cá»©u, thá»‘ng kÃª vÃ  xuáº¥t bÃ¡o cÃ¡o.
- * ToÃ n bá»™ endpoint chá»‰ dÃ nh cho Admin.
+ * M10 - Tra cứu, thống kê và xuất báo cáo.
+ * Toàn bộ endpoint chỉ dành cho Admin.
  *
- *  - Thá»‘ng kÃª sá»‘ liá»‡u  â†’ JSON bá»c trong ApiResponse.ok(...)
- *  - Xuáº¥t file Excel/PDF â†’ ResponseEntity&lt;byte[]&gt; kÃ¨m Content-Disposition: attachment
+ *  - Thống kê số liệu -> JSON bọc trong ApiResponse.ok(...)
+ *  - Xuất file Excel/PDF -> ResponseEntity<byte[]> kèm Content-Disposition: attachment
  */
 @RestController
 @RequestMapping("/api/reports")
@@ -41,29 +41,29 @@ public class ReportController {
         this.reportService = reportService;
     }
 
-    // ===================== THá»NG KÃŠ (JSON) =====================
+    // ===================== THỐNG KÊ (JSON) =====================
 
-    // F10.1 â€“ Thá»‘ng kÃª tÃ¬nh tráº¡ng Ä‘á»£t thu
+    // F10.1 - Thống kê tình trạng đợt thu
     @GetMapping("/fee-periods/{id}/statistics")
     public ResponseEntity<ApiResponse<FeePeriodStatisticsDTO>> feePeriodStatistics(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getFeePeriodStatistics(id)));
     }
 
-    // F10.2 â€“ Thá»‘ng kÃª khoáº£n Ä‘Ã³ng gÃ³p theo Ä‘á»£t
+    // F10.2 - Thống kê khoản đóng góp theo đợt
     @GetMapping("/donations/{feePeriodId}/statistics")
     public ResponseEntity<ApiResponse<DonationStatisticsDTO>> donationStatistics(
             @PathVariable Long feePeriodId) {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getDonationStatistics(feePeriodId)));
     }
 
-    // F10.3 â€“ Thá»‘ng kÃª theo há»™ gia Ä‘Ã¬nh
+    // F10.3 - Thống kê theo hộ gia đình
     @GetMapping("/households/statistics")
     public ResponseEntity<ApiResponse<List<HouseholdPaymentSummaryDTO>>> householdStatistics() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getHouseholdStatistics()));
     }
 
-    // F10.4 â€“ Thá»‘ng kÃª dÃ¢n cÆ°
+    // F10.4 - Thống kê dân cư
     @GetMapping("/residents/statistics")
     public ResponseEntity<ApiResponse<ResidentStatisticsDTO>> residentStatistics() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getResidentStatistics()));

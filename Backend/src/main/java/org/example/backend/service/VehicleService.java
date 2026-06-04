@@ -24,9 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 
 /**
- * M6 â€“ F6.1, F6.2, F6.3: quáº£n lÃ½ phÆ°Æ¡ng tiá»‡n (xe) cá»§a há»™ dÃ¢n.
- * Viá»‡c gÃ¡n/giáº£i phÃ³ng chá»— gá»­i xe (ParkingRegistration) do {@link ParkingService} phá»¥ trÃ¡ch;
- * khi huá»· xe, service nÃ y cÅ©ng Ä‘Ã³ng lÆ°á»£t Ä‘Äƒng kÃ½ ACTIVE vÃ  tráº£ chá»— vá» EMPTY.
+ * M6 - F6.1, F6.2, F6.3: quản lý phương tiện (xe) của hộ dân.
+ * Việc gán/giải phóng chỗ gửi xe (ParkingRegistration) do {@link ParkingService} phụ trách;
+ * khi huỷ xe, service này cũng đóng lượt đăng ký ACTIVE và trả chỗ về EMPTY.
  */
 @Service
 public class VehicleService {
@@ -49,17 +49,17 @@ public class VehicleService {
         this.currentUserService = currentUserService;
     }
 
-    // F6.1 â€“ ÄÄƒng kÃ½ xe cho há»™.
+    // F6.1 - Đăng ký xe cho hộ.
     @Transactional
     public VehicleDTO register(RegisterVehicleRequest req) {
         String plate = req.licensePlate().trim();
         if (vehicleRepository.existsByLicensePlate(plate)) {
             throw new BadRequestException("VEHICLE_PLATE_DUPLICATE",
-                    "Biá»ƒn sá»‘ Ä‘Ã£ Ä‘Æ°á»£c Ä‘Äƒng kÃ½: " + plate);
+                    "Biển số đã được đăng ký: " + plate);
         }
         Household household = householdRepository.findById(req.householdId())
                 .orElseThrow(() -> new NotFoundException(
-                        "HOUSEHOLD_NOT_FOUND", "KhÃ´ng tÃ¬m tháº¥y há»™ id=" + req.householdId()));
+                        "HOUSEHOLD_NOT_FOUND", "Không tìm thấy hộ id=" + req.householdId()));
 
         Vehicle v = new Vehicle();
         v.setHousehold(household);
@@ -72,7 +72,7 @@ public class VehicleService {
         return mapper.toDto(v);
     }
 
-    // F6.2 â€“ Cáº­p nháº­t thÃ´ng tin xe.
+    // F6.2 - Cập nhật thông tin xe.
     @Transactional
     public VehicleDTO update(Long id, UpdateVehicleRequest req) {
         Vehicle v = requireVehicle(id);
@@ -82,7 +82,7 @@ public class VehicleService {
             if (!plate.equalsIgnoreCase(v.getLicensePlate())
                     && vehicleRepository.existsByLicensePlate(plate)) {
                 throw new BadRequestException("VEHICLE_PLATE_DUPLICATE",
-                        "Biá»ƒn sá»‘ Ä‘Ã£ Ä‘Æ°á»£c Ä‘Äƒng kÃ½: " + plate);
+                        "Biển số đã được đăng ký: " + plate);
             }
             v.setLicensePlate(plate);
         }
@@ -93,7 +93,7 @@ public class VehicleService {
         return mapper.toDto(v);
     }
 
-    // F6.2 â€“ Huá»· Ä‘Äƒng kÃ½ xe (soft delete) + tráº£ chá»— gá»­i vá» EMPTY.
+    // F6.2 - Huỷ đăng ký xe (soft delete) + trả chỗ gửi về EMPTY.
     @Transactional
     public void cancel(Long id) {
         Vehicle v = requireVehicle(id);
@@ -111,12 +111,12 @@ public class VehicleService {
 
     }
 
-    // F6.3 â€“ Admin tra cá»©u xe theo há»™.
+    // F6.3 - Admin tra cứu xe theo hộ.
     @Transactional(readOnly = true)
     public PageResponse<VehicleDTO> listByHousehold(Long householdId, Pageable pageable) {
         if (!householdRepository.existsById(householdId)) {
             throw new NotFoundException("HOUSEHOLD_NOT_FOUND",
-                    "KhÃ´ng tÃ¬m tháº¥y há»™ id=" + householdId);
+                    "Không tìm thấy hộ id=" + householdId);
         }
         Page<VehicleDTO> page = vehicleRepository
                 .findByHouseholdId(householdId, pageable)
@@ -124,7 +124,7 @@ public class VehicleService {
         return PageResponse.of(page);
     }
 
-    // F6.3 â€“ CÆ° dÃ¢n xem xe cá»§a há»™ mÃ¬nh.
+    // F6.3 - Cư dân xem xe của hộ mình.
     @Transactional(readOnly = true)
     public PageResponse<VehicleDTO> listMyHousehold(Pageable pageable) {
         Long householdId = currentHouseholdId();
@@ -139,14 +139,14 @@ public class VehicleService {
     private Vehicle requireVehicle(Long id) {
         return vehicleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(
-                        "VEHICLE_NOT_FOUND", "KhÃ´ng tÃ¬m tháº¥y xe id=" + id));
+                        "VEHICLE_NOT_FOUND", "Không tìm thấy xe id=" + id));
     }
 
     private Long currentHouseholdId() {
         Household h = currentUserService.getCurrentUser().getHousehold();
         if (h == null) {
             throw new BadRequestException("RESIDENT_NO_HOUSEHOLD",
-                    "TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c gÃ¡n vÃ o há»™ dÃ¢n nÃ o");
+                    "Tài khoản chưa được gán vào hộ dân nào");
         }
         return h.getId();
     }

@@ -16,9 +16,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * M6 â€“ Quáº£n lÃ½ chá»— gá»­i xe vÃ  lÆ°á»£t Ä‘Äƒng kÃ½/cho thuÃª.
- * Admin: F6.4 (xem tÃ¬nh tráº¡ng chá»—), F6.1 gÃ¡n xe vÃ o chá»—, F6.5 cho thuÃª chá»— thá»«a, káº¿t thÃºc lÆ°á»£t.
- * CÆ° dÃ¢n: xem cÃ¡c lÆ°á»£t gá»­i xe Ä‘ang hiá»‡u lá»±c cá»§a há»™ mÃ¬nh.
+ * M6 - Quản lý chỗ gửi xe và lượt đăng ký/cho thuê.
+ * Admin: F6.4 (xem tình trạng chỗ), F6.1 gán xe vào chỗ, F6.5 cho thuê chỗ thừa, kết thúc lượt.
+ * Cư dân: xem các lượt gửi xe đang hiệu lực của hộ mình.
  */
 @RestController
 @RequestMapping("/api")
@@ -30,7 +30,7 @@ public class ParkingController {
         this.parkingService = parkingService;
     }
 
-    // F6.4 â€“ Danh sÃ¡ch chá»— gá»­i. GET /api/parking-slots
+    // F6.4 - Danh sách chỗ gửi. GET /api/parking-slots
     @GetMapping("/parking-slots")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<ParkingSlotDTO>>> listSlots(
@@ -39,7 +39,7 @@ public class ParkingController {
         return ResponseEntity.ok(ApiResponse.ok(parkingService.listSlots(pageable)));
     }
 
-    // F6.4 â€“ TÃ¬nh tráº¡ng chá»— gá»­i (tá»•ng/Ä‘Ã£ dÃ¹ng/cho thuÃª/cÃ²n trá»‘ng).
+    // F6.4 - Tình trạng chỗ gửi (tổng/đã dùng/cho thuê/còn trống).
     // GET /api/parking-slots/summary
     @GetMapping("/parking-slots/summary")
     @PreAuthorize("hasRole('ADMIN')")
@@ -47,25 +47,25 @@ public class ParkingController {
         return ResponseEntity.ok(ApiResponse.ok(parkingService.summary()));
     }
 
-    // F6.1 (gÃ¡n xe há»™) + F6.5 (cho thuÃª chá»— thá»«a). POST /api/parking-registrations
+    // F6.1 (gán xe hộ) + F6.5 (cho thuê chỗ thừa). POST /api/parking-registrations
     @PostMapping("/parking-registrations")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ParkingRegistrationDTO>> createRegistration(
             @Valid @RequestBody CreateParkingRegistrationRequest req) {
         ParkingRegistrationDTO dto = parkingService.createRegistration(req);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "ÄÄƒng kÃ½ chá»— gá»­i xe thÃ nh cÃ´ng"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Đăng ký chỗ gửi xe thành công"));
     }
 
-    // F6.2 / F6.5 â€“ Káº¿t thÃºc lÆ°á»£t Ä‘Äƒng kÃ½. PUT /api/parking-registrations/{id}/end
+    // F6.2 / F6.5 - Kết thúc lượt đăng ký. PUT /api/parking-registrations/{id}/end
     @PutMapping("/parking-registrations/{id}/end")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ParkingRegistrationDTO>> endRegistration(
             @PathVariable Long id) {
         ParkingRegistrationDTO dto = parkingService.endRegistration(id);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "ÄÃ£ káº¿t thÃºc lÆ°á»£t gá»­i xe"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Đã kết thúc lượt gửi xe"));
     }
 
-    // CÆ° dÃ¢n xem lÆ°á»£t gá»­i xe cá»§a há»™. GET /api/parking-registrations/my-household
+    // Cư dân xem lượt gửi xe của hộ. GET /api/parking-registrations/my-household
     @GetMapping("/parking-registrations/my-household")
     @PreAuthorize("hasRole('RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<ParkingRegistrationDTO>>> myHousehold(
