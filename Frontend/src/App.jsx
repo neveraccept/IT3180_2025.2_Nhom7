@@ -58,6 +58,7 @@ const adminNav = [
 const residentNav = [
   { key: "dashboard", label: "Dashboard", icon: Home },
   { key: "myFees", label: "Khoản phí của tôi", icon: WalletCards },
+  { key: "vehicles", label: "Gửi xe", icon: Car },
   { key: "complaints", label: "Khiếu nại của tôi", icon: MessageSquareWarning },
   { key: "notifications", label: "Thông báo", icon: Bell },
   { key: "profile", label: "Thông tin cá nhân", icon: KeyRound },
@@ -705,10 +706,11 @@ function IntroductionPage({ onStartLogin, onStartRegister }) {
   );
 }
 
-function Login({ setUser, initialMode = "login", onBackIntro }) {
+function Login({ setUser, initialMode = "login", onBackIntro, registrations = [], setRegistrations }) {
   const [mode, setMode] = useState(initialMode);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
@@ -733,8 +735,10 @@ function Login({ setUser, initialMode = "login", onBackIntro }) {
 
       if (result.success) {
         setUser({
+          ...result.user,
           username: result.user.username,
-          name: result.user.name,
+          name: result.user.name || result.user.fullName || result.user.username,
+          fullName: result.user.fullName || result.user.name || result.user.username,
           role: result.user.role,
           token: result.token,
         });
@@ -750,8 +754,32 @@ function Login({ setUser, initialMode = "login", onBackIntro }) {
   };
 
   const handleRegister = async () => {
-    if (!fullName || !username || !password || !email || !phone || !apartment) {
+    const cleanFullName = fullName.trim();
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+    const cleanConfirmPassword = confirmPassword.trim();
+    const cleanEmail = email.trim();
+    const cleanPhone = phone.trim();
+    const cleanApartment = apartment.trim();
+
+    if (!cleanFullName || !cleanUsername || !cleanPassword || !cleanConfirmPassword || !cleanEmail || !cleanPhone || !cleanApartment) {
       setError("Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+
+    if (cleanPassword !== cleanConfirmPassword) {
+      setError("Mật khẩu nhập lại không khớp");
+      return;
+    }
+
+    const existedRegistration = registrations.some(
+      (item) =>
+        item.username?.toLowerCase() === cleanUsername.toLowerCase() &&
+        item.status !== "rejected"
+    );
+
+    if (existedRegistration) {
+      setError("Tên đăng nhập này đã gửi đăng ký hoặc đã được duyệt.");
       return;
     }
 
@@ -759,28 +787,45 @@ function Login({ setUser, initialMode = "login", onBackIntro }) {
     setError("");
 
     try {
-      const result = await registerAPI(fullName, username, password, email, phone, apartment);
+      // Lưu đăng ký vào danh sách chờ duyệt của Admin.
+      // Đây là database mô phỏng bằng localStorage thông qua useDatabaseState ở AppContent.
+      const newRegistration = {
+        id: Date.now(),
+        fullName: cleanFullName,
+        username: cleanUsername,
+        password: cleanPassword,
+        email: cleanEmail,
+        phone: cleanPhone,
+        apartment: cleanApartment,
+        status: "pending",
+        createdAt: new Date().toLocaleDateString("vi-VN"),
+      };
 
-      if (result.success) {
-        setRegisterSuccess(true);
-        // Reset form
-        setFullName("");
-        setUsername("");
-        setPassword("");
-        setEmail("");
-        setPhone("");
-        setApartment("");
-        
-        // Hiển thị thông báo thành công
-        setTimeout(() => {
-          setMode("login");
-          setRegisterSuccess(false);
-        }, 3000);
-      } else {
-        setError(result.message);
+      setRegistrations((prev) => [newRegistration, ...prev]);
+
+      // Gọi API nếu backend có cấu hình; nếu chưa có backend thì vẫn đã lưu vào danh sách duyệt.
+      try {
+        await registerAPI(cleanFullName, cleanUsername, cleanPassword, cleanEmail, cleanPhone, cleanApartment);
+      } catch (apiError) {
+        console.warn("Register API chưa kết nối, đã lưu đăng ký vào localStorage:", apiError);
       }
+
+      setRegisterSuccess(true);
+
+      setFullName("");
+      setUsername("");
+      setPassword("");
+      setConfirmPassword("");
+      setEmail("");
+      setPhone("");
+      setApartment("");
+
+      setTimeout(() => {
+        setMode("login");
+        setRegisterSuccess(false);
+      }, 3000);
     } catch (err) {
-      setError("Lỗi kết nối server. Vui lòng thử lại.");
+      setError("Lỗi khi lưu đăng ký. Vui lòng thử lại.");
       console.error("Register error:", err);
     } finally {
       setLoading(false);
@@ -825,13 +870,13 @@ function Login({ setUser, initialMode = "login", onBackIntro }) {
           </div>
 
           <div className="mb-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
-            <button onClick={() => { setMode("login"); setError(""); }} className={`rounded-xl px-3 py-2 text-sm font-bold ${mode === "login" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500"}`}>Đăng nhập</button>
+            <button onClick={() => { setMode("login"); setError(""); setConfirmPassword(""); }} className={`rounded-xl px-3 py-2 text-sm font-bold ${mode === "login" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500"}`}>Đăng nhập</button>
             <button onClick={() => { setMode("register"); setError(""); setRegisterSuccess(false); }} className={`rounded-xl px-3 py-2 text-sm font-bold ${mode === "register" ? "bg-white text-sky-700 shadow-sm" : "text-slate-500"}`}>Đăng ký</button>
           </div>
 
           {registerSuccess && (
             <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
-              ✓ Đăng ký thành công! Admin sẽ duyệt yêu cầu của bạn trong thời gian sớm nhất.
+              ✓ Đăng ký thành công! Yêu cầu đã được gửi vào mục Duyệt Đăng Ký của Admin.
             </div>
           )}
 
@@ -882,6 +927,15 @@ function Login({ setUser, initialMode = "login", onBackIntro }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {mode === "register" && (
+              <Input
+                label="Nhập lại mật khẩu"
+                type="password"
+                placeholder="Nhập lại mật khẩu"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            )}
             {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
             <Button 
               className="w-full py-3" 
@@ -944,12 +998,10 @@ function Layout({
 
   const openComplaintFromDashboard = (complaintId) => {
     setDashboardTarget({ complaintId, notificationId: null });
-    setActive("complaints");
   };
 
   const openNotificationFromDashboard = (notificationId) => {
     setDashboardTarget({ complaintId: null, notificationId });
-    setActive("notifications");
   };
 
   const clearDashboardTarget = () => {
@@ -1008,6 +1060,8 @@ function Layout({
         <div className="p-4 md:p-8">
           <Page
             active={active}
+            user={user}
+            setUser={setUser}
             role={user.role}
             registrations={registrations}
             setRegistrations={setRegistrations}
@@ -1034,6 +1088,8 @@ function Layout({
 
 function Page({
   active,
+  user,
+  setUser,
   role,
   registrations,
   setRegistrations,
@@ -1056,6 +1112,8 @@ function Page({
     return (
       <Dashboard
         role={role}
+        user={user}
+        paymentRecords={paymentRecords}
         complaintsList={complaintsList}
         notificationList={notificationList}
         onOpenComplaint={onOpenComplaint}
@@ -1086,12 +1144,13 @@ function Page({
       />
     );
   }
-  if (active === "vehicles") return <Vehicles />;
+  if (active === "vehicles") return <Vehicles role={role} user={user} />;
   if (active === "utilities") return <Utilities />;
   if (active === "complaints") {
     return (
       <Complaints
         role={role}
+        user={user}
         complaintsList={complaintsList}
         setComplaintsList={setComplaintsList}
         initialComplaintId={dashboardTarget.complaintId}
@@ -1110,12 +1169,14 @@ function Page({
       />
     );
   }
-  if (active === "statistics") return <Statistics />;
-  if (active === "myFees") return <MyFees />;
-  if (active === "profile") return <Profile />;
+  if (active === "statistics") return <Statistics paymentRecords={paymentRecords} />;
+  if (active === "myFees") return <MyFees user={user} paymentRecords={paymentRecords} />;
+  if (active === "profile") return <Profile user={user} setUser={setUser} />;
   return (
     <Dashboard
       role={role}
+      user={user}
+      paymentRecords={paymentRecords}
       complaintsList={complaintsList}
       notificationList={notificationList}
       onOpenComplaint={onOpenComplaint}
@@ -1129,39 +1190,68 @@ function Registrations({ registrations, setRegistrations }) {
   const regs = registrations;
   const setRegs = setRegistrations;
   const [loading, setLoading] = useState(false);
-  const [rejectingId, setRejectingId] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [modalError, setModalError] = useState("");
+  const [toast, setToast] = useState(null);
 
-  const handleApprove = async (id) => {
+  const pendingRegs = regs.filter((r) => r.status === "pending");
+  const selectedReg = confirmAction?.id ? regs.find((r) => r.id === confirmAction.id) : null;
+
+  const showToast = (message, tone = "green") => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const openApproveConfirm = (id) => {
+    setConfirmAction({ type: "approve", id });
+    setRejectReason("");
+    setModalError("");
+  };
+
+  const openRejectConfirm = (id) => {
+    setConfirmAction({ type: "reject", id });
+    setRejectReason("");
+    setModalError("");
+  };
+
+  const closeConfirm = () => {
+    if (loading) return;
+    setConfirmAction(null);
+    setRejectReason("");
+    setModalError("");
+  };
+
+  const confirmApprove = async () => {
+    if (!selectedReg) return;
+
+    if (selectedReg.status !== "pending") {
+      setModalError("Yêu cầu này đã được xử lý rồi.");
+      return;
+    }
+
     setLoading(true);
+    setModalError("");
+
     try {
-      const reg = regs.find((r) => r.id === id);
-
-      if (!reg) {
-        return;
-      }
-
-      if (reg.status !== "pending") {
-        alert("Yêu cầu này đã được xử lý rồi.");
-        return;
-      }
-
-      const existedAccount = accountUsers.some((u) => u.username === reg.username);
+      const existedAccount = accountUsers.some((u) => u.username === selectedReg.username);
       if (!existedAccount) {
         addUser({
-          username: reg.username,
-          fullName: reg.fullName,
+          username: selectedReg.username,
+          password: selectedReg.password || "",
+          fullName: selectedReg.fullName,
+          name: selectedReg.fullName,
           role: "RESIDENT",
-          email: reg.email,
-          phone: reg.phone,
-          apartment: reg.apartment,
+          email: selectedReg.email,
+          phone: selectedReg.phone,
+          apartment: selectedReg.apartment,
           active: "Hoạt động",
         });
       }
 
       setRegs((prev) =>
         prev.map((r) =>
-          r.id === id
+          r.id === selectedReg.id
             ? {
                 ...r,
                 status: "approved",
@@ -1174,24 +1264,32 @@ function Registrations({ registrations, setRegistrations }) {
         )
       );
 
-      alert("Duyệt thành công! Tài khoản đã được thêm vào phần Tài khoản.");
+      closeConfirm();
+      showToast("Duyệt thành công! Tài khoản đã được thêm vào phần Tài khoản.", "green");
     } catch (err) {
       console.error("Approve error:", err);
-      alert("Lỗi: " + err.message);
+      setModalError("Lỗi: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRejectSubmit = () => {
+  const confirmReject = () => {
+    if (!selectedReg) return;
+
     if (!rejectReason.trim()) {
-      alert("Vui lòng nhập lý do từ chối");
+      setModalError("Vui lòng nhập lý do từ chối.");
+      return;
+    }
+
+    if (selectedReg.status !== "pending") {
+      setModalError("Yêu cầu này đã được xử lý rồi.");
       return;
     }
 
     setRegs((prev) =>
       prev.map((r) =>
-        r.id === rejectingId
+        r.id === selectedReg.id
           ? {
               ...r,
               status: "rejected",
@@ -1205,41 +1303,30 @@ function Registrations({ registrations, setRegistrations }) {
       )
     );
 
-    setRejectingId(null);
-    setRejectReason("");
+    closeConfirm();
+    showToast("Đã từ chối yêu cầu đăng ký.", "red");
   };
-
-  const pendingRegs = regs.filter(r => r.status === "pending");
-
-  if (rejectingId) {
-    return (
-      <>
-        <SectionHeader title="Duyệt Đăng Ký Cư Dân" />
-        <Card className="max-w-md">
-          <h3 className="mb-4 text-lg font-bold">Lý do từ chối</h3>
-          <textarea 
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-            placeholder="Nhập lý do từ chối..."
-            rows={4}
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-          />
-          <div className="mt-4 flex gap-3">
-            <Button variant="primary" onClick={handleRejectSubmit}>Xác nhận</Button>
-            <Button variant="secondary" onClick={() => { setRejectingId(null); setRejectReason(""); }}>Huỷ</Button>
-          </div>
-        </Card>
-      </>
-    );
-  }
 
   return (
     <>
       <SectionHeader title="Duyệt Đăng Ký Cư Dân" desc={`Có ${pendingRegs.length} yêu cầu chờ duyệt`} />
-      
+
+      {toast && (
+        <div
+          className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ring-1 ${
+            toast.tone === "red"
+              ? "bg-rose-50 text-rose-700 ring-rose-200"
+              : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+          }`}
+        >
+          {toast.tone === "red" ? "✕ " : "✓ "}
+          {toast.message}
+        </div>
+      )}
+
       {pendingRegs.length === 0 ? (
-        <Card className="text-center py-12">
-          <div className="text-slate-500 text-lg font-semibold">Không có yêu cầu đăng ký nào chờ duyệt</div>
+        <Card className="py-12 text-center">
+          <div className="text-lg font-semibold text-slate-500">Không có yêu cầu đăng ký nào chờ duyệt</div>
         </Card>
       ) : (
         <div className="space-y-4">
@@ -1248,7 +1335,7 @@ function Registrations({ registrations, setRegistrations }) {
               <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg text-slate-900">{reg.fullName}</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{reg.fullName}</h3>
                     <Badge tone="yellow">Chờ duyệt</Badge>
                   </div>
                   <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
@@ -1260,16 +1347,16 @@ function Registrations({ registrations, setRegistrations }) {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 md:items-end">
-                  <Button 
-                    variant="primary" 
-                    onClick={() => handleApprove(reg.id)}
+                  <Button
+                    variant="primary"
+                    onClick={() => openApproveConfirm(reg.id)}
                     disabled={loading}
                   >
                     <CheckCircle2 className="h-4 w-4" /> Duyệt
                   </Button>
-                  <Button 
-                    variant="danger" 
-                    onClick={() => setRejectingId(reg.id)}
+                  <Button
+                    variant="danger"
+                    onClick={() => openRejectConfirm(reg.id)}
                     disabled={loading}
                   >
                     <AlertCircle className="h-4 w-4" /> Từ chối
@@ -1281,7 +1368,7 @@ function Registrations({ registrations, setRegistrations }) {
         </div>
       )}
 
-      {regs.some(r => r.status !== "pending") && (
+      {regs.some((r) => r.status !== "pending") && (
         <>
           <SectionHeader title="Lịch Sử Duyệt" className="mt-8" />
           <DataTable columns={[
@@ -1292,16 +1379,493 @@ function Registrations({ registrations, setRegistrations }) {
             { key: "status", label: "Trạng thái", render: (r) => <Badge tone={r.status === "approved" ? "green" : "red"}>{r.status === "approved" ? "Đã duyệt" : "Từ chối"}</Badge> },
             { key: "createdAt", label: "Ngày đăng ký" },
             { key: "approvedAt", label: "Ngày xử lý", render: (r) => r.approvedAt || r.rejectedAt || "__" },
-          ]} rows={regs.filter(r => r.status !== "pending")} />
+          ]} rows={regs.filter((r) => r.status !== "pending")} />
         </>
+      )}
+
+      {confirmAction && selectedReg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <div className="mb-5 flex items-start gap-4">
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                  confirmAction.type === "approve"
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-rose-50 text-rose-600"
+                }`}
+              >
+                {confirmAction.type === "approve" ? (
+                  <CheckCircle2 className="h-6 w-6" />
+                ) : (
+                  <AlertCircle className="h-6 w-6" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">
+                  {confirmAction.type === "approve" ? "Xác nhận duyệt đăng ký" : "Xác nhận từ chối đăng ký"}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  {confirmAction.type === "approve"
+                    ? "Bạn có chắc chắn muốn duyệt yêu cầu này không?"
+                    : "Bạn có chắc chắn muốn từ chối yêu cầu này không?"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <div className="grid gap-2 md:grid-cols-2">
+                <p><span className="font-semibold">Họ tên:</span> {selectedReg.fullName}</p>
+                <p><span className="font-semibold">Username:</span> {selectedReg.username}</p>
+                <p><span className="font-semibold">Căn hộ:</span> {selectedReg.apartment}</p>
+                <p><span className="font-semibold">SĐT:</span> {selectedReg.phone}</p>
+                <p className="md:col-span-2"><span className="font-semibold">Email:</span> {selectedReg.email}</p>
+              </div>
+            </div>
+
+            {confirmAction.type === "reject" && (
+              <label className="mb-4 block">
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">Lý do từ chối</span>
+                <textarea
+                  rows={4}
+                  value={rejectReason}
+                  onChange={(e) => {
+                    setRejectReason(e.target.value);
+                    setModalError("");
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                  placeholder="Nhập lý do từ chối để lưu vào lịch sử..."
+                />
+              </label>
+            )}
+
+            {modalError && (
+              <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+                {modalError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={closeConfirm} disabled={loading}>
+                Hủy
+              </Button>
+              {confirmAction.type === "approve" ? (
+                <Button onClick={confirmApprove} disabled={loading}>
+                  {loading ? "Đang duyệt..." : "Xác nhận duyệt"}
+                </Button>
+              ) : (
+                <Button variant="danger" onClick={confirmReject} disabled={loading}>
+                  Xác nhận từ chối
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        </div>
       )}
     </>
   );
 }
 
-function Dashboard({ role, complaintsList = complaints, notificationList = normalizeNotifications(notifications), onOpenComplaint, onOpenNotification }) {
+
+const adminBankInfo = {
+  bankName: "MB Bank",
+  accountNumber: "0123456789",
+  accountHolder: "BAN QUAN TRI CHUNG CU BLUEMOON",
+};
+
+const getResidentRoomByUser = (user) => {
+  if (!user) return "1201";
+  if (user.apartment) return String(user.apartment);
+  if (user.room) return String(user.room);
+
+  const userName = user.fullName || user.name || "";
+  const matchedResident = residents.find((resident) => resident.name === userName);
+  if (matchedResident?.room) return matchedResident.room;
+
+  const matchedApartment = apartments.find((apartment) => apartment.owner === userName);
+  if (matchedApartment?.code) return matchedApartment.code;
+
+  const usernameMap = {
+    resident1: "1201",
+    resident2: "1808",
+    resident3: "2405",
+  };
+  return usernameMap[user.username] || "1201";
+};
+
+const getResidentDisplayName = (user) => user?.fullName || user?.name || user?.username || "Cư dân";
+
+const parseNumberValue = (value) => {
+  if (value === "__") return 0;
+  const number = Number(value);
+  return Number.isNaN(number) ? 0 : number;
+};
+
+const getUtilityName = (type) => {
+  if (type === "ELECTRICITY") return "Điện";
+  if (type === "WATER") return "Nước";
+  if (type === "INTERNET") return "Internet";
+  return type;
+};
+
+const getUtilityUnitText = (type) => {
+  if (type === "ELECTRICITY") return "đ/số";
+  if (type === "WATER") return "đ/m³";
+  return "đ/tháng";
+};
+
+const buildHouseholdBillRows = ({
+  rooms,
+  paymentRecords,
+  vehiclesList,
+  utilitiesList,
+  unitPrices,
+  householdPaymentStatus,
+  filters = { status: "ALL", month: "ALL", year: "ALL" },
+}) => {
+  const matchesPeriod = (month, year) => {
+    if (filters.month && filters.month !== "ALL" && Number(month) !== Number(filters.month)) return false;
+    if (filters.year && filters.year !== "ALL" && Number(year) !== Number(filters.year)) return false;
+    return true;
+  };
+
+  const makePeriodKey = (month, year) => `${month}/${year}`;
+
+  const calculateUtilityAmount = (utility) => {
+    if (utility.type === "INTERNET") return parseNumberValue(unitPrices.INTERNET);
+    return Math.max(0, parseNumberValue(utility.newIndex) - parseNumberValue(utility.oldIndex)) * parseNumberValue(unitPrices[utility.type]);
+  };
+
+  const buildItemsForPeriod = (room, month, year) => {
+    const period = makePeriodKey(month, year);
+
+    const feeItems = paymentRecords
+      .filter((record) => String(record.room) === String(room) && Number(record.month) === Number(month) && Number(record.year) === Number(year))
+      .map((record) => ({
+        id: record.id,
+        period,
+        group: record.feeName?.toLowerCase().includes("phòng") ? "Tiền phòng" : "Khoản thu bắt buộc",
+        name: record.feeName,
+        formula: record.chargeMethod === "PER_M2"
+          ? `${record.area || 0} m² × ${new Intl.NumberFormat("vi-VN").format(record.unitPrice || 0)} đ/m²`
+          : `Cố định ${money(record.unitPrice || record.amountDue || 0)}`,
+        amountDue: Number(record.amountDue || 0),
+      }));
+
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const vehicleItems = Number(month) === Number(currentMonth) && Number(year) === Number(currentYear)
+      ? vehiclesList
+          .filter((vehicle) => String(vehicle.room) === String(room))
+          .map((vehicle) => ({
+            id: `VEHICLE-${vehicle.plate}-${vehicle.slot}-${room}-${month}-${year}`,
+            period,
+            group: "Gửi xe",
+            name: `${vehicle.type}${vehicle.plate && vehicle.plate !== "__" ? ` - ${vehicle.plate}` : ""} (${vehicle.slot})`,
+            formula: `${new Intl.NumberFormat("vi-VN").format(Number(vehicle.fee || 0))} đ/tháng`,
+            amountDue: Number(vehicle.fee || 0),
+          }))
+      : [];
+
+    const utilityItems = utilitiesList
+      .filter((utility) => String(utility.room) === String(room) && Number(utility.month) === Number(month) && Number(utility.year) === Number(year))
+      .map((utility) => {
+        const amountDue = calculateUtilityAmount(utility);
+        const formula = utility.type === "INTERNET"
+          ? `${new Intl.NumberFormat("vi-VN").format(unitPrices.INTERNET || 0)} đ/tháng`
+          : `(${utility.newIndex} - ${utility.oldIndex}) × ${new Intl.NumberFormat("vi-VN").format(unitPrices[utility.type] || 0)} ${getUtilityUnitText(utility.type)}`;
+
+        return {
+          id: `UTILITY-${utility.id}`,
+          period,
+          group: "Điện/Nước/Internet",
+          name: getUtilityName(utility.type),
+          formula,
+          amountDue,
+        };
+      });
+
+    return [...feeItems, ...vehicleItems, ...utilityItems];
+  };
+
+  return rooms
+    .map((room) => {
+      const roomText = String(room);
+      const periods = new Set();
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      paymentRecords.filter((record) => String(record.room) === roomText).forEach((record) => periods.add(`${record.month}|${record.year}`));
+      utilitiesList.filter((utility) => String(utility.room) === roomText).forEach((utility) => periods.add(`${utility.month}|${utility.year}`));
+      if (vehiclesList.some((vehicle) => String(vehicle.room) === roomText)) periods.add(`${currentMonth}|${currentYear}`);
+
+      const parsedPeriods = Array.from(periods)
+        .map((periodKey) => {
+          const [month, year] = periodKey.split("|");
+          return { month: Number(month), year: Number(year) };
+        })
+        .filter(({ month, year }) => matchesPeriod(month, year))
+        .sort((a, b) => Number(a.year) - Number(b.year) || Number(a.month) - Number(b.month));
+
+      const items = parsedPeriods.flatMap(({ month, year }) => buildItemsForPeriod(roomText, month, year));
+      const amountDue = items.reduce((sum, item) => sum + Number(item.amountDue || 0), 0);
+      const savedPayment = householdPaymentStatus[roomText];
+      const legacyPaid = paymentRecords
+        .filter((record) => String(record.room) === roomText && matchesPeriod(record.month, record.year))
+        .reduce((sum, record) => sum + Number(record.amountPaid || 0), 0);
+      const amountPaid = savedPayment ? Number(savedPayment.amountPaid || 0) : legacyPaid;
+      const household = getHouseholds().find((item) => String(item.room) === roomText);
+      const fallbackRecord = paymentRecords.find((record) => String(record.room) === roomText);
+
+      return {
+        id: roomText,
+        key: roomText,
+        room: roomText,
+        owner: household?.owner || fallbackRecord?.owner || "__",
+        periods: parsedPeriods,
+        items,
+        amountDue,
+        amountPaid,
+        status: calculatePaymentStatus(amountDue, amountPaid),
+        paidDate: savedPayment?.paidDate || "",
+        note: savedPayment?.note || "",
+      };
+    })
+    .filter((bill) => bill.amountDue > 0)
+    .filter((bill) => !filters.status || filters.status === "ALL" || bill.status === filters.status);
+};
+
+const getPeriodSummaryText = (bill) => {
+  if (!bill.periods?.length) return "__";
+  if (bill.periods.length === 1) return `Tháng ${bill.periods[0].month}/${bill.periods[0].year}`;
+  const first = bill.periods[0];
+  const last = bill.periods[bill.periods.length - 1];
+  return `${bill.periods.length} kỳ (${first.month}/${first.year} - ${last.month}/${last.year})`;
+};
+
+function FakeQRCode({ room, amount }) {
+  const seed = `${room}-${amount}-${adminBankInfo.accountNumber}`;
+  return (
+    <div className="grid h-44 w-44 grid-cols-9 gap-1 rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+      {Array.from({ length: 81 }).map((_, index) => {
+        const active = index < 10 || (index % 9 < 2 && index < 27) || (((index + seed.length) * 7 + seed.charCodeAt(index % seed.length)) % 5 < 2);
+        return <span key={index} className={`rounded-sm ${active ? "bg-slate-950" : "bg-slate-100"}`} />;
+      })}
+    </div>
+  );
+}
+
+function NotificationDetailModal({ notification, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
+        <div className="mb-4">
+          <h3 className="text-xl font-black text-slate-900">{notification.title}</h3>
+          <p className="mt-1 text-sm text-slate-500">{notification.scope} • {notification.date}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">{notification.content}</div>
+        <div className="mt-5 flex justify-end"><Button variant="secondary" onClick={onClose}>Đóng</Button></div>
+      </motion.div>
+    </div>
+  );
+}
+
+function ComplaintReadOnlyModal({ complaint, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-900">{complaint.title}</h3>
+            <p className="mt-1 text-sm text-slate-500">{complaint.id} • {complaint.sender}</p>
+          </div>
+          <StatusBadge status={complaint.status} />
+        </div>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nội dung khiếu nại</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{complaint.content}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nội dung xử lý</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{complaint.response || "Ban quản trị chưa cập nhật nội dung xử lý."}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end"><Button variant="secondary" onClick={onClose}>Đóng</Button></div>
+      </motion.div>
+    </div>
+  );
+}
+
+function PaymentQRModal({ bill, onClose }) {
+  const remaining = Math.max(0, Number(bill.amountDue || 0) - Number(bill.amountPaid || 0));
+  const transferContent = `BLUEMOON ${bill.room} ${getPeriodSummaryText(bill)}`.replace(/\s+/g, " ");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-900">Thanh toán phí căn hộ {bill.room}</h3>
+            <p className="mt-1 text-sm text-slate-500">{getPeriodSummaryText(bill)}</p>
+          </div>
+          <Badge tone={bill.status === "PAID" ? "green" : "red"}>{bill.status === "PAID" ? "Đã nộp" : "Chưa nộp"}</Badge>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+          <div className="flex flex-col items-center justify-center rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+            <FakeQRCode room={bill.room} amount={remaining} />
+            <p className="mt-3 text-center text-xs font-semibold text-slate-500">Quét mã QR để thanh toán</p>
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Số tiền cần chuyển</p>
+              <p className="mt-1 text-3xl font-black text-rose-700">{money(remaining)}</p>
+            </div>
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Ngân hàng</p><p className="mt-1 font-black text-slate-900">{adminBankInfo.bankName}</p></div>
+              <div className="rounded-2xl border border-slate-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Số tài khoản</p><p className="mt-1 font-black text-slate-900">{adminBankInfo.accountNumber}</p></div>
+              <div className="rounded-2xl border border-slate-200 p-4 md:col-span-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Chủ tài khoản</p><p className="mt-1 font-black text-slate-900">{adminBankInfo.accountHolder}</p></div>
+              <div className="rounded-2xl border border-slate-200 p-4 md:col-span-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nội dung chuyển khoản</p><p className="mt-1 font-black text-slate-900">{transferContent}</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+              <tr><th className="px-4 py-3">Kỳ</th><th className="px-4 py-3">Nhóm</th><th className="px-4 py-3">Khoản</th><th className="px-4 py-3">Cách tính</th><th className="px-4 py-3 text-right">Số tiền</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {bill.items.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-4 py-3 text-slate-700">{item.period}</td>
+                  <td className="px-4 py-3 text-slate-700">{item.group}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{item.name}</td>
+                  <td className="px-4 py-3 text-slate-600">{item.formula}</td>
+                  <td className="px-4 py-3 text-right font-bold text-slate-900">{money(item.amountDue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-5 flex justify-end"><Button variant="secondary" onClick={onClose}>Đóng</Button></div>
+      </motion.div>
+    </div>
+  );
+}
+
+function Dashboard({ role, user, paymentRecords = [], complaintsList = complaints, notificationList = normalizeNotifications(notifications) }) {
   const unresolvedComplaints = complaintsList.filter((c) => c.status === "IN_PROGRESS");
   const unreadNotifications = notificationList.filter((item) => !item.read);
+  const [dashboardComplaintId, setDashboardComplaintId] = useState(null);
+  const [dashboardNotificationId, setDashboardNotificationId] = useState(null);
+
+  const selectedDashboardComplaint = complaintsList.find((item) => item.id === dashboardComplaintId);
+  const selectedDashboardNotification = notificationList.find((item) => item.id === dashboardNotificationId);
+
+  const closeDashboardModal = () => {
+    setDashboardComplaintId(null);
+    setDashboardNotificationId(null);
+  };
+
+
+  const [dashboardPaymentBill, setDashboardPaymentBill] = useState(null);
+  const [vehiclesList] = useDatabaseState("bluemoon_vehicles", initialVehicles);
+  const [utilitiesList] = useDatabaseState("bluemoon_utilities", initialUtilities);
+  const [unitPrices] = useDatabaseState("bluemoon_utility_prices", {
+    ELECTRICITY: 3500,
+    WATER: 7000,
+    INTERNET: 220000,
+  });
+  const [householdPaymentStatus] = useDatabaseState("bluemoon_household_payment_status", {});
+  const residentRoom = getResidentRoomByUser(user);
+  const residentBills = buildHouseholdBillRows({
+    rooms: [residentRoom],
+    paymentRecords,
+    vehiclesList,
+    utilitiesList,
+    unitPrices,
+    householdPaymentStatus,
+    filters: { status: "ALL", month: "ALL", year: "ALL" },
+  });
+  const unpaidResidentBills = residentBills.filter((bill) => bill.status === "UNPAID");
+
+  if (role !== "ADMIN") {
+    return (
+      <>
+        <SectionHeader title="Dashboard cư dân" desc="Các khoản phí chưa nộp và thông báo mới nhất của hộ cư dân." />
+
+        <div className="mb-6 grid gap-4 md:grid-cols-2">
+          <Card>
+            <p className="text-sm font-semibold text-slate-500">Căn hộ</p>
+            <p className="mt-2 text-3xl font-black text-slate-950">{residentRoom}</p>
+            <p className="mt-1 text-xs text-slate-500">{getResidentDisplayName(user)}</p>
+          </Card>
+          <Card>
+            <p className="text-sm font-semibold text-slate-500">Tổng chưa nộp</p>
+            <p className="mt-2 text-3xl font-black text-rose-700">
+              {money(unpaidResidentBills.reduce((sum, bill) => sum + Math.max(0, bill.amountDue - bill.amountPaid), 0))}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">{unpaidResidentBills.length} khoản/hóa đơn cần thanh toán</p>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card>
+            <h3 className="mb-4 text-lg font-black">Các khoản phí chưa nộp</h3>
+            <div className="space-y-3">
+              {unpaidResidentBills.length === 0 ? (
+                <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  ✓ Hộ của bạn không còn khoản phí chưa nộp.
+                </div>
+              ) : (
+                unpaidResidentBills.map((bill) => (
+                  <button
+                    key={bill.key}
+                    onClick={() => setDashboardPaymentBill(bill)}
+                    className="flex w-full items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
+                  >
+                    <div>
+                      <p className="font-black text-slate-900">Căn hộ {bill.room}</p>
+                      <p className="mt-1 text-sm text-slate-500">{getPeriodSummaryText(bill)}</p>
+                      <p className="mt-2 text-sm font-semibold text-rose-700">Cần nộp: {money(Math.max(0, bill.amountDue - bill.amountPaid))}</p>
+                    </div>
+                    <Badge tone="red">Chưa nộp</Badge>
+                  </button>
+                ))
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <h3 className="mb-4 text-lg font-black">Thông báo</h3>
+            <div className="space-y-3">
+              {notificationList.map((n) => (
+                <button
+                  key={n.id || n.title}
+                  onClick={() => setDashboardNotificationId(n.id)}
+                  className="flex w-full gap-3 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-slate-100"
+                >
+                  {n.read ? <CheckCircle2 className="mt-1 h-5 w-5 text-emerald-600" /> : <Bell className="mt-1 h-5 w-5 text-sky-600" />}
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-800">{n.title}</p>
+                    <p className="text-sm text-slate-500">{n.scope} • {n.date}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {dashboardPaymentBill && <PaymentQRModal bill={dashboardPaymentBill} onClose={() => setDashboardPaymentBill(null)} />}
+        {selectedDashboardNotification && <NotificationDetailModal notification={selectedDashboardNotification} onClose={closeDashboardModal} />}
+      </>
+    );
+  }
 
   const cards = role === "ADMIN"
     ? [
@@ -1347,7 +1911,10 @@ function Dashboard({ role, complaintsList = complaints, notificationList = norma
               unresolvedComplaints.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => onOpenComplaint?.(c.id)}
+                  onClick={() => {
+                    setDashboardComplaintId(c.id);
+                    setDashboardNotificationId(null);
+                  }}
                   className="flex w-full gap-3 rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
                 >
                   <MessageSquareWarning className="mt-1 h-5 w-5 flex-shrink-0 text-amber-600" />
@@ -1372,7 +1939,10 @@ function Dashboard({ role, complaintsList = complaints, notificationList = norma
             {notificationList.map((n) => (
               <button
                 key={n.id || n.title}
-                onClick={() => onOpenNotification?.(n.id)}
+                onClick={() => {
+                  setDashboardNotificationId(n.id);
+                  setDashboardComplaintId(null);
+                }}
                 className="flex w-full gap-3 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-slate-100"
               >
                 <Bell className="mt-1 h-5 w-5 text-sky-600" />
@@ -1385,6 +1955,90 @@ function Dashboard({ role, complaintsList = complaints, notificationList = norma
           </div>
         </Card>
       </div>
+
+      {selectedDashboardComplaint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeDashboardModal}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">
+                  {selectedDashboardComplaint.title}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedDashboardComplaint.id} • {selectedDashboardComplaint.sender}
+                </p>
+              </div>
+              <StatusBadge status={selectedDashboardComplaint.status} />
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Danh mục</p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">{selectedDashboardComplaint.category}</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nội dung khiếu nại</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{selectedDashboardComplaint.content}</p>
+              </div>
+
+              {selectedDashboardComplaint.response && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Nội dung xử lý</p>
+                  <p className="mt-2 text-sm leading-6 text-emerald-800">{selectedDashboardComplaint.response}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" onClick={closeDashboardModal}>
+                Đóng
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {selectedDashboardNotification && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeDashboardModal}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-4">
+              <h3 className="text-xl font-black text-slate-900">
+                {selectedDashboardNotification.title}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                {selectedDashboardNotification.scope} • {selectedDashboardNotification.date}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              {selectedDashboardNotification.content}
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" onClick={closeDashboardModal}>
+                Đóng
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   );
 }
@@ -1407,7 +2061,9 @@ function Accounts({ registrations = [] }) {
     .filter((reg) => reg.status === "approved")
     .map((reg) => ({
       username: reg.username,
+      password: reg.password || "",
       fullName: reg.fullName,
+      name: reg.fullName,
       email: reg.email,
       phone: reg.phone,
       apartment: reg.apartment,
@@ -1416,150 +2072,305 @@ function Accounts({ registrations = [] }) {
     }));
 
   const accountRows = [
-    ...users,
+    ...users.map((user) => ({
+      ...user,
+      fullName: user.fullName || user.name || user.username,
+      active: user.active || "Hoạt động",
+      apartment: user.apartment || "",
+      phone: user.phone || "",
+      email: user.email || "",
+    })),
     ...approvedRegistrationAccounts.filter(
       (approved) => !users.some((user) => user.username === approved.username)
     ),
   ];
-  const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
+
+  const emptyForm = {
     fullName: "",
     username: "",
     password: "",
+    confirmPassword: "",
     email: "",
     phone: "",
+    apartment: "",
     role: "RESIDENT",
+    active: "Hoạt động",
+  };
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(null);
+  const [error, setError] = useState("");
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [formData, setFormData] = useState(emptyForm);
+
+  const filteredRows = accountRows.filter((account) => {
+    const keyword = searchKeyword.trim().toLowerCase();
+    if (!keyword) return true;
+
+    return (
+      String(account.username || "").toLowerCase().includes(keyword) ||
+      String(account.fullName || account.name || "").toLowerCase().includes(keyword) ||
+      String(account.email || "").toLowerCase().includes(keyword) ||
+      String(account.phone || "").toLowerCase().includes(keyword) ||
+      String(account.apartment || "").toLowerCase().includes(keyword)
+    );
   });
 
-  const handleCreate = () => {
-    // Validate form
-    if (!formData.fullName.trim() || !formData.username.trim() || !formData.password.trim() || !formData.email.trim() || !formData.phone.trim()) {
-      setError("Vui lòng nhập đầy đủ thông tin");
-      return;
-    }
+  const openCreateForm = () => {
+    setFormData(emptyForm);
+    setEditingUsername(null);
+    setError("");
+    setShowForm(true);
+  };
 
-    // Check if username already exists
-    if (users.find(u => u.username === formData.username)) {
-      setError("Tên đăng nhập đã tồn tại");
-      return;
-    }
-
-    // Create new user
-    const newUser = {
-      username: formData.username,
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      role: formData.role,
-      active: "Hoạt động",
-    };
-
-    setUsers([...users, newUser]);
-    
-    // Reset form
+  const openEditForm = (account) => {
     setFormData({
-      fullName: "",
-      username: "",
+      fullName: account.fullName || account.name || "",
+      username: account.username || "",
       password: "",
-      email: "",
-      phone: "",
-      role: "RESIDENT",
+      confirmPassword: "",
+      email: account.email || "",
+      phone: account.phone || "",
+      apartment: account.apartment || "",
+      role: account.role || "RESIDENT",
+      active: account.active || "Hoạt động",
     });
+    setEditingUsername(account.username);
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleCancel = () => {
+    setFormData(emptyForm);
+    setEditingUsername(null);
     setError("");
     setShowForm(false);
   };
 
-  const handleCancel = () => {
-    setFormData({
-      fullName: "",
-      username: "",
-      password: "",
-      email: "",
-      phone: "",
-      role: "RESIDENT",
+  const validateAccountForm = () => {
+    if (
+      !formData.fullName.trim() ||
+      !formData.username.trim() ||
+      !formData.email.trim() ||
+      !formData.phone.trim()
+    ) {
+      setError("Vui lòng nhập đầy đủ họ tên, username, email và số điện thoại");
+      return false;
+    }
+
+    if (!editingUsername && !formData.password.trim()) {
+      setError("Vui lòng nhập mật khẩu");
+      return false;
+    }
+
+    if ((formData.password || formData.confirmPassword) && formData.password !== formData.confirmPassword) {
+      setError("Mật khẩu nhập lại không khớp");
+      return false;
+    }
+
+    const usernameExisted = users.some(
+      (u) =>
+        u.username?.toLowerCase() === formData.username.trim().toLowerCase() &&
+        u.username !== editingUsername
+    );
+
+    if (usernameExisted) {
+      setError("Tên đăng nhập đã tồn tại");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSave = () => {
+    if (!validateAccountForm()) return;
+
+    const cleanUsername = formData.username.trim();
+    const savedAccount = {
+      username: cleanUsername,
+      fullName: formData.fullName.trim(),
+      name: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      apartment: formData.apartment.trim(),
+      role: formData.role,
+      active: formData.active,
+    };
+
+    if (formData.password.trim()) {
+      savedAccount.password = formData.password.trim();
+    }
+
+    setUsers((prev) => {
+      const existed = prev.some((u) => u.username === editingUsername || u.username === cleanUsername);
+      if (!existed) {
+        return [...prev, savedAccount];
+      }
+
+      return prev.map((u) => {
+        if (u.username !== editingUsername && u.username !== cleanUsername) return u;
+
+        return {
+          ...u,
+          ...savedAccount,
+          password: formData.password.trim() ? formData.password.trim() : u.password,
+        };
+      });
     });
-    setError("");
-    setShowForm(false);
+
+    handleCancel();
   };
 
   return (
     <>
-      <SectionHeader title="Quản lý tài khoản" desc="Admin tạo, sửa, khoá/mở khoá và duyệt tài khoản cư dân đăng ký." action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4" /> Tạo tài khoản</Button>} />
-      
+      <SectionHeader
+        title="Quản lý tài khoản"
+        desc="Admin tạo, sửa, khoá/mở khoá và duyệt tài khoản cư dân đăng ký."
+        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Tạo tài khoản</Button>}
+      />
+
       {showForm && (
-        <Card className="mb-5">
-          <h3 className="mb-4 text-lg font-bold">Tạo tài khoản mới</h3>
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input 
-                label="Họ tên" 
-                placeholder="Nguyễn Văn A"
-                value={formData.fullName}
-                onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-              />
-              <Select label="Vai trò" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
-                <option value="ADMIN">Admin</option>
-                <option value="RESIDENT">Cư dân</option>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <h3 className="mb-4 text-xl font-black text-slate-900">
+              {editingUsername ? "Chi tiết / chỉnh sửa tài khoản" : "Tạo tài khoản mới"}
+            </h3>
+
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Họ tên"
+                  placeholder="Nguyễn Văn A"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                />
+                <Select label="Vai trò" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
+                  <option value="ADMIN">Admin</option>
+                  <option value="RESIDENT">Cư dân</option>
+                </Select>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Email"
+                  type="email"
+                  placeholder="name@email.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+                <Input
+                  label="Số điện thoại"
+                  placeholder="09xxxxxxxx"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Tên đăng nhập"
+                  placeholder="Nhập tên đăng nhập"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                />
+                <Input
+                  label="Căn hộ"
+                  placeholder="VD: 1201"
+                  value={formData.apartment}
+                  onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label={editingUsername ? "Mật khẩu mới" : "Mật khẩu"}
+                  type="password"
+                  placeholder={editingUsername ? "Bỏ trống nếu không đổi" : "Nhập mật khẩu"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+                <Input
+                  label="Nhập lại mật khẩu"
+                  type="password"
+                  placeholder={editingUsername ? "Nhập lại mật khẩu mới" : "Nhập lại mật khẩu"}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                />
+              </div>
+
+              <Select label="Trạng thái" value={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.value })}>
+                <option>Hoạt động</option>
+                <option>Khoá</option>
               </Select>
+
+              {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="secondary" onClick={handleCancel}>Hủy</Button>
+                <Button onClick={handleSave}>{editingUsername ? "Lưu thay đổi" : "Tạo tài khoản"}</Button>
+              </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input 
-                label="Email" 
-                type="email"
-                placeholder="name@email.com"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-              />
-              <Input 
-                label="Số điện thoại" 
-                placeholder="09xxxxxxxx"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-              />
-            </div>
-            <Input 
-              label="Tên đăng nhập" 
-              placeholder="Nhập tên đăng nhập"
-              value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
-            />
-            <Input 
-              label="Mật khẩu" 
-              type="password" 
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-            />
-            {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={handleCancel}>Huỷ</Button>
-              <Button onClick={handleCreate}>Tạo tài khoản</Button>
-            </div>
-          </div>
-        </Card>
+          </motion.div>
+        </div>
       )}
-      
-      <div className="relative max-w-md flex-1 mb-5">
+
+      <div className="relative mb-5 max-w-md flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input placeholder="Tìm username, họ tên, email..." className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+        <input
+          placeholder="Tìm username, họ tên, email, căn hộ..."
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+        />
       </div>
-      
-      <DataTable columns={[
-        { key: "username", label: "Username" },
-        { key: "fullName", label: "Họ tên" },
-        { key: "email", label: "Email" },
-        { key: "phone", label: "SĐT", render: (r) => r.phone || "__" },
-        { key: "apartment", label: "Căn hộ", render: (r) => r.apartment || "__" },
-        { key: "role", label: "Vai trò", render: (r) => <Badge tone={r.role === "ADMIN" ? "blue" : "green"}>{r.role}</Badge> },
-        { key: "active", label: "Trạng thái", render: (r) => <Badge tone={r.active === "Chờ duyệt" ? "yellow" : "green"}>{r.active}</Badge> },
-      ]} rows={accountRows} />
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-4">Username</th>
+                <th className="px-5 py-4">Họ tên</th>
+                <th className="px-5 py-4">Email</th>
+                <th className="px-5 py-4">SĐT</th>
+                <th className="px-5 py-4">Căn hộ</th>
+                <th className="px-5 py-4">Vai trò</th>
+                <th className="px-5 py-4">Trạng thái</th>
+                <th className="px-5 py-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredRows.map((row) => (
+                <tr key={row.username} className="hover:bg-slate-50/80">
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.username}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.fullName || row.name}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.email || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.phone || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.apartment || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.role === "ADMIN" ? "blue" : "green"}>{row.role}</Badge></td>
+                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.active === "Khoá" ? "red" : "green"}>{row.active || "Hoạt động"}</Badge></td>
+                  <td className="px-5 py-4 text-right">
+                    <button onClick={() => openEditForm(row)} className="font-semibold text-sky-700 hover:text-sky-900">
+                      Chi tiết
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </>
   );
 }
 
 function Apartments() {
   const [filteredApartments, setFilteredApartments] = useState(apartments);
+  const [selectedApartment, setSelectedApartment] = useState(null);
   const [filters, setFilters] = useState({
     code: "",
     floor: "Tất cả tầng",
@@ -1570,30 +2381,26 @@ function Apartments() {
   const handleSearch = () => {
     let results = apartments;
 
-    // Filter by apartment code
     if (filters.code.trim()) {
-      results = results.filter(a => a.code.includes(filters.code.trim()));
+      results = results.filter((a) => a.code.includes(filters.code.trim()));
     }
 
-    // Filter by floor
     if (filters.floor !== "Tất cả tầng") {
       const floorNum = parseInt(filters.floor.replace("Tầng ", ""));
-      results = results.filter(a => a.floor === floorNum);
+      results = results.filter((a) => a.floor === floorNum);
     }
 
-    // Filter by status
     if (filters.status !== "Tất cả") {
       const statusMap = {
         "Đang ở": "OCCUPIED",
         "Đang trống": "AVAILABLE",
       };
       const statusValue = statusMap[filters.status];
-      results = results.filter(a => a.status === statusValue);
+      results = results.filter((a) => a.status === statusValue);
     }
 
-    // Filter by owner name
     if (filters.owner.trim()) {
-      results = results.filter(a => a.owner.toLowerCase().includes(filters.owner.toLowerCase()));
+      results = results.filter((a) => a.owner.toLowerCase().includes(filters.owner.toLowerCase()));
     }
 
     setFilteredApartments(results);
@@ -1609,56 +2416,158 @@ function Apartments() {
     setFilteredApartments(apartments);
   };
 
+  const getApartmentMembers = (apartmentCode) => residents.filter((resident) => resident.room === apartmentCode);
+
   return (
     <>
       <SectionHeader title="Quản lý căn hộ" desc="Danh sách căn hộ cố định, có lọc theo số căn, tầng, trạng thái và chủ hộ." />
+
       <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <Input 
-          label="Số căn hộ" 
-          placeholder="VD: 1201" 
+        <Input
+          label="Số căn hộ"
+          placeholder="VD: 1201"
           value={filters.code}
-          onChange={(e) => setFilters({...filters, code: e.target.value})}
+          onChange={(e) => setFilters({ ...filters, code: e.target.value })}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
         />
-        <Select 
-          label="Tầng" 
+        <Select
+          label="Tầng"
           value={filters.floor}
-          onChange={(e) => setFilters({...filters, floor: e.target.value})}
+          onChange={(e) => setFilters({ ...filters, floor: e.target.value })}
         >
           <option>Tất cả tầng</option>
           <option>Tầng 12</option>
           <option>Tầng 18</option>
           <option>Tầng 24</option>
         </Select>
-        <Select 
-          label="Trạng thái" 
+        <Select
+          label="Trạng thái"
           value={filters.status}
-          onChange={(e) => setFilters({...filters, status: e.target.value})}
+          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
         >
           <option>Tất cả</option>
           <option>Đang ở</option>
           <option>Đang trống</option>
         </Select>
-        <Input 
-          label="Tên chủ hộ" 
+        <Input
+          label="Tên chủ hộ"
           placeholder="Nhập tên chủ hộ"
           value={filters.owner}
-          onChange={(e) => setFilters({...filters, owner: e.target.value})}
+          onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
         />
       </div>
+
       <div className="mb-5 flex gap-3">
         <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
         <Button variant="secondary" onClick={handleReset}>Xoá bộ lọc</Button>
       </div>
-      <DataTable columns={[
-        { key: "code", label: "Số căn" },
-        { key: "floor", label: "Tầng" },
-        { key: "area", label: "Diện tích", render: (r) => `${r.area} m²` },
-        { key: "owner", label: "Chủ hộ" },
-        { key: "members", label: "Nhân khẩu" },
-        { key: "status", label: "Trạng thái", render: (r) => <StatusBadge status={r.status} /> },
-      ]} rows={filteredApartments} />
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-4">Số căn</th>
+                <th className="px-5 py-4">Tầng</th>
+                <th className="px-5 py-4">Diện tích</th>
+                <th className="px-5 py-4">Chủ hộ</th>
+                <th className="px-5 py-4">Nhân khẩu</th>
+                <th className="px-5 py-4">Trạng thái</th>
+                <th className="px-5 py-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredApartments.map((apartment) => (
+                <tr key={apartment.code} className="hover:bg-slate-50/80">
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{apartment.code}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{apartment.floor}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{apartment.area} m²</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{apartment.owner}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{apartment.members}</td>
+                  <td className="whitespace-nowrap px-5 py-4"><StatusBadge status={apartment.status} /></td>
+                  <td className="px-5 py-4 text-right">
+                    <button onClick={() => setSelectedApartment(apartment)} className="font-semibold text-sky-700 hover:text-sky-900">
+                      Chi tiết
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selectedApartment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Chi tiết căn hộ {selectedApartment.code}</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Tầng {selectedApartment.floor} • {selectedApartment.area} m² • Chủ hộ: {selectedApartment.owner}
+                </p>
+              </div>
+              <StatusBadge status={selectedApartment.status} />
+            </div>
+
+            <div className="mb-5 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Số căn</p>
+                <p className="mt-1 text-lg font-black text-slate-900">{selectedApartment.code}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Tầng</p>
+                <p className="mt-1 text-lg font-black text-slate-900">{selectedApartment.floor}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Diện tích</p>
+                <p className="mt-1 text-lg font-black text-slate-900">{selectedApartment.area} m²</p>
+              </div>
+            </div>
+
+            <h4 className="mb-3 text-lg font-black text-slate-900">Thành viên trong căn hộ</h4>
+            {getApartmentMembers(selectedApartment.code).length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+                Căn hộ này chưa có thông tin thành viên.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Họ tên</th>
+                      <th className="px-4 py-3">Năm sinh</th>
+                      <th className="px-4 py-3">CCCD/CMND</th>
+                      <th className="px-4 py-3">Quan hệ</th>
+                      <th className="px-4 py-3">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {getApartmentMembers(selectedApartment.code).map((member) => (
+                      <tr key={`${member.room}-${member.name}`}>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{member.name}</td>
+                        <td className="px-4 py-3 text-slate-700">{member.birthYear}</td>
+                        <td className="px-4 py-3 text-slate-700">{member.idCard}</td>
+                        <td className="px-4 py-3 text-slate-700">{member.relation}</td>
+                        <td className="px-4 py-3"><StatusBadge status={member.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" onClick={() => setSelectedApartment(null)}>Đóng</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   );
 }
@@ -1668,6 +2577,7 @@ function Residents() {
   const [filteredResidents, setFilteredResidents] = useState(residents);
   const [showForm, setShowForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [residentEditingVehicle, setResidentEditingVehicle] = useState(null);
   const [error, setError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchFilters, setSearchFilters] = useState({
@@ -2937,7 +3847,7 @@ function Payments({ feesList, paymentRecords, setPaymentRecords }) {
   );
 }
 
-function Vehicles() {
+function Vehicles({ role = "ADMIN", user }) {
   const parkingFloors = [
     { id: "T1", label: "Tầng 1", desc: "Xe máy & xe đạp", total: 108, types: ["Xe máy", "Xe đạp"], area: "450m²" },
     { id: "T2", label: "Tầng 2", desc: "Ô tô", total: 20, types: ["Ô tô"], area: "520m²" },
@@ -2951,19 +3861,26 @@ function Vehicles() {
     "Xe đạp": 30000,
   };
 
-  const [vehiclesList, setVehiclesList] = useDatabaseState("bluemoon_vehicles", initialVehicles);
-  const [filteredVehicles, setFilteredVehicles] = useState(vehiclesList);
-  const [selectedFloor, setSelectedFloor] = useState("T1");
-  const [showForm, setShowForm] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [error, setError] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [searchFilters, setSearchFilters] = useState({
+  const emptySearchFilters = {
     plate: "",
     type: "",
     room: "",
     slot: "",
-  });
+  };
+
+  const [vehiclesList, setVehiclesList] = useDatabaseState("bluemoon_vehicles", initialVehicles);
+  const [parkingRequests, setParkingRequests] = useDatabaseState("bluemoon_parking_requests", []);
+  const vehiclesData = Array.isArray(vehiclesList) ? vehiclesList : [];
+  const parkingRequestsData = Array.isArray(parkingRequests) ? parkingRequests : [];
+  const [filteredVehicles, setFilteredVehicles] = useState(() => vehiclesData);
+  const [selectedFloor, setSelectedFloor] = useState("T1");
+  const [showForm, setShowForm] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [residentEditingVehicle, setResidentEditingVehicle] = useState(null);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [searchFilters, setSearchFilters] = useState(emptySearchFilters);
   const [formData, setFormData] = useState({
     name: "",
     birthYear: "",
@@ -2975,6 +3892,15 @@ function Vehicles() {
     slot: "",
     status: "USED",
   });
+
+  const isAdmin = role === "ADMIN";
+  const residentRoom = getResidentRoomByUser(user);
+  const residentName = getResidentDisplayName(user);
+
+  const showToast = (message, tone = "green") => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const normalizeSlot = (slot) => {
     const value = String(slot || "").trim().toUpperCase();
@@ -3023,50 +3949,97 @@ function Vehicles() {
 
   const selectedFloorInfo = parkingFloors.find((floor) => floor.id === selectedFloor) || parkingFloors[0];
   const selectedFloorSlots = makeSlotsForFloor(selectedFloorInfo);
-  const parkingBlocks = buildParkingBlocks(selectedFloorSlots, 3);
-  const occupiedSlotKeys = new Set(vehiclesList.map((vehicle) => normalizeSlot(vehicle.slot)).filter(Boolean));
+  const isCarFloor = selectedFloorInfo.types.includes("Ô tô");
+  const parkingBlocks = isCarFloor
+    ? [
+        {
+          left: selectedFloorSlots.slice(0, 10),
+          right: selectedFloorSlots.slice(10, 20),
+        },
+      ]
+    : buildParkingBlocks(selectedFloorSlots, 3);
+
+  const occupiedSlotKeys = new Set(vehiclesData.map((vehicle) => normalizeSlot(vehicle.slot)).filter(Boolean));
+  const pendingRequests = parkingRequestsData.filter((request) => request.status === "pending");
+  const pendingSlotKeys = new Set(pendingRequests.map((request) => normalizeSlot(request.slot)).filter(Boolean));
+  const myParkingRequests = parkingRequestsData.filter(
+    (request) => request.requesterUsername === user?.username || String(request.room) === String(residentRoom)
+  );
+  const myVehicles = vehiclesData.filter((vehicle) => String(vehicle.room) === String(residentRoom));
+
   const selectedFloorOccupied = selectedFloorSlots.filter((slot) => occupiedSlotKeys.has(slot.id)).length;
-  const selectedFloorAvailable = selectedFloorInfo.total - selectedFloorOccupied;
+  const selectedFloorPending = selectedFloorSlots.filter((slot) => pendingSlotKeys.has(slot.id)).length;
+  const selectedFloorAvailable = selectedFloorInfo.total - selectedFloorOccupied - selectedFloorPending;
   const totalSlots = parkingFloors.reduce((sum, floor) => sum + floor.total, 0);
   const occupiedInMap = parkingFloors.reduce((sum, floor) => {
     const slots = makeSlotsForFloor(floor);
     return sum + slots.filter((slot) => occupiedSlotKeys.has(slot.id)).length;
   }, 0);
-  const totalVehicles = vehiclesList.length;
+  const pendingInMap = parkingFloors.reduce((sum, floor) => {
+    const slots = makeSlotsForFloor(floor);
+    return sum + slots.filter((slot) => pendingSlotKeys.has(slot.id)).length;
+  }, 0);
+  const totalVehicles = vehiclesData.length;
   const totalOccupied = Math.max(occupiedInMap, totalVehicles);
-  const totalAvailable = Math.max(0, totalSlots - totalOccupied);
+  const totalAvailable = Math.max(0, totalSlots - totalOccupied - pendingInMap);
   const allSlotOptions = parkingFloors.flatMap((floor) => makeSlotsForFloor(floor).map((slot) => ({ ...slot, floor })));
 
   const getVehicleBySlot = (slotId) => {
-    const index = vehiclesList.findIndex((vehicle) => normalizeSlot(vehicle.slot) === slotId);
+    const index = vehiclesData.findIndex((vehicle) => normalizeSlot(vehicle.slot) === slotId);
     return { index, vehicle: index >= 0 ? vehiclesList[index] : null };
   };
 
-  const openCreateForm = (slotId = "") => {
+  const getPendingRequestBySlot = (slotId) =>
+    pendingRequests.find((request) => normalizeSlot(request.slot) === slotId);
+
+  const createDefaultFormData = (slotId = "") => {
     const floor = slotId ? getFloorBySlot(slotId) : selectedFloorInfo;
     const defaultType = floor?.types?.[0] || "Xe máy";
-    setFormData({
-      name: "",
+    return {
+      name: isAdmin ? "" : residentName,
       birthYear: "",
       idCard: "",
       plate: "",
       type: defaultType,
-      room: "",
+      room: isAdmin ? "" : residentRoom,
       fee: String(feeByType[defaultType] || 0),
       slot: slotId,
       status: "USED",
-    });
+    };
+  };
+
+  const openCreateForm = (slotId = "") => {
+    setFormData(createDefaultFormData(slotId));
     setEditingIndex(null);
+    setResidentEditingVehicle(null);
     setError("");
     setShowForm(true);
   };
 
   const handleSlotClick = (slotId) => {
     const { index, vehicle } = getVehicleBySlot(slotId);
+    const pendingRequest = getPendingRequestBySlot(slotId);
+
     if (vehicle) {
-      handleEdit(index, vehicle);
+      if (isAdmin) {
+        handleEdit(index, vehicle);
+      } else if (String(vehicle.room) === String(residentRoom)) {
+        openResidentVehicleEdit(vehicle);
+      } else {
+        showToast("Chỗ gửi này đã có người gửi. Vui lòng chọn chỗ khác.", "red");
+      }
       return;
     }
+
+    if (pendingRequest) {
+      if (!isAdmin && String(pendingRequest.room) === String(residentRoom)) {
+        showToast("Yêu cầu của bạn đang chờ Admin duyệt.", "yellow");
+      } else {
+        showToast("Chỗ gửi này đang chờ Admin duyệt. Vui lòng chọn chỗ khác.", "yellow");
+      }
+      return;
+    }
+
     openCreateForm(slotId);
   };
 
@@ -3089,8 +4062,10 @@ function Vehicles() {
     });
   };
 
-  const filterVehicles = (source = vehiclesList) => {
-    let results = source;
+  const getSearchSource = (source = vehiclesData) => (isAdmin ? source : source.filter((vehicle) => String(vehicle.room) === String(residentRoom)));
+
+  const filterVehicles = (source = vehiclesData) => {
+    let results = getSearchSource(source);
 
     if (searchFilters.plate.trim()) {
       const keyword = searchFilters.plate.trim().toLowerCase();
@@ -3118,32 +4093,62 @@ function Vehicles() {
   };
 
   const handleResetSearch = () => {
-    setSearchFilters({ plate: "", type: "", room: "", slot: "" });
-    setFilteredVehicles(vehiclesList);
+    setSearchFilters(emptySearchFilters);
+    setFilteredVehicles(getSearchSource(vehiclesData));
   };
 
-  const handleAdd = () => {
-    const normalizedSlot = formData.slot.trim();
-    const normalizedSlotKey = normalizeSlot(normalizedSlot);
-    const normalizedPlate = formData.plate.trim() || "__";
-    const normalizedRoom = formData.room.trim() || "__";
+  const validateVehicleForm = () => {
+    const normalizedSlot = normalizeSlot(formData.slot.trim());
+    const normalizedPlate = formData.plate.trim();
 
     if (!formData.name.trim() || !formData.birthYear.trim() || !formData.fee || !normalizedSlot) {
       setError("Vui lòng nhập đầy đủ thông tin và chọn chỗ gửi trên sơ đồ");
-      return;
+      return false;
     }
 
-    const selectedSlotFloor = getFloorBySlot(normalizedSlotKey);
+    if ((formData.type === "Xe máy" || formData.type === "Ô tô") && !normalizedPlate) {
+      setError("Xe máy và ô tô bắt buộc phải nhập biển số xe");
+      return false;
+    }
+
+    const selectedSlotFloor = getFloorBySlot(normalizedSlot);
     if (selectedSlotFloor && !selectedSlotFloor.types.includes(formData.type)) {
       setError(`${selectedSlotFloor.label} chỉ nhận: ${selectedSlotFloor.types.join(", ")}`);
-      return;
+      return false;
     }
 
-    const slotUsed = vehiclesList.some((vehicle, index) => index !== editingIndex && normalizeSlot(vehicle.slot) === normalizedSlotKey);
+    const slotUsed = vehiclesData.some((vehicle, index) => {
+      if (index === editingIndex || normalizeSlot(vehicle.slot) !== normalizedSlot) return false;
+
+      const isCurrentResidentVehicle =
+        !isAdmin &&
+        residentEditingVehicle &&
+        String(vehicle.room) === String(residentRoom) &&
+        normalizeSlot(vehicle.slot) === normalizeSlot(residentEditingVehicle.slot);
+
+      return !isCurrentResidentVehicle;
+    });
+
     if (slotUsed) {
       setError("Chỗ gửi này đã có người gửi");
-      return;
+      return false;
     }
+
+    const slotPending = pendingRequests.some((request) => normalizeSlot(request.slot) === normalizedSlot);
+    if (slotPending && editingIndex === null && !residentEditingVehicle) {
+      setError("Chỗ gửi này đang chờ Admin duyệt");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleAdd = () => {
+    if (!validateVehicleForm()) return;
+
+    const normalizedSlotKey = normalizeSlot(formData.slot.trim());
+    const normalizedPlate = formData.plate.trim() || "__";
+    const normalizedRoom = formData.room.trim() || "__";
 
     const savedVehicle = {
       name: formData.name.trim(),
@@ -3157,11 +4162,38 @@ function Vehicles() {
       status: formData.status,
     };
 
+    if (!isAdmin) {
+      const newRequest = {
+        id: `PARK-${Date.now()}`,
+        ...savedVehicle,
+        requestType: residentEditingVehicle ? "UPDATE" : "CREATE",
+        originalSlot: residentEditingVehicle ? normalizeSlot(residentEditingVehicle.slot) : "",
+        originalPlate: residentEditingVehicle ? residentEditingVehicle.plate : "",
+        originalType: residentEditingVehicle ? residentEditingVehicle.type : "",
+        status: "pending",
+        requesterUsername: user?.username || "",
+        createdAt: new Date().toLocaleString("vi-VN", {
+          dateStyle: "short",
+          timeStyle: "short",
+        }),
+      };
+
+      setParkingRequests((prev) => [newRequest, ...(Array.isArray(prev) ? prev : [])]);
+      handleCancel();
+      showToast(
+        residentEditingVehicle
+          ? "Đã gửi yêu cầu thay đổi thông tin xe đến Admin. Vui lòng chờ duyệt."
+          : "Đã gửi đăng ký gửi xe đến Admin. Vui lòng chờ duyệt.",
+        "green"
+      );
+      return;
+    }
+
     let updatedList;
     if (editingIndex !== null) {
-      updatedList = vehiclesList.map((vehicle, index) => (index === editingIndex ? savedVehicle : vehicle));
+      updatedList = vehiclesData.map((vehicle, index) => (index === editingIndex ? savedVehicle : vehicle));
     } else {
-      updatedList = [...vehiclesList, savedVehicle];
+      updatedList = [...vehiclesData, savedVehicle];
     }
 
     setVehiclesList(updatedList);
@@ -3170,6 +4202,8 @@ function Vehicles() {
   };
 
   const handleEdit = (index, vehicle) => {
+    if (!isAdmin) return;
+
     const slotKey = normalizeSlot(vehicle.slot);
     setFormData({
       name: vehicle.name,
@@ -3183,20 +4217,40 @@ function Vehicles() {
       status: vehicle.status,
     });
     setEditingIndex(index);
+    setResidentEditingVehicle(null);
+    setError("");
+    setShowForm(true);
+  };
+
+  const openResidentVehicleEdit = (vehicle) => {
+    const slotKey = normalizeSlot(vehicle.slot);
+    setFormData({
+      name: vehicle.name || residentName,
+      birthYear: vehicle.birthYear || "",
+      idCard: vehicle.idCard || "",
+      plate: vehicle.plate === "__" ? "" : vehicle.plate,
+      type: vehicle.type || "Xe máy",
+      room: vehicle.room || residentRoom,
+      fee: String(vehicle.fee || feeByType[vehicle.type] || 0),
+      slot: slotKey || vehicle.slot,
+      status: vehicle.status || "USED",
+    });
+    setResidentEditingVehicle(vehicle);
+    setEditingIndex(null);
     setError("");
     setShowForm(true);
   };
 
   const handleDeleteClick = () => {
     if (editingIndex !== null) {
-      const vehicle = vehiclesList[editingIndex];
+      const vehicle = vehiclesData[editingIndex];
       setDeleteConfirm({ index: editingIndex, plate: vehicle.plate, slot: vehicle.slot });
     }
   };
 
   const handleConfirmDelete = () => {
     if (deleteConfirm) {
-      const updatedList = vehiclesList.filter((_, i) => i !== deleteConfirm.index);
+      const updatedList = vehiclesData.filter((_, i) => i !== deleteConfirm.index);
       setVehiclesList(updatedList);
       setFilteredVehicles(filterVehicles(updatedList));
       setDeleteConfirm(null);
@@ -3206,34 +4260,126 @@ function Vehicles() {
   };
 
   const handleCancel = () => {
-    const defaultType = selectedFloorInfo.types[0] || "Xe máy";
-    setFormData({
-      name: "",
-      birthYear: "",
-      idCard: "",
-      plate: "",
-      type: defaultType,
-      room: "",
-      fee: String(feeByType[defaultType] || 0),
-      slot: "",
-      status: "USED",
-    });
+    setFormData(createDefaultFormData(""));
     setError("");
     setShowForm(false);
     setEditingIndex(null);
+    setResidentEditingVehicle(null);
+  };
+
+  const handleApproveParkingRequest = (request) => {
+    const normalizedSlot = normalizeSlot(request.slot);
+    const originalSlot = normalizeSlot(request.originalSlot);
+    const isUpdateRequest = request.requestType === "UPDATE";
+
+    const slotUsed = vehiclesData.some((vehicle) => {
+      if (normalizeSlot(vehicle.slot) !== normalizedSlot) return false;
+
+      const isOriginalVehicle =
+        isUpdateRequest &&
+        String(vehicle.room) === String(request.room) &&
+        normalizeSlot(vehicle.slot) === originalSlot;
+
+      return !isOriginalVehicle;
+    });
+
+    if (slotUsed) {
+      showToast("Không thể duyệt vì chỗ gửi này đã có người gửi.", "red");
+      return;
+    }
+
+    const approvedVehicle = {
+      name: request.name,
+      birthYear: request.birthYear,
+      idCard: request.idCard,
+      plate: request.plate || "__",
+      type: request.type,
+      room: request.room,
+      fee: Number(request.fee || feeByType[request.type] || 0),
+      slot: normalizedSlot,
+      status: "USED",
+    };
+
+    let updatedVehicles;
+    if (isUpdateRequest) {
+      let updatedExistingVehicle = false;
+      updatedVehicles = vehiclesData.map((vehicle) => {
+        const isOriginalVehicle =
+          String(vehicle.room) === String(request.room) &&
+          normalizeSlot(vehicle.slot) === originalSlot;
+
+        if (!isOriginalVehicle) return vehicle;
+        updatedExistingVehicle = true;
+        return approvedVehicle;
+      });
+
+      if (!updatedExistingVehicle) {
+        updatedVehicles = [...updatedVehicles, approvedVehicle];
+      }
+    } else {
+      updatedVehicles = [...vehiclesData, approvedVehicle];
+    }
+
+    setVehiclesList(updatedVehicles);
+    setFilteredVehicles(filterVehicles(updatedVehicles));
+
+    setParkingRequests((prev) =>
+      (Array.isArray(prev) ? prev : []).map((item) =>
+        item.id === request.id
+          ? {
+              ...item,
+              status: "approved",
+              approvedAt: new Date().toLocaleString("vi-VN", {
+                dateStyle: "short",
+                timeStyle: "short",
+              }),
+            }
+          : item
+      )
+    );
+
+    showToast(
+      isUpdateRequest
+        ? "Đã duyệt thay đổi thông tin xe."
+        : "Đã duyệt đăng ký gửi xe và thêm vào danh sách xe.",
+      "green"
+    );
+  };
+
+  const handleRejectParkingRequest = (request) => {
+    setParkingRequests((prev) =>
+      (Array.isArray(prev) ? prev : []).map((item) =>
+        item.id === request.id
+          ? {
+              ...item,
+              status: "rejected",
+              rejectedAt: new Date().toLocaleString("vi-VN", {
+                dateStyle: "short",
+                timeStyle: "short",
+              }),
+            }
+          : item
+      )
+    );
+
+    showToast("Đã từ chối đăng ký gửi xe.", "red");
   };
 
   const currentSlotFloor = getFloorBySlot(formData.slot) || selectedFloorInfo;
   const allowedTypesForForm = currentSlotFloor?.types || ["Ô tô", "Xe máy", "Xe đạp"];
   const availableSlotOptions = allSlotOptions.filter(({ id }) => {
-    if (editingIndex !== null && normalizeSlot(vehiclesList[editingIndex]?.slot) === id) return true;
-    return !occupiedSlotKeys.has(id);
+    if (editingIndex !== null && normalizeSlot(vehiclesData[editingIndex]?.slot) === id) return true;
+    if (residentEditingVehicle && normalizeSlot(residentEditingVehicle.slot) === id) return true;
+    return !occupiedSlotKeys.has(id) && !pendingSlotKeys.has(id);
   });
 
   const getSlotType = (slot) => {
     const { vehicle } = getVehicleBySlot(slot.id);
+    const pendingRequest = getPendingRequestBySlot(slot.id);
+
     return (
       vehicle?.type ||
+      pendingRequest?.type ||
       (selectedFloorInfo.types.includes("Ô tô")
         ? "Ô tô"
         : slot.index % 4 === 0
@@ -3244,18 +4390,36 @@ function Vehicles() {
 
   const renderSpot = (slot) => {
     const occupied = occupiedSlotKeys.has(slot.id);
+    const pending = pendingSlotKeys.has(slot.id);
     const vehicleType = getSlotType(slot);
-    const iconColor = occupied ? "text-rose-500" : "text-emerald-400";
+    const isCarSpot = vehicleType === "Ô tô";
+    const iconColor = occupied ? "text-rose-500" : pending ? "text-amber-500" : "text-emerald-500";
 
     return (
       <button
         key={slot.id}
         onClick={() => handleSlotClick(slot.id)}
-        title={occupied ? `${slot.id} - đã đặt` : `${slot.id} - còn trống`}
-        className={`flex h-8 items-center justify-center rounded-sm border transition sm:h-9 ${occupied ? "border-rose-200/70 bg-rose-100/25 hover:bg-rose-100/40" : "border-emerald-200/70 bg-emerald-100/20 hover:bg-emerald-100/35"}`}
+        title={occupied ? `${slot.id} - đã đặt` : pending ? `${slot.id} - đang chờ duyệt` : `${slot.id} - còn trống`}
+        className={`flex items-center justify-center border transition ${
+          isCarSpot
+            ? `h-14 rounded-xl sm:h-16 md:h-20 ${
+                occupied
+                  ? "border-rose-200 bg-rose-50 hover:bg-rose-100"
+                  : pending
+                    ? "border-amber-200 bg-amber-50 hover:bg-amber-100"
+                    : "border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+              }`
+            : `h-8 rounded-sm sm:h-9 ${
+                occupied
+                  ? "border-rose-200/70 bg-rose-100/25 hover:bg-rose-100/40"
+                  : pending
+                    ? "border-amber-200/70 bg-amber-100/30 hover:bg-amber-100/50"
+                    : "border-emerald-200/70 bg-emerald-100/20 hover:bg-emerald-100/35"
+              }`
+        }`}
       >
-        {vehicleType === "Ô tô" ? (
-          <Car className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
+        {isCarSpot ? (
+          <Car className={`h-8 w-8 sm:h-9 sm:w-9 md:h-11 md:w-11 ${iconColor}`} strokeWidth={2.2} />
         ) : (
           <Bike className={`h-3.5 w-3.5 ${iconColor}`} strokeWidth={2.2} />
         )}
@@ -3263,12 +4427,108 @@ function Vehicles() {
     );
   };
 
+  const visibleVehicles = filterVehicles(vehiclesData);
+
+  const requestStatusBadge = (status) => {
+    if (status === "approved") return <Badge tone="green">Đã duyệt</Badge>;
+    if (status === "rejected") return <Badge tone="red">Từ chối</Badge>;
+    return <Badge tone="yellow">Chờ duyệt</Badge>;
+  };
+
   return (
     <>
       <SectionHeader
-        title="Sơ đồ bãi đỗ xe"
-        desc="Chọn một chỗ trống trên sơ đồ để đăng ký xe. Chỗ đã đặt có thể bấm để xem chi tiết hoặc chỉnh sửa."
+        title={isAdmin ? "Sơ đồ bãi đỗ xe" : "Đăng ký gửi xe"}
+        desc={
+          isAdmin
+            ? "Admin quản lý sơ đồ bãi đỗ, danh sách xe và duyệt đăng ký gửi xe của cư dân."
+            : "Cư dân chọn chỗ gửi xe trên sơ đồ. Sau khi gửi, Admin sẽ duyệt trước khi chỗ gửi được xác nhận."
+        }
+        action={
+          <Button onClick={() => openCreateForm()}>
+            <Plus className="h-4 w-4" />
+            {isAdmin ? "Đăng ký xe" : "Gửi đăng ký xe"}
+          </Button>
+        }
       />
+
+      {toast && (
+        <div
+          className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ring-1 ${
+            toast.tone === "red"
+              ? "bg-rose-50 text-rose-700 ring-rose-200"
+              : toast.tone === "yellow"
+                ? "bg-amber-50 text-amber-700 ring-amber-200"
+                : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      {!isAdmin && (
+        <Card className="mb-5 border-sky-100 bg-sky-50/60">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="font-black text-slate-900">Hướng dẫn đăng ký gửi xe</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Bấm vào một chỗ màu xanh trên sơ đồ hoặc bấm nút <strong>Gửi đăng ký xe</strong>. Nếu muốn đổi thông tin xe đã duyệt, bấm <strong>Chi tiết</strong> ở mục Chỗ gửi xe của tôi.
+              </p>
+            </div>
+            <Button onClick={() => openCreateForm()}><Plus className="h-4 w-4" /> Gửi đăng ký xe</Button>
+          </div>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="mb-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Duyệt đăng ký gửi xe</h3>
+              <p className="mt-1 text-sm text-slate-500">Có {pendingRequests.length} yêu cầu đang chờ duyệt.</p>
+            </div>
+            <Badge tone={pendingRequests.length > 0 ? "yellow" : "green"}>
+              {pendingRequests.length > 0 ? "Chờ xử lý" : "Không có yêu cầu"}
+            </Badge>
+          </div>
+
+          {pendingRequests.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 px-4 py-5 text-center text-sm font-semibold text-slate-500">
+              Không có yêu cầu gửi xe nào đang chờ duyệt.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingRequests.map((request) => (
+                <div key={request.id} className="grid gap-4 rounded-2xl border border-amber-200 bg-amber-50/40 p-4 md:grid-cols-[1fr_auto]">
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <p className="font-black text-slate-900">{request.name}</p>
+                      <Badge tone="yellow">Chờ duyệt</Badge>
+                    </div>
+                    <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+                      <div><span className="font-semibold">Căn hộ:</span> {request.room}</div>
+                      <div><span className="font-semibold">Yêu cầu:</span> {request.requestType === "UPDATE" ? "Đổi thông tin xe" : "Đăng ký mới"}</div>
+                      <div><span className="font-semibold">Loại xe:</span> {request.type}</div>
+                      <div><span className="font-semibold">Biển số:</span> {request.plate || "__"}</div>
+                      <div><span className="font-semibold">Chỗ gửi:</span> {normalizeSlot(request.slot)}</div>
+                      <div><span className="font-semibold">Phí tháng:</span> {money(request.fee)}</div>
+                      <div><span className="font-semibold">Ngày gửi:</span> {request.createdAt}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 md:flex-col md:items-end">
+                    <Button onClick={() => handleApproveParkingRequest(request)}>
+                      <CheckCircle2 className="h-4 w-4" /> Duyệt
+                    </Button>
+                    <Button variant="danger" onClick={() => handleRejectParkingRequest(request)}>
+                      <AlertCircle className="h-4 w-4" /> Từ chối
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <div className="mb-5 grid gap-4 md:grid-cols-4">
         <Card>
@@ -3287,13 +4547,9 @@ function Vehicles() {
           <p className="mt-1 text-xs text-slate-500">Đang được sử dụng</p>
         </Card>
         <Card>
-          <p className="text-sm font-semibold text-slate-500">Tình trạng {selectedFloorInfo.label}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            <span className="text-emerald-600">{selectedFloorAvailable}</span>
-            <span className="mx-1 text-slate-400">/</span>
-            <span className="text-rose-600">{selectedFloorOccupied}</span>
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Trống / đã đặt</p>
+          <p className="text-sm font-semibold text-slate-500">Đang chờ duyệt</p>
+          <p className="mt-2 text-3xl font-black text-amber-600">{pendingInMap}</p>
+          <p className="mt-1 text-xs text-slate-500">Chưa được xác nhận</p>
         </Card>
       </div>
 
@@ -3306,7 +4562,8 @@ function Vehicles() {
           {parkingFloors.map((floor) => {
             const slots = makeSlotsForFloor(floor);
             const occupied = slots.filter((slot) => occupiedSlotKeys.has(slot.id)).length;
-            const available = floor.total - occupied;
+            const pending = slots.filter((slot) => pendingSlotKeys.has(slot.id)).length;
+            const available = floor.total - occupied - pending;
             const selected = selectedFloor === floor.id;
             return (
               <button
@@ -3322,6 +4579,7 @@ function Vehicles() {
                   <Car className="h-5 w-5" />
                 </div>
                 <p className="mt-3 text-sm font-bold text-emerald-600">{available} chỗ trống</p>
+                {pending > 0 && <p className="mt-1 text-xs font-semibold text-amber-600">{pending} chờ duyệt</p>}
               </button>
             );
           })}
@@ -3334,8 +4592,9 @@ function Vehicles() {
             <h3 className="text-lg font-black text-slate-900">Sơ đồ {selectedFloorInfo.label} - Bãi đỗ {selectedFloorInfo.desc}</h3>
             <p className="text-sm text-slate-500">Diện tích: {selectedFloorInfo.area}</p>
           </div>
-          <div className="flex gap-3 text-xs font-semibold">
+          <div className="flex flex-wrap gap-3 text-xs font-semibold">
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-emerald-100 ring-1 ring-emerald-300" /> Trống</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-300" /> Chờ duyệt</span>
             <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-rose-100 ring-1 ring-rose-300" /> Đã đặt</span>
           </div>
         </div>
@@ -3346,20 +4605,29 @@ function Vehicles() {
           </div>
 
           <div className="overflow-x-auto">
-            <div className="parking-diagram mx-auto flex min-w-[680px] items-stretch justify-center gap-4 rounded-3xl border border-slate-200 bg-white p-4 sm:gap-5 sm:p-6">
+            <div className={`parking-diagram mx-auto flex items-stretch justify-center rounded-3xl border border-slate-200 bg-white ${
+              isCarFloor
+                ? "w-full min-w-[640px] max-w-6xl gap-6 p-6 sm:gap-8 sm:p-8"
+                : "min-w-[680px] gap-4 p-4 sm:gap-5 sm:p-6"
+            }`}>
               {parkingBlocks.map((block, blockIndex) => (
-                <div key={blockIndex} className="flex flex-1 items-stretch gap-2 sm:gap-3">
-                  <div className="flex w-16 flex-col gap-1.5 sm:w-20">
+                <div
+                  key={blockIndex}
+                  className={isCarFloor ? "flex w-full items-stretch gap-5 sm:gap-8" : "flex flex-1 items-stretch gap-2 sm:gap-3"}
+                >
+                  <div className={isCarFloor ? "flex flex-1 flex-col gap-3 sm:gap-4" : "flex w-16 flex-col gap-1.5 sm:w-20"}>
                     {block.left.map(renderSpot)}
                   </div>
 
-                  <div className="flex w-8 items-center justify-center sm:w-10">
-                    <div className="parking-lane flex h-28 items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:h-36 [writing-mode:vertical-rl] [text-orientation:mixed]">
+                  <div className={isCarFloor ? "flex w-16 items-center justify-center sm:w-20" : "flex w-8 items-center justify-center sm:w-10"}>
+                    <div className={`parking-lane flex items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 [writing-mode:vertical-rl] [text-orientation:mixed] ${
+                      isCarFloor ? "h-40 sm:h-56" : "h-28 sm:h-36"
+                    }`}>
                       Làn xe
                     </div>
                   </div>
 
-                  <div className="flex w-16 flex-col gap-1.5 sm:w-20">
+                  <div className={isCarFloor ? "flex flex-1 flex-col gap-3 sm:gap-4" : "flex w-16 flex-col gap-1.5 sm:w-20"}>
                     {block.right.map(renderSpot)}
                   </div>
                 </div>
@@ -3376,7 +4644,18 @@ function Vehicles() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-bold">{editingIndex !== null ? "Chi tiết đăng ký xe" : "Đăng ký xe mới"}</h3>
+            <h3 className="mb-4 text-lg font-bold">
+              {isAdmin
+                ? (editingIndex !== null ? "Chi tiết đăng ký xe" : "Đăng ký xe mới")
+                : residentEditingVehicle
+                  ? "Gửi yêu cầu đổi thông tin xe"
+                  : "Gửi đăng ký chỗ gửi xe"}
+            </h3>
+            {!isAdmin && (
+              <div className="mb-4 rounded-xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 ring-1 ring-sky-200">
+                Sau khi gửi, Admin sẽ duyệt trước khi chỗ gửi xe được xác nhận.
+              </div>
+            )}
             <div className="space-y-4">
               <Select label="Chọn chỗ gửi" value={formData.slot} onChange={(e) => handleSlotChange(e.target.value)}>
                 <option value="">Chọn chỗ gửi</option>
@@ -3395,22 +4674,35 @@ function Vehicles() {
                 {allowedTypesForForm.map((type) => <option key={type} value={type}>{type}</option>)}
               </Select>
 
-              <Input label="Biển số" placeholder="Có thể bỏ trống, hệ thống sẽ lưu là __" value={formData.plate} onChange={(e) => setFormData({ ...formData, plate: e.target.value })} />
-              <Input label="Căn hộ" placeholder="1201" value={formData.room} onChange={(e) => setFormData({ ...formData, room: e.target.value })} />
-              <Input label="Phí tháng" placeholder="1200000" value={formData.fee} onChange={(e) => setFormData({ ...formData, fee: e.target.value })} />
+              <Input
+                label={formData.type === "Xe đạp" ? "Biển số" : "Biển số *"}
+                placeholder={formData.type === "Xe đạp" ? "Có thể bỏ trống, hệ thống sẽ lưu là __" : "Bắt buộc với xe máy/ô tô"}
+                value={formData.plate}
+                onChange={(e) => setFormData({ ...formData, plate: e.target.value })}
+              />
+              <Input label="Căn hộ" placeholder="1201" value={formData.room} onChange={(e) => setFormData({ ...formData, room: e.target.value })} disabled={!isAdmin} />
+              <Input label="Phí tháng" placeholder="1200000" value={formData.fee} onChange={(e) => setFormData({ ...formData, fee: e.target.value })} disabled={!isAdmin} />
 
-              <Select label="Trạng thái" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                <option value="USED">Đang dùng</option>
-                <option value="RENTED">Cho thuê</option>
-              </Select>
+              {isAdmin && (
+                <Select label="Trạng thái" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                  <option value="USED">Đang dùng</option>
+                  <option value="RENTED">Cho thuê</option>
+                </Select>
+              )}
 
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
               <div className="flex justify-between gap-3 pt-4">
                 <div className="flex gap-3">
                   <Button variant="secondary" onClick={handleCancel}>Hủy</Button>
-                  {editingIndex !== null && <Button variant="danger" onClick={handleDeleteClick}>Xóa xe</Button>}
+                  {isAdmin && editingIndex !== null && <Button variant="danger" onClick={handleDeleteClick}>Xóa xe</Button>}
                 </div>
-                <Button onClick={handleAdd}>{editingIndex !== null ? "Lưu" : "Đăng ký"}</Button>
+                <Button onClick={handleAdd}>
+                  {isAdmin
+                    ? (editingIndex !== null ? "Lưu" : "Đăng ký")
+                    : residentEditingVehicle
+                      ? "Gửi yêu cầu thay đổi"
+                      : "Gửi đăng ký"}
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -3435,25 +4727,67 @@ function Vehicles() {
         </div>
       )}
 
-      <Card className="mb-5">
-        <div className="grid gap-3 md:grid-cols-4">
-          <Input label="Biển số" placeholder="VD: 30A-12345" value={searchFilters.plate} onChange={(e) => setSearchFilters({ ...searchFilters, plate: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
-          <Input label="Căn hộ" placeholder="Nhập số căn" value={searchFilters.room} onChange={(e) => setSearchFilters({ ...searchFilters, room: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
-          <Select label="Loại xe" value={searchFilters.type} onChange={(e) => setSearchFilters({ ...searchFilters, type: e.target.value })}>
-            <option value="">Tất cả loại</option>
-            <option value="Ô tô">Ô tô</option>
-            <option value="Xe máy">Xe máy</option>
-            <option value="Xe đạp">Xe đạp</option>
-          </Select>
-          <Input label="Chỗ gửi" placeholder="VD: T1-008" value={searchFilters.slot} onChange={(e) => setSearchFilters({ ...searchFilters, slot: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
-        </div>
-        <div className="mt-4 flex gap-3">
-          <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
-          <Button variant="secondary" onClick={handleResetSearch}>Xóa bộ lọc</Button>
-        </div>
-      </Card>
+      {!isAdmin && (
+        <Card className="mb-5">
+          <h3 className="mb-4 text-lg font-black text-slate-900">Đăng ký gửi xe của tôi</h3>
+          {myParkingRequests.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 px-4 py-5 text-center text-sm font-semibold text-slate-500">
+              Bạn chưa gửi yêu cầu đăng ký gửi xe nào.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myParkingRequests.map((request) => (
+                <div key={request.id} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="font-black text-slate-900">
+                        {request.requestType === "UPDATE" ? "Đổi thông tin xe" : "Đăng ký mới"} • {request.type} • {request.plate || "__"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Chỗ gửi {normalizeSlot(request.slot)} • {money(request.fee)} / tháng
+                      </p>
+                      {request.requestType === "UPDATE" && request.originalSlot && (
+                        <p className="mt-1 text-xs text-slate-500">Chỗ cũ: {normalizeSlot(request.originalSlot)} • Biển số cũ: {request.originalPlate || "__"}</p>
+                      )}
+                      <p className="mt-1 text-xs text-slate-500">Ngày gửi: {request.createdAt}</p>
+                    </div>
+                    {requestStatusBadge(request.status)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <Card className="mb-5 !p-0">
+        <div className="border-b border-slate-200 px-5 py-5">
+          <h3 className="font-black text-slate-900">{isAdmin ? "Danh sách xe đang gửi" : "Chỗ gửi xe của tôi"}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {isAdmin ? "Admin có thể tìm kiếm, xem chi tiết và chỉnh sửa xe." : "Cư dân xem các chỗ gửi đã được duyệt và gửi yêu cầu đổi thông tin xe khi cần."}
+          </p>
+
+          {isAdmin && (
+            <div className="mt-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <Input label="Biển số" placeholder="VD: 30A-12345" value={searchFilters.plate} onChange={(e) => setSearchFilters({ ...searchFilters, plate: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+                <Input label="Căn hộ" placeholder="Nhập số căn" value={searchFilters.room} onChange={(e) => setSearchFilters({ ...searchFilters, room: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+                <Select label="Loại xe" value={searchFilters.type} onChange={(e) => setSearchFilters({ ...searchFilters, type: e.target.value })}>
+                  <option value="">Tất cả loại</option>
+                  <option value="Ô tô">Ô tô</option>
+                  <option value="Xe máy">Xe máy</option>
+                  <option value="Xe đạp">Xe đạp</option>
+                </Select>
+                <Input label="Chỗ gửi" placeholder="VD: T1-008" value={searchFilters.slot} onChange={(e) => setSearchFilters({ ...searchFilters, slot: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+              </div>
+              <div className="mt-4 flex gap-3">
+                <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
+                <Button variant="secondary" onClick={handleResetSearch}>Xóa bộ lọc</Button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -3468,8 +4802,15 @@ function Vehicles() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredVehicles.map((v, idx) => {
-                const originalIdx = vehiclesList.findIndex((vehicle) => vehicle.plate === v.plate && vehicle.slot === v.slot && vehicle.room === v.room && vehicle.name === v.name);
+              {(isAdmin ? visibleVehicles : myVehicles).length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
+                    {isAdmin ? "Chưa có xe nào trong danh sách." : "Bạn chưa có chỗ gửi xe nào được duyệt."}
+                  </td>
+                </tr>
+              )}
+              {(isAdmin ? visibleVehicles : myVehicles).map((v, idx) => {
+                const originalIdx = vehiclesData.findIndex((vehicle) => vehicle.plate === v.plate && vehicle.slot === v.slot && vehicle.room === v.room && vehicle.name === v.name);
                 return (
                   <tr key={`${v.slot}-${idx}`} className="hover:bg-slate-50/80">
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.plate}</td>
@@ -3479,7 +4820,11 @@ function Vehicles() {
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(v.fee)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700"><Badge tone={v.status === "RENTED" ? "violet" : "green"}>{v.status === "RENTED" ? "Cho thuê" : "Đang dùng"}</Badge></td>
                     <td className="px-5 py-4 text-right">
-                      <button onClick={() => handleEdit(originalIdx, v)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
+                      {isAdmin ? (
+                        <button onClick={() => handleEdit(originalIdx, v)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
+                      ) : (
+                        <button onClick={() => openResidentVehicleEdit(v)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -3487,10 +4832,11 @@ function Vehicles() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </>
   );
 }
+
 function Utilities() {
   const utilityTypes = [
     { value: "ELECTRICITY", label: "Điện" },
@@ -4095,9 +5441,13 @@ function Utilities() {
   );
 }
 
-function Complaints({ role, complaintsList, setComplaintsList, initialComplaintId, onInitialComplaintHandled }) {
+function Complaints({ role, user, complaintsList, setComplaintsList, initialComplaintId, onInitialComplaintHandled }) {
+  const residentRoom = getResidentRoomByUser(user);
+  const visibleComplaints = role === "ADMIN"
+    ? complaintsList
+    : complaintsList.filter((complaint) => String(complaint.sender || "").trim() === `Căn ${residentRoom}`);
   const [selectedComplaint, setSelectedComplaint] = useState(() =>
-    initialComplaintId ? complaintsList.find((item) => item.id === initialComplaintId) || null : null
+    initialComplaintId ? visibleComplaints.find((item) => item.id === initialComplaintId) || null : null
   );
   const [handlingContent, setHandlingContent] = useState(() => selectedComplaint?.response || "");
   const [handlingStatus, setHandlingStatus] = useState(() => selectedComplaint?.status || "IN_PROGRESS");
@@ -4121,8 +5471,10 @@ function Complaints({ role, complaintsList, setComplaintsList, initialComplaintI
   };
 
   const handleSave = () => {
-    if (role === "ADMIN" && !handlingContent.trim()) {
-      setError("Vui lòng nhập nội dung xử lý");
+    if (role !== "ADMIN") return;
+
+    if (handlingStatus === "RESOLVED" && !handlingContent.trim()) {
+      setError("Khi chuyển sang Đã giải quyết, vui lòng nhập nội dung xử lý");
       return;
     }
 
@@ -4150,7 +5502,7 @@ function Complaints({ role, complaintsList, setComplaintsList, initialComplaintI
     const createdComplaint = {
       id: `KN-${Date.now()}`,
       title: newComplaint.title.trim(),
-      sender: "Căn 1201",
+      sender: `Căn ${residentRoom}`,
       category: newComplaint.category,
       content: newComplaint.content.trim(),
       response: "",
@@ -4170,7 +5522,7 @@ function Complaints({ role, complaintsList, setComplaintsList, initialComplaintI
         desc={
           role === "ADMIN"
             ? "Admin xem nội dung khiếu nại, nhập nội dung xử lý và cập nhật trạng thái."
-            : "Cư dân gửi khiếu nại và theo dõi trạng thái xử lý."
+            : `Cư dân căn ${residentRoom} chỉ xem và gửi khiếu nại của chính căn hộ mình.`
         }
         action={
           role === "ADMIN" ? null : (
@@ -4219,7 +5571,7 @@ function Complaints({ role, complaintsList, setComplaintsList, initialComplaintI
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {complaintsList.map((complaint) => (
+              {visibleComplaints.map((complaint) => (
                 <tr key={complaint.id} className="hover:bg-slate-50/80">
                   <td className="px-5 py-4 text-slate-700">{complaint.id}</td>
                   <td className="px-5 py-4 font-semibold text-slate-800">{complaint.title}</td>
@@ -4231,6 +5583,13 @@ function Complaints({ role, complaintsList, setComplaintsList, initialComplaintI
                   </td>
                 </tr>
               ))}
+              {visibleComplaints.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">
+                    Chưa có khiếu nại nào của căn hộ này.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -4239,38 +5598,54 @@ function Complaints({ role, complaintsList, setComplaintsList, initialComplaintI
       {selectedComplaint && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-black">Chi tiết khiếu nại</h3>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Chi tiết khiếu nại</h3>
+                <p className="mt-1 text-sm text-slate-500">{selectedComplaint.id} • {selectedComplaint.sender}</p>
+              </div>
+              <StatusBadge status={selectedComplaint.status} />
+            </div>
+
             <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              <p><strong>Mã:</strong> {selectedComplaint.id}</p>
               <p><strong>Tiêu đề:</strong> {selectedComplaint.title}</p>
-              <p><strong>Người gửi:</strong> {selectedComplaint.sender}</p>
               <p><strong>Loại:</strong> {selectedComplaint.category}</p>
-              <p className="mt-2"><strong>Nội dung:</strong></p>
+              <p className="mt-2"><strong>Nội dung khiếu nại:</strong></p>
               <p>{selectedComplaint.content}</p>
             </div>
 
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-slate-700">Nội dung xử lý</span>
-                <textarea
-                  rows={5}
-                  value={handlingContent}
-                  onChange={(e) => setHandlingContent(e.target.value)}
-                  disabled={role !== "ADMIN"}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50"
-                  placeholder="Nhập nội dung xử lý..."
-                />
-              </label>
-              <Select label="Trạng thái" value={handlingStatus} onChange={(e) => setHandlingStatus(e.target.value)}>
-                <option value="IN_PROGRESS">Đang xử lý</option>
-                <option value="RESOLVED">Đã giải quyết</option>
-              </Select>
-              {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
-              <div className="flex justify-end gap-3">
-                <Button variant="secondary" onClick={closeDetail}>Hủy</Button>
-                {role === "ADMIN" && <Button onClick={handleSave}>Lưu</Button>}
+            {role === "ADMIN" ? (
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-semibold text-slate-700">Nội dung xử lý</span>
+                  <textarea
+                    rows={5}
+                    value={handlingContent}
+                    onChange={(e) => setHandlingContent(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                    placeholder={handlingStatus === "IN_PROGRESS" ? "Có thể bỏ trống khi trạng thái là Đang xử lý" : "Nhập nội dung xử lý khi đã giải quyết..."}
+                  />
+                </label>
+                <Select label="Trạng thái" value={handlingStatus} onChange={(e) => setHandlingStatus(e.target.value)}>
+                  <option value="IN_PROGRESS">Đang xử lý</option>
+                  <option value="RESOLVED">Đã giải quyết</option>
+                </Select>
+                {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
+                <div className="flex justify-end gap-3">
+                  <Button variant="secondary" onClick={closeDetail}>Hủy</Button>
+                  <Button onClick={handleSave}>Lưu</Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nội dung xử lý của Ban quản trị</p>
+                  <p className="mt-2">{selectedComplaint.response || "Ban quản trị chưa cập nhật nội dung xử lý."}</p>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="secondary" onClick={closeDetail}>Đóng</Button>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
@@ -4404,7 +5779,7 @@ function Notifications({ role, notificationList, setNotificationList, initialNot
     <>
       <SectionHeader
         title="Gửi/Xem thông báo"
-        desc="Admin soạn thông báo theo toàn chung cư, theo tầng hoặc theo hộ; cư dân xem thông báo nhận được."
+        desc={role === "ADMIN" ? "Admin soạn thông báo và xem lại danh sách thông báo đã gửi." : "Cư dân xem thông báo nhận được từ Ban quản trị."}
         action={
           role === "ADMIN" ? (
             <Button onClick={() => setShowCompose(true)}>
@@ -4516,7 +5891,9 @@ function Notifications({ role, notificationList, setNotificationList, initialNot
               className="flex w-full items-start justify-between rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
             >
               <div className="flex gap-3">
-                {item.read ? (
+                {role === "ADMIN" ? (
+                  <Bell className="mt-1 h-5 w-5 text-sky-600" />
+                ) : item.read ? (
                   <CheckCircle2 className="mt-1 h-5 w-5 text-emerald-600" />
                 ) : (
                   <AlertCircle className="mt-1 h-5 w-5 text-sky-600" />
@@ -4528,9 +5905,11 @@ function Notifications({ role, notificationList, setNotificationList, initialNot
                   </p>
                 </div>
               </div>
-              <Badge tone={item.read ? "green" : "blue"}>
-                {item.read ? "Đã đọc" : "Chưa đọc"}
-              </Badge>
+              {role !== "ADMIN" && (
+                <Badge tone={item.read ? "green" : "blue"}>
+                  {item.read ? "Đã đọc" : "Chưa đọc"}
+                </Badge>
+              )}
             </button>
           ))}
         </div>
@@ -4556,9 +5935,11 @@ function Notifications({ role, notificationList, setNotificationList, initialNot
                   {selectedNotification.scope} • {selectedNotification.date}
                 </p>
               </div>
-              <Badge tone={selectedNotification.read ? "green" : "blue"}>
-                {selectedNotification.read ? "Đã đọc" : "Chưa đọc"}
-              </Badge>
+              {role !== "ADMIN" && (
+                <Badge tone={selectedNotification.read ? "green" : "blue"}>
+                  {selectedNotification.read ? "Đã đọc" : "Chưa đọc"}
+                </Badge>
+              )}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
@@ -4569,14 +5950,14 @@ function Notifications({ role, notificationList, setNotificationList, initialNot
               <Button variant="secondary" onClick={closeDetail}>
                 Đóng
               </Button>
-              <Button onClick={handleToggleRead}>
-                {selectedNotification.read ? "Đánh dấu là chưa đọc" : "Đã đọc"}
-              </Button>
+              {role !== "ADMIN" && (
+                <Button onClick={handleToggleRead}>
+                  {selectedNotification.read ? "Đánh dấu là chưa đọc" : "Đã đọc"}
+                </Button>
+              )}
             </div>
 
-            <p className="mt-3 text-xs text-slate-500">
-              Bấm ra ngoài khung thông báo sẽ đóng chi tiết và giữ nguyên trạng thái hiện tại.
-            </p>
+
           </motion.div>
         </div>
       )}
@@ -4584,69 +5965,481 @@ function Notifications({ role, notificationList, setNotificationList, initialNot
   );
 }
 
-function Statistics() {
+function Statistics({ paymentRecords = [] }) {
+  const getChargeMethodLabel = (method) => {
+    if (method === "PER_M2") return "Theo m²";
+    if (method === "FIXED") return "Cố định / hộ";
+    if (method === "DONATION") return "Tự nguyện";
+    return method || "__";
+  };
+
+  const totalDue = paymentRecords.reduce((sum, record) => sum + Number(record.amountDue || 0), 0);
+  const totalPaid = paymentRecords.reduce((sum, record) => sum + Number(record.amountPaid || 0), 0);
+  const totalMissing = Math.max(0, totalDue - totalPaid);
+
+  const householdSummaries = Object.values(
+    paymentRecords.reduce((acc, record) => {
+      const key = record.room || "__";
+      if (!acc[key]) {
+        acc[key] = {
+          room: record.room || "__",
+          owner: record.owner || "__",
+          amountDue: 0,
+          amountPaid: 0,
+        };
+      }
+      acc[key].amountDue += Number(record.amountDue || 0);
+      acc[key].amountPaid += Number(record.amountPaid || 0);
+      return acc;
+    }, {})
+  ).map((item) => ({
+    ...item,
+    missing: Math.max(0, item.amountDue - item.amountPaid),
+    status: Number(item.amountPaid || 0) >= Number(item.amountDue || 0) && Number(item.amountDue || 0) > 0 ? "PAID" : "UNPAID",
+  }));
+
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const exportPaymentInvoicesExcel = () => {
+    if (!paymentRecords.length) {
+      alert("Chưa có dữ liệu hóa đơn thu phí để xuất.");
+      return;
+    }
+
+    const headers = [
+      "STT",
+      "Căn hộ",
+      "Chủ hộ",
+      "Tháng",
+      "Năm",
+      "Khoản thu",
+      "Cách tính",
+      "Diện tích (m²)",
+      "Đơn giá",
+      "Số tiền phải nộp",
+      "Số tiền đã nộp",
+      "Còn thiếu",
+      "Trạng thái",
+      "Ngày nộp",
+      "Ghi chú",
+    ];
+
+    const rows = paymentRecords.map((record, index) => {
+      const amountDue = Number(record.amountDue || 0);
+      const amountPaid = Number(record.amountPaid || 0);
+      return [
+        index + 1,
+        record.room || "__",
+        record.owner || "__",
+        record.month || "__",
+        record.year || "__",
+        record.feeName || "__",
+        getChargeMethodLabel(record.chargeMethod),
+        record.area || "__",
+        Number(record.unitPrice || 0),
+        amountDue,
+        amountPaid,
+        Math.max(0, amountDue - amountPaid),
+        record.status === "PAID" ? "Đã nộp" : "Chưa nộp",
+        record.paidDate || "__",
+        record.note || "__",
+      ];
+    });
+
+    const summaryRows = householdSummaries.map((item, index) => [
+      index + 1,
+      item.room,
+      item.owner,
+      item.amountDue,
+      item.amountPaid,
+      item.missing,
+      item.status === "PAID" ? "Đã nộp" : "Chưa nộp",
+    ]);
+
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+            th { background: #dbeafe; font-weight: bold; }
+            th, td { border: 1px solid #94a3b8; padding: 6px 8px; }
+            .title { font-size: 18px; font-weight: bold; background: #0ea5e9; color: white; }
+            .section { font-weight: bold; background: #e2e8f0; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td class="title" colspan="15">BÁO CÁO HÓA ĐƠN THU PHÍ CHUNG CƯ BLUEMOON</td></tr>
+            <tr><td colspan="15">Ngày xuất: ${escapeHtml(new Date().toLocaleString("vi-VN"))}</td></tr>
+            <tr><td colspan="15"></td></tr>
+            <tr><td class="section" colspan="15">TỔNG HỢP THEO HỘ</td></tr>
+            <tr>${["STT", "Căn hộ", "Chủ hộ", "Tổng phải nộp", "Tổng đã nộp", "Còn thiếu", "Trạng thái"].map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>
+            ${summaryRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+            <tr><td colspan="15"></td></tr>
+            <tr><td class="section" colspan="15">CHI TIẾT CÁC KHOẢN THU PHÍ</td></tr>
+            <tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>
+            ${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+          </table>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateText = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `hoa_don_thu_phi_bluemoon_${dateText}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
-      <SectionHeader title="Thống kê và xuất file" desc="Thống kê đợt thu, đóng góp, dân cư và xuất báo cáo Excel/PDF." action={<div className="flex gap-2"><Button variant="secondary"><Download className="h-4 w-4" /> Excel</Button><Button><Download className="h-4 w-4" /> PDF</Button></div>} />
+      <SectionHeader
+        title="Thống kê và xuất file"
+        desc="Thống kê hóa đơn thu phí của các hộ và xuất ra file Excel."
+        action={
+          <Button onClick={exportPaymentInvoicesExcel}>
+            <Download className="h-4 w-4" /> Xuất Excel hóa đơn
+          </Button>
+        }
+      />
+
       <Card className="mb-6">
         <div className="grid gap-4 md:grid-cols-4">
-          <Select label="Loại báo cáo"><option>Tình trạng đợt thu</option><option>Đóng góp</option><option>Dân cư</option><option>Theo hộ gia đình</option></Select>
+          <Select label="Loại báo cáo">
+            <option>Hóa đơn thu phí các hộ</option>
+          </Select>
           <Input label="Từ ngày" type="date" />
           <Input label="Đến ngày" type="date" />
-          <Select label="Định dạng"><option>Excel</option><option>PDF</option></Select>
+          <Select label="Định dạng">
+            <option>Excel</option>
+          </Select>
         </div>
       </Card>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><p className="text-sm font-semibold text-slate-500">Tổng phải thu</p><p className="mt-2 text-3xl font-black">{money(245600000)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Đã thu</p><p className="mt-2 text-3xl font-black text-emerald-700">{money(198300000)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Còn thiếu</p><p className="mt-2 text-3xl font-black text-rose-700">{money(47300000)}</p></Card>
+
+      <div className="mb-6 grid gap-4 md:grid-cols-3">
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Tổng phải thu</p>
+          <p className="mt-2 text-3xl font-black">{money(totalDue)}</p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Đã thu</p>
+          <p className="mt-2 text-3xl font-black text-emerald-700">{money(totalPaid)}</p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Còn thiếu</p>
+          <p className="mt-2 text-3xl font-black text-rose-700">{money(totalMissing)}</p>
+        </Card>
       </div>
+
+      <Card>
+        <h3 className="mb-4 text-lg font-black">Tổng hợp hóa đơn theo hộ</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-4">Căn hộ</th>
+                <th className="px-5 py-4">Chủ hộ</th>
+                <th className="px-5 py-4">Phải nộp</th>
+                <th className="px-5 py-4">Đã nộp</th>
+                <th className="px-5 py-4">Còn thiếu</th>
+                <th className="px-5 py-4">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {householdSummaries.map((item) => (
+                <tr key={item.room} className="hover:bg-slate-50/80">
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{item.room}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{item.owner}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(item.amountDue)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(item.amountPaid)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(item.missing)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700"><StatusBadge status={item.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </>
   );
 }
 
-function MyFees() {
-  const rows = [
-    { room: "1201", owner: "Hộ của tôi", due: 532000, paid: 532000, status: "PAID" },
-    { room: "1201", owner: "Hộ của tôi", due: 452000, paid: 0, status: "UNPAID" },
-  ];
+function MyFees({ user, paymentRecords = [] }) {
+  const residentRoom = getResidentRoomByUser(user);
+  const months = Array.from({ length: 12 }, (_, index) => index + 1);
+  const years = [2025, 2026, 2027, 2028];
+  const [filters, setFilters] = useState({ status: "ALL", month: "ALL", year: "ALL" });
+  const [paymentBill, setPaymentBill] = useState(null);
+  const [vehiclesList] = useDatabaseState("bluemoon_vehicles", initialVehicles);
+  const [utilitiesList] = useDatabaseState("bluemoon_utilities", initialUtilities);
+  const [unitPrices] = useDatabaseState("bluemoon_utility_prices", {
+    ELECTRICITY: 3500,
+    WATER: 7000,
+    INTERNET: 220000,
+  });
+  const [householdPaymentStatus] = useDatabaseState("bluemoon_household_payment_status", {});
+
+  const billRows = buildHouseholdBillRows({
+    rooms: [residentRoom],
+    paymentRecords,
+    vehiclesList,
+    utilitiesList,
+    unitPrices,
+    householdPaymentStatus,
+    filters,
+  });
+
+  const summary = billRows.reduce(
+    (acc, bill) => {
+      acc.totalDue += Number(bill.amountDue || 0);
+      acc.totalPaid += Number(bill.amountPaid || 0);
+      if (bill.status === "PAID") acc.paid += 1;
+      if (bill.status === "UNPAID") acc.unpaid += 1;
+      return acc;
+    },
+    { totalDue: 0, totalPaid: 0, paid: 0, unpaid: 0 }
+  );
+
   return (
     <>
-      <SectionHeader title="Khoản phí của tôi" desc="Cư dân chỉ xem được khoản phí và lịch sử nộp của hộ mình." />
-      <DataTable columns={[
-        { key: "room", label: "Căn hộ" },
-        { key: "owner", label: "Hộ" },
-        { key: "due", label: "Phải nộp", render: (r) => money(r.due) },
-        { key: "paid", label: "Đã nộp", render: (r) => money(r.paid) },
-        { key: "status", label: "Trạng thái", render: (r) => <StatusBadge status={r.status} /> },
-      ]} rows={rows} />
+      <SectionHeader
+        title="Khoản phí của tôi"
+        desc={`Hiển thị các khoản phí của căn hộ ${residentRoom}. Bấm Thanh toán để xem QR và thông tin chuyển khoản.`}
+      />
+
+      <div className="mb-5 grid gap-4 md:grid-cols-4">
+        <Card><p className="text-sm font-semibold text-slate-500">Tổng phải nộp</p><p className="mt-2 text-2xl font-black">{money(summary.totalDue)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Đã nộp</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Còn thiếu</p><p className="mt-2 text-2xl font-black text-rose-700">{money(Math.max(0, summary.totalDue - summary.totalPaid))}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Hóa đơn chưa nộp</p><p className="mt-2 text-2xl font-black text-rose-700">{summary.unpaid}</p></Card>
+      </div>
+
+      <Card className="mb-5">
+        <div className="grid gap-3 md:grid-cols-3">
+          <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+            <option value="ALL">Tất cả</option>
+            <option value="PAID">Đã nộp</option>
+            <option value="UNPAID">Chưa nộp</option>
+          </Select>
+          <Select label="Tháng" value={filters.month} onChange={(e) => setFilters({ ...filters, month: e.target.value })}>
+            <option value="ALL">Tất cả tháng</option>
+            {months.map((month) => <option key={month} value={month}>Tháng {month}</option>)}
+          </Select>
+          <Select label="Năm" value={filters.year} onChange={(e) => setFilters({ ...filters, year: e.target.value })}>
+            <option value="ALL">Tất cả năm</option>
+            {years.map((year) => <option key={year} value={year}>{year}</option>)}
+          </Select>
+        </div>
+      </Card>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-4">Căn hộ</th>
+                <th className="px-5 py-4">Chủ hộ</th>
+                <th className="px-5 py-4">Kỳ thu</th>
+                <th className="px-5 py-4">Cần đóng</th>
+                <th className="px-5 py-4">Đã nộp</th>
+                <th className="px-5 py-4">Trạng thái</th>
+                <th className="px-5 py-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {billRows.map((bill) => (
+                <tr key={bill.key} className="hover:bg-slate-50/80">
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.room}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{bill.owner}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{getPeriodSummaryText(bill)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(bill.amountDue)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(bill.amountPaid)}</td>
+                  <td className="whitespace-nowrap px-5 py-4"><StatusBadge status={bill.status} /></td>
+                  <td className="px-5 py-4 text-right">
+                    <button onClick={() => setPaymentBill(bill)} className="font-semibold text-sky-700 hover:text-sky-900">
+                      Thanh toán
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {billRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">
+                    Không có khoản phí nào phù hợp với bộ lọc.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {paymentBill && <PaymentQRModal bill={paymentBill} onClose={() => setPaymentBill(null)} />}
     </>
   );
 }
 
-function Profile() {
+function Profile({ user, setUser }) {
+  const { users, setUsers } = useAppContext();
+  const residentRoom = getResidentRoomByUser(user);
+  const currentAccount = users.find((account) => account.username === user?.username) || {};
+  const [formData, setFormData] = useState({
+    fullName: currentAccount.fullName || currentAccount.name || user?.fullName || user?.name || "",
+    email: currentAccount.email || user?.email || "",
+    phone: currentAccount.phone || user?.phone || "",
+    apartment: currentAccount.apartment || user?.apartment || residentRoom,
+    oldPassword: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
+  const [message, setMessage] = useState(null);
+
+  const handleSave = () => {
+    setMessage(null);
+
+    if (!formData.fullName.trim() || !formData.email.trim() || !formData.phone.trim()) {
+      setMessage({ tone: "red", text: "Vui lòng nhập đầy đủ họ tên, email và số điện thoại." });
+      return;
+    }
+
+    if (formData.newPassword || formData.confirmNewPassword) {
+      if (!formData.oldPassword.trim()) {
+        setMessage({ tone: "red", text: "Vui lòng nhập mật khẩu cũ khi đổi mật khẩu." });
+        return;
+      }
+
+      if (currentAccount.password && formData.oldPassword !== currentAccount.password) {
+        setMessage({ tone: "red", text: "Mật khẩu cũ không đúng." });
+        return;
+      }
+
+      if (formData.newPassword !== formData.confirmNewPassword) {
+        setMessage({ tone: "red", text: "Mật khẩu mới nhập lại không khớp." });
+        return;
+      }
+    }
+
+    const updatedAccount = {
+      ...currentAccount,
+      username: user?.username,
+      role: user?.role || currentAccount.role || "RESIDENT",
+      fullName: formData.fullName.trim(),
+      name: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      apartment: residentRoom,
+      active: currentAccount.active || "Hoạt động",
+      password: formData.newPassword ? formData.newPassword : currentAccount.password,
+    };
+
+    setUsers((prev) => {
+      const existed = prev.some((account) => account.username === user?.username);
+      if (!existed) return [...prev, updatedAccount];
+      return prev.map((account) => account.username === user?.username ? { ...account, ...updatedAccount } : account);
+    });
+
+    setUser?.((prev) => ({
+      ...prev,
+      fullName: updatedAccount.fullName,
+      name: updatedAccount.name,
+      email: updatedAccount.email,
+      phone: updatedAccount.phone,
+      apartment: residentRoom,
+    }));
+
+    setFormData({
+      ...formData,
+      oldPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+      apartment: residentRoom,
+    });
+    setMessage({ tone: "green", text: "Đã lưu thông tin cá nhân." });
+  };
+
   return (
     <>
-      <SectionHeader title="Thông tin cá nhân" desc="Cập nhật thông tin cá nhân và đổi mật khẩu tài khoản." />
+      <SectionHeader title="Thông tin cá nhân" desc="Cập nhật thông tin cá nhân và đổi mật khẩu tài khoản. Căn hộ không được phép thay đổi." />
       <Card className="max-w-3xl">
         <div className="grid gap-4 md:grid-cols-2">
-          <Input label="Họ tên" defaultValue="Cư dân căn 1201" />
-          <Input label="Email" defaultValue="resident@email.com" />
-          <Input label="Số điện thoại" defaultValue="09xxxxxxxx" />
-          <Input label="Căn hộ" defaultValue="1201" />
-          <Input label="Mật khẩu cũ" type="password" />
-          <Input label="Mật khẩu mới" type="password" />
+          <Input label="Họ tên" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
+          <Input label="Email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+          <Input label="Số điện thoại" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+          <Input label="Căn hộ" value={residentRoom} disabled className="opacity-80" />
+          <Input label="Mật khẩu cũ" type="password" value={formData.oldPassword} onChange={(e) => setFormData({ ...formData, oldPassword: e.target.value })} />
+          <Input label="Mật khẩu mới" type="password" value={formData.newPassword} onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })} />
+          <Input label="Nhập lại mật khẩu mới" type="password" value={formData.confirmNewPassword} onChange={(e) => setFormData({ ...formData, confirmNewPassword: e.target.value })} />
         </div>
-        <div className="mt-5 flex justify-end"><Button>Lưu thay đổi</Button></div>
+
+        {message && (
+          <div className={`mt-5 rounded-xl px-4 py-3 text-sm font-semibold ring-1 ${message.tone === "red" ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>
+            {message.text}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end"><Button onClick={handleSave}>Lưu thay đổi</Button></div>
       </Card>
     </>
   );
+}
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("BlueMoon render error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-rose-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-2xl bg-rose-50 p-3 text-rose-600">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black">Có lỗi hiển thị giao diện</h1>
+                <p className="text-sm text-slate-500">Bạn có thể bấm tải lại trang. Nếu vẫn lỗi, gửi mình ảnh Console.</p>
+              </div>
+            </div>
+            <pre className="max-h-72 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-white">
+              {String(this.state.error?.message || this.state.error || "Không rõ lỗi")}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default function App() {
   return (
     <AppProvider>
-      <AppContent />
+      <AppErrorBoundary>
+        <AppContent />
+      </AppErrorBoundary>
     </AppProvider>
   );
 }
@@ -4738,6 +6531,8 @@ const syncPaymentsForMandatoryFee = (fee, month = new Date().getMonth() + 1, yea
       setUser={setUser}
       initialMode={authMode}
       onBackIntro={() => setShowIntro(true)}
+      registrations={registrations}
+      setRegistrations={setRegistrations}
     />
   );
 }
