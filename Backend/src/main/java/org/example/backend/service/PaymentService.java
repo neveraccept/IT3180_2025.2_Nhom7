@@ -1,7 +1,7 @@
 package org.example.backend.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
 import org.example.backend.dto.PaymentTransactionDTO;
 import org.example.backend.dto.request.VnpayPaymentUrlRequest;

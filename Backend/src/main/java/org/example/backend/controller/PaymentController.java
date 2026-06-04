@@ -1,7 +1,7 @@
 package org.example.backend.controller;
 
-import org.example.backend.dto.ApiResponse;
-import org.example.backend.dto.PageResponse;
+import org.example.backend.dto.response.ApiResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.PaymentService;
