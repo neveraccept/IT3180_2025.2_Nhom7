@@ -1,244 +1,263 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus } from "lucide-react";
 import { Badge, Button, Card, Input, Select } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
+import {
+  listFeesAPI,
+  searchFeesAPI,
+  createFeeAPI,
+  updateFeeAPI,
+  deleteFeeAPI,
+  listFeePeriodsAPI,
+  createFeePeriodAPI,
+  closeFeePeriodAPI,
+} from "../api/feeApi";
 
-export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, removePaymentsForFee }) {
+// ============================================================
+//  Module 4 — Quản lý khoản thu (Fee) + đợt thu (FeePeriod).
+//  Nguồn dữ liệu: backend FeeController/FeePeriodController (ADMIN).
+//  Giữ nguyên UI/Tailwind; thay toàn bộ logic mock bằng gọi API thật.
+//  Mapping FeeDTO: { name, type(MANDATORY|DONATION), unitPrice, unit, description, active }.
+//  (Backend không có "cách tính" hay "lịch sử chỉnh sửa" → đã lược bỏ.)
+// ============================================================
+export function Fees() {
   const emptyForm = {
     name: "",
     type: "MANDATORY",
-    chargeMethod: "PER_M2",
     unitPrice: "",
+    unit: "đ/m²",
     description: "",
-    status: "ACTIVE",
+    active: true,
   };
 
-  const [filteredFees, setFilteredFees] = useState(feesList);
+  const [fees, setFees] = useState([]);
+  const [periods, setPeriods] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+
   const [showForm, setShowForm] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [historyTarget, setHistoryTarget] = useState(null);
-  const [filters, setFilters] = useState({ name: "", type: "ALL", chargeMethod: "ALL", status: "ALL" });
+  const [filters, setFilters] = useState({ keyword: "", type: "ALL", active: "ALL" });
 
-  const getTypeLabel = (type) => type === "MANDATORY" ? "Bắt buộc" : "Tự nguyện";
-  const getTypeTone = (type) => type === "MANDATORY" ? "red" : "violet";
-  const getStatusLabel = (status) => status === "ACTIVE" ? "Đang dùng" : "Ngừng dùng";
-  const getStatusTone = (status) => status === "ACTIVE" ? "green" : "gray";
-  const getMethodLabel = (method) => {
-    const map = {
-      PER_M2: "Theo m²",
-      FIXED: "Cố định / hộ",
-      DONATION: "Tự nguyện",
-      NONE: "Không tính tự động",
-    };
-    return map[method] || method;
-  };
-  const getUnitLabel = (method) => {
-    const map = {
-      PER_M2: "đ/m²",
-      FIXED: "đ/hộ",
-      DONATION: "Theo số tiền nộp",
-      NONE: "__",
-    };
-    return map[method] || "__";
-  };
-  const getFormulaText = (fee) => {
-    if (fee.type === "DONATION" || fee.chargeMethod === "DONATION") return "Cư dân nộp bao nhiêu thì ghi nhận bấy nhiêu";
-    if (fee.chargeMethod === "PER_M2") return "Diện tích căn hộ × đơn giá";
-    if (fee.chargeMethod === "FIXED") return "Mỗi hộ nộp một số tiền cố định";
-    return "Nhập thủ công khi thu phí";
-  };
+  // ---- Đợt thu ----
+  const emptyPeriodForm = { feeId: "", name: "", startDate: "", endDate: "" };
+  const [showPeriodForm, setShowPeriodForm] = useState(false);
+  const [periodForm, setPeriodForm] = useState(emptyPeriodForm);
+  const [periodError, setPeriodError] = useState("");
+  const [closeConfirm, setCloseConfirm] = useState(null);
+
+  const getTypeLabel = (type) => (type === "MANDATORY" ? "Bắt buộc" : "Tự nguyện");
+  const getTypeTone = (type) => (type === "MANDATORY" ? "red" : "violet");
+  const getStatusLabel = (active) => (active ? "Đang dùng" : "Ngừng dùng");
+  const getStatusTone = (active) => (active ? "green" : "gray");
   const formatUnitPrice = (fee) => {
-    if (!fee.unitPrice || fee.type === "DONATION" || fee.chargeMethod === "DONATION") return "__";
-    return `${new Intl.NumberFormat("vi-VN").format(Number(fee.unitPrice))} ${getUnitLabel(fee.chargeMethod)}`;
+    if (!fee.unitPrice || Number(fee.unitPrice) <= 0) return "__";
+    return `${new Intl.NumberFormat("vi-VN").format(Number(fee.unitPrice))} ${fee.unit || ""}`.trim();
   };
-  const getFeeChangeLog = (from, to) => {
-    const changes = [];
-    if (from.name !== to.name) changes.push(`Tên: "${from.name}" → "${to.name}"`);
-    if (from.type !== to.type) changes.push(`Loại: ${getTypeLabel(from.type)} → ${getTypeLabel(to.type)}`);
-    if (from.chargeMethod !== to.chargeMethod) changes.push(`Cách tính: ${getMethodLabel(from.chargeMethod)} → ${getMethodLabel(to.chargeMethod)}`);
-    if (Number(from.unitPrice || 0) !== Number(to.unitPrice || 0)) changes.push(`Đơn giá: ${formatUnitPrice(from)} → ${formatUnitPrice(to)}`);
-    if (from.status !== to.status) changes.push(`Trạng thái: ${getStatusLabel(from.status)} → ${getStatusLabel(to.status)}`);
-    if ((from.description || "") !== (to.description || "")) changes.push("Mô tả đã được cập nhật");
-    return changes;
+  const getPeriodStatusLabel = (status) => (status === "OPEN" ? "Đang mở" : "Đã đóng");
+  const getPeriodStatusTone = (status) => (status === "OPEN" ? "green" : "gray");
+  const formatDate = (value) => {
+    if (!value) return "__";
+    try {
+      return new Date(value).toLocaleDateString("vi-VN");
+    } catch {
+      return value;
+    }
   };
+  const feeName = (feeId) => fees.find((f) => f.id === feeId)?.name || `#${feeId}`;
 
-  const applyFilters = (source = feesList) => {
-    let results = source;
+  // ---- Tải dữ liệu ----
+  const loadFees = useCallback(async () => {
+    const res = await searchFeesAPI({
+      keyword: filters.keyword.trim() || undefined,
+      type: filters.type !== "ALL" ? filters.type : undefined,
+      active: filters.active !== "ALL" ? filters.active === "ACTIVE" : undefined,
+    });
+    if (res.success) setFees(res.data?.items || []);
+    else setPageError(res.message || "Không tải được danh sách khoản thu");
+  }, [filters]);
 
-    if (filters.name.trim()) {
-      const keyword = filters.name.trim().toLowerCase();
-      results = results.filter((fee) => fee.name.toLowerCase().includes(keyword));
-    }
+  const loadPeriods = useCallback(async () => {
+    const res = await listFeePeriodsAPI();
+    if (res.success) setPeriods(res.data?.items || []);
+  }, []);
 
-    if (filters.type !== "ALL") {
-      results = results.filter((fee) => fee.type === filters.type);
-    }
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setPageError("");
+      const res = await listFeesAPI();
+      if (res.success) setFees(res.data?.items || []);
+      else setPageError(res.message || "Không tải được danh sách khoản thu");
+      await loadPeriods();
+      setLoading(false);
+    })();
+  }, [loadPeriods]);
 
-    if (filters.chargeMethod !== "ALL") {
-      results = results.filter((fee) => fee.chargeMethod === filters.chargeMethod);
-    }
-
-    if (filters.status !== "ALL") {
-      results = results.filter((fee) => fee.status === filters.status);
-    }
-
-    setFilteredFees(results);
-  };
-
-  const handleResetFilters = () => {
-    setFilters({ name: "", type: "ALL", chargeMethod: "ALL", status: "ALL" });
-    setFilteredFees(feesList);
+  const handleSearch = () => loadFees();
+  const handleResetFilters = async () => {
+    setFilters({ keyword: "", type: "ALL", active: "ALL" });
+    const res = await listFeesAPI();
+    if (res.success) setFees(res.data?.items || []);
   };
 
   const openCreateForm = () => {
     setFormData(emptyForm);
-    setEditingIndex(null);
+    setEditingId(null);
     setError("");
     setShowForm(true);
   };
 
   const openDetail = (fee) => {
-    const index = feesList.findIndex((item) => item.id === fee.id);
-    setEditingIndex(index);
+    setEditingId(fee.id);
     setFormData({
-      name: fee.name,
-      type: fee.type,
-      chargeMethod: fee.chargeMethod,
-      unitPrice: fee.unitPrice ? String(fee.unitPrice) : "",
+      name: fee.name || "",
+      type: fee.type || "MANDATORY",
+      unitPrice: fee.unitPrice != null ? String(fee.unitPrice) : "",
+      unit: fee.unit || "",
       description: fee.description || "",
-      status: fee.status,
+      active: fee.active !== false,
     });
     setError("");
     setShowForm(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const name = formData.name.trim();
-    const description = formData.description.trim();
-    const unitPrice = Number(formData.unitPrice || 0);
-
     if (!name) {
       setError("Vui lòng nhập tên khoản thu");
       return;
     }
-
-    const duplicated = feesList.some((fee, index) =>
-      index !== editingIndex && fee.name.trim().toLowerCase() === name.toLowerCase()
-    );
-    if (duplicated) {
-      setError("Tên khoản thu đã tồn tại");
-      return;
-    }
-
-    if (formData.type === "MANDATORY" && formData.chargeMethod !== "NONE" && unitPrice <= 0) {
+    const unitPrice = Number(formData.unitPrice || 0);
+    if (formData.type === "MANDATORY" && unitPrice <= 0) {
       setError("Khoản thu bắt buộc phải có đơn giá lớn hơn 0");
       return;
     }
 
-    const oldFee = editingIndex !== null ? feesList[editingIndex] : null;
-    const history = oldFee?.history ? [...oldFee.history] : [];
-    const normalizedFee = {
-      id: editingIndex !== null ? feesList[editingIndex].id : `FEE-${Date.now()}`,
+    const payload = {
       name,
       type: formData.type,
-      chargeMethod: formData.type === "DONATION" ? "DONATION" : formData.chargeMethod,
       unitPrice: formData.type === "DONATION" ? 0 : unitPrice,
-      description,
-      status: formData.status,
-      history,
+      unit: formData.unit.trim(),
+      description: formData.description.trim(),
+      active: !!formData.active,
     };
 
-    if (oldFee) {
-      const changes = getFeeChangeLog(oldFee, normalizedFee);
-      if (changes.length) {
-        history.unshift({
-          id: `H-${Date.now()}`,
-          date: new Date().toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }),
-          changes,
-        });
-      }
-    }
-
-    let updatedList;
-    if (editingIndex !== null) {
-      updatedList = feesList.map((fee, index) => index === editingIndex ? normalizedFee : fee);
-    } else {
-      updatedList = [...feesList, normalizedFee];
-    }
-
-    setFeesList(updatedList);
-    setFilteredFees(updatedList);
-    syncPaymentsForMandatoryFee?.(normalizedFee);
-    setFormData(emptyForm);
-    setEditingIndex(null);
+    setSaving(true);
     setError("");
+    const res = editingId ? await updateFeeAPI(editingId, payload) : await createFeeAPI(payload);
+    setSaving(false);
+    if (!res.success) {
+      setError(res.message || "Lưu khoản thu thất bại");
+      return;
+    }
     setShowForm(false);
+    setEditingId(null);
+    setFormData(emptyForm);
+    await loadFees();
   };
 
-  const handleDelete = () => {
-    if (deleteConfirm === null) return;
-    const deletedFee = feesList[deleteConfirm.index];
-    const updatedList = feesList.filter((_, index) => index !== deleteConfirm.index);
-    setFeesList(updatedList);
-    setFilteredFees(updatedList);
-    removePaymentsForFee?.(deletedFee.id);
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    const res = await deleteFeeAPI(deleteConfirm.id);
     setDeleteConfirm(null);
+    if (!res.success) {
+      setPageError(res.message || "Xoá khoản thu thất bại");
+      return;
+    }
     setShowForm(false);
-    setEditingIndex(null);
-    setFormData(emptyForm);
-    setError("");
+    setEditingId(null);
+    await loadFees();
   };
 
-  const handleCancel = () => {
-    setFormData(emptyForm);
-    setEditingIndex(null);
-    setError("");
-    setShowForm(false);
+  // ---- Đợt thu ----
+  const openPeriodForm = () => {
+    setPeriodForm({ ...emptyPeriodForm, feeId: fees[0]?.id ? String(fees[0].id) : "" });
+    setPeriodError("");
+    setShowPeriodForm(true);
   };
 
-  const currentFee = editingIndex !== null ? feesList[editingIndex] : null;
+  const handleSavePeriod = async () => {
+    if (!periodForm.feeId) {
+      setPeriodError("Vui lòng chọn khoản thu");
+      return;
+    }
+    if (!periodForm.name.trim()) {
+      setPeriodError("Vui lòng nhập tên đợt thu");
+      return;
+    }
+    if (!periodForm.startDate || !periodForm.endDate) {
+      setPeriodError("Vui lòng chọn ngày bắt đầu và kết thúc");
+      return;
+    }
+    if (periodForm.endDate < periodForm.startDate) {
+      setPeriodError("Ngày kết thúc phải sau ngày bắt đầu");
+      return;
+    }
+    const res = await createFeePeriodAPI({
+      feeId: Number(periodForm.feeId),
+      name: periodForm.name.trim(),
+      startDate: periodForm.startDate,
+      endDate: periodForm.endDate,
+    });
+    if (!res.success) {
+      setPeriodError(res.message || "Tạo đợt thu thất bại");
+      return;
+    }
+    setShowPeriodForm(false);
+    await loadPeriods();
+  };
+
+  const handleClosePeriod = async () => {
+    if (!closeConfirm) return;
+    const res = await closeFeePeriodAPI(closeConfirm.id);
+    setCloseConfirm(null);
+    if (!res.success) {
+      setPageError(res.message || "Đóng đợt thu thất bại");
+      return;
+    }
+    await loadPeriods();
+  };
 
   return (
     <>
       <SectionHeader
         title="Quản lý khoản thu"
-        desc="Dữ liệu khoản thu được lưu trong database mô phỏng localStorage. Khoản thu bắt buộc sẽ tự sinh tiền cần nộp ở phần Thu phí."
+        desc="Quản lý danh mục khoản thu và các đợt thu phí. Dữ liệu được đồng bộ trực tiếp với hệ thống."
         action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Tạo khoản thu</Button>}
       />
 
+      {pageError && (
+        <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
+      )}
+
       <Card className="mb-5">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Input
             label="Tìm theo tên khoản thu"
             placeholder="VD: phí quản lý"
-            value={filters.name}
-            onChange={(e) => setFilters({ ...filters, name: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
           <Select label="Loại khoản thu" value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
             <option value="ALL">Tất cả</option>
             <option value="MANDATORY">Bắt buộc</option>
             <option value="DONATION">Tự nguyện</option>
           </Select>
-          <Select label="Cách tính" value={filters.chargeMethod} onChange={(e) => setFilters({ ...filters, chargeMethod: e.target.value })}>
-            <option value="ALL">Tất cả</option>
-            <option value="PER_M2">Theo m²</option>
-            <option value="FIXED">Cố định / hộ</option>
-            <option value="DONATION">Tự nguyện</option>
-            <option value="NONE">Không tính tự động</option>
-          </Select>
-          <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+          <Select label="Trạng thái" value={filters.active} onChange={(e) => setFilters({ ...filters, active: e.target.value })}>
             <option value="ALL">Tất cả</option>
             <option value="ACTIVE">Đang dùng</option>
-            <option value="ENDED">Ngừng dùng</option>
+            <option value="INACTIVE">Ngừng dùng</option>
           </Select>
         </div>
         <div className="mt-4 flex gap-3">
-          <Button onClick={() => applyFilters()}><Search className="h-4 w-4" /> Tìm kiếm</Button>
+          <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
           <Button variant="secondary" onClick={handleResetFilters}>Xóa bộ lọc</Button>
         </div>
       </Card>
@@ -250,20 +269,26 @@ export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, remov
               <tr>
                 <th className="px-5 py-4">Tên khoản thu</th>
                 <th className="px-5 py-4">Loại</th>
-                <th className="px-5 py-4">Cách tính</th>
                 <th className="px-5 py-4">Đơn giá</th>
+                <th className="px-5 py-4">Mô tả</th>
                 <th className="px-5 py-4">Trạng thái</th>
                 <th className="px-5 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredFees.map((fee) => (
+              {loading && (
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
+              )}
+              {!loading && fees.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Chưa có khoản thu nào.</td></tr>
+              )}
+              {!loading && fees.map((fee) => (
                 <tr key={fee.id} className="hover:bg-slate-50/80">
                   <td className="px-5 py-4 font-semibold text-slate-800">{fee.name}</td>
                   <td className="px-5 py-4"><Badge tone={getTypeTone(fee.type)}>{getTypeLabel(fee.type)}</Badge></td>
-                  <td className="px-5 py-4 text-slate-700">{getMethodLabel(fee.chargeMethod)}</td>
                   <td className="px-5 py-4 text-slate-700">{formatUnitPrice(fee)}</td>
-                  <td className="px-5 py-4"><Badge tone={getStatusTone(fee.status)}>{getStatusLabel(fee.status)}</Badge></td>
+                  <td className="px-5 py-4 text-slate-600">{fee.description || "__"}</td>
+                  <td className="px-5 py-4"><Badge tone={getStatusTone(fee.active)}>{getStatusLabel(fee.active)}</Badge></td>
                   <td className="px-5 py-4 text-right">
                     <button onClick={() => openDetail(fee)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
                   </td>
@@ -274,30 +299,72 @@ export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, remov
         </div>
       </div>
 
+      {/* ===================== ĐỢT THU ===================== */}
+      <div className="mt-8">
+        <SectionHeader
+          title="Đợt thu phí"
+          desc="Mỗi đợt thu gắn với một khoản thu, có khoảng thời gian áp dụng. Đóng đợt thu khi đã thu xong."
+          action={<Button onClick={openPeriodForm} disabled={fees.length === 0}><Plus className="h-4 w-4" /> Tạo đợt thu</Button>}
+        />
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-4">Tên đợt thu</th>
+                  <th className="px-5 py-4">Khoản thu</th>
+                  <th className="px-5 py-4">Từ ngày</th>
+                  <th className="px-5 py-4">Đến ngày</th>
+                  <th className="px-5 py-4">Trạng thái</th>
+                  <th className="px-5 py-4 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {periods.length === 0 && (
+                  <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Chưa có đợt thu nào.</td></tr>
+                )}
+                {periods.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/80">
+                    <td className="px-5 py-4 font-semibold text-slate-800">{p.name}</td>
+                    <td className="px-5 py-4 text-slate-700">{feeName(p.feeId)}</td>
+                    <td className="px-5 py-4 text-slate-700">{formatDate(p.startDate)}</td>
+                    <td className="px-5 py-4 text-slate-700">{formatDate(p.endDate)}</td>
+                    <td className="px-5 py-4"><Badge tone={getPeriodStatusTone(p.status)}>{getPeriodStatusLabel(p.status)}</Badge></td>
+                    <td className="px-5 py-4 text-right">
+                      {p.status === "OPEN" ? (
+                        <button onClick={() => setCloseConfirm(p)} className="font-semibold text-rose-700 hover:text-rose-900">Đóng đợt</button>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ===================== MODAL KHOẢN THU ===================== */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-black">{editingIndex !== null ? "Chi tiết khoản thu" : "Tạo khoản thu mới"}</h3>
+            <h3 className="mb-4 text-lg font-black">{editingId ? "Chi tiết khoản thu" : "Tạo khoản thu mới"}</h3>
             <div className="space-y-4">
               <Input label="Tên khoản thu" placeholder="VD: Phí quản lý chung cư" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
               <div className="grid gap-4 md:grid-cols-2">
-                <Select label="Loại" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value, chargeMethod: e.target.value === "DONATION" ? "DONATION" : "PER_M2", unitPrice: e.target.value === "DONATION" ? "" : formData.unitPrice })}>
+                <Select label="Loại" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value, unitPrice: e.target.value === "DONATION" ? "" : formData.unitPrice })}>
                   <option value="MANDATORY">Bắt buộc</option>
                   <option value="DONATION">Tự nguyện</option>
                 </Select>
-                <Select label="Cách tính" value={formData.chargeMethod} onChange={(e) => setFormData({ ...formData, chargeMethod: e.target.value })}>
-                  <option value="PER_M2">Theo m²</option>
-                  <option value="FIXED">Cố định / hộ</option>
-                  <option value="DONATION">Tự nguyện</option>
-                  <option value="NONE">Không tính tự động</option>
+                <Select label="Trạng thái" value={formData.active ? "ACTIVE" : "INACTIVE"} onChange={(e) => setFormData({ ...formData, active: e.target.value === "ACTIVE" })}>
+                  <option value="ACTIVE">Đang dùng</option>
+                  <option value="INACTIVE">Ngừng dùng</option>
                 </Select>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Input label={`Đơn giá (${getUnitLabel(formData.chargeMethod)})`} placeholder="VD: 7000" type="number" value={formData.unitPrice} disabled={formData.type === "DONATION" || formData.chargeMethod === "DONATION"} onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })} />
-                <Select label="Trạng thái" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                  <option value="ACTIVE">Đang dùng</option>
-                  <option value="ENDED">Ngừng dùng</option>
-                </Select>
+                <Input label="Đơn giá" placeholder="VD: 7000" type="number" value={formData.unitPrice} disabled={formData.type === "DONATION"} onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })} />
+                <Input label="Đơn vị tính" placeholder="VD: đ/m², đ/hộ" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} />
               </div>
               <label className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-slate-700">Mô tả</span>
@@ -308,15 +375,12 @@ export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, remov
 
               <div className="flex flex-col gap-3 pt-2 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap gap-3">
-                  <Button variant="secondary" onClick={handleCancel}>Hủy</Button>
-                  {editingIndex !== null && (
-                    <>
-                      <Button variant="secondary" onClick={() => setHistoryTarget(currentFee)}>Lịch sử chỉnh sửa</Button>
-                      <Button variant="danger" onClick={() => setDeleteConfirm({ index: editingIndex, name: currentFee.name })}>Xóa</Button>
-                    </>
+                  <Button variant="secondary" onClick={() => { setShowForm(false); setEditingId(null); setError(""); }}>Hủy</Button>
+                  {editingId && (
+                    <Button variant="danger" onClick={() => setDeleteConfirm({ id: editingId, name: formData.name })}>Xóa</Button>
                   )}
                 </div>
-                <Button onClick={handleSave}>Lưu</Button>
+                <Button onClick={handleSave} disabled={saving}>{saving ? "Đang lưu…" : "Lưu"}</Button>
               </div>
             </div>
           </motion.div>
@@ -327,7 +391,7 @@ export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, remov
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
             <h3 className="mb-3 text-lg font-black">Xóa khoản thu</h3>
-            <p className="mb-5 text-sm text-slate-600">Bạn có chắc muốn xóa <strong>{deleteConfirm.name}</strong>? Các bản ghi thu phí liên quan cũng sẽ được xóa khỏi database mô phỏng.</p>
+            <p className="mb-5 text-sm text-slate-600">Bạn có chắc muốn xóa <strong>{deleteConfirm.name}</strong>?</p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
               <Button variant="danger" onClick={handleDelete}>Xóa</Button>
@@ -336,26 +400,38 @@ export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, remov
         </div>
       )}
 
-      {historyTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+      {/* ===================== MODAL ĐỢT THU ===================== */}
+      {showPeriodForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-black">Lịch sử chỉnh sửa</h3>
-            {historyTarget.history?.length ? (
-              <div className="space-y-3">
-                {historyTarget.history.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
-                    <p className="font-bold text-slate-900">{item.date}</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-                      {item.changes.map((change, index) => <li key={index}>{change}</li>)}
-                    </ul>
-                  </div>
-                ))}
+            <h3 className="mb-4 text-lg font-black">Tạo đợt thu mới</h3>
+            <div className="space-y-4">
+              <Select label="Khoản thu" value={periodForm.feeId} onChange={(e) => setPeriodForm({ ...periodForm, feeId: e.target.value })}>
+                {fees.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </Select>
+              <Input label="Tên đợt thu" placeholder="VD: Phí quản lý tháng 6/2026" value={periodForm.name} onChange={(e) => setPeriodForm({ ...periodForm, name: e.target.value })} />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input label="Từ ngày" type="date" value={periodForm.startDate} onChange={(e) => setPeriodForm({ ...periodForm, startDate: e.target.value })} />
+                <Input label="Đến ngày" type="date" value={periodForm.endDate} onChange={(e) => setPeriodForm({ ...periodForm, endDate: e.target.value })} />
               </div>
-            ) : (
-              <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">Chưa có lịch sử chỉnh sửa.</p>
-            )}
-            <div className="mt-5 flex justify-end">
-              <Button variant="secondary" onClick={() => setHistoryTarget(null)}>Đóng</Button>
+              {periodError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{periodError}</div>}
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="secondary" onClick={() => setShowPeriodForm(false)}>Hủy</Button>
+                <Button onClick={handleSavePeriod}>Lưu</Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {closeConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-3 text-lg font-black">Đóng đợt thu</h3>
+            <p className="mb-5 text-sm text-slate-600">Bạn có chắc muốn đóng đợt thu <strong>{closeConfirm.name}</strong>? Sau khi đóng sẽ không thể mở lại.</p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setCloseConfirm(null)}>Hủy</Button>
+              <Button variant="danger" onClick={handleClosePeriod}>Đóng đợt</Button>
             </div>
           </motion.div>
         </div>
@@ -363,4 +439,3 @@ export function Fees({ feesList, setFeesList, syncPaymentsForMandatoryFee, remov
     </>
   );
 }
-
