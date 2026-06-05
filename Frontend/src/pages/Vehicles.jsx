@@ -59,7 +59,7 @@ function AdminVehicles() {
   const [cancelConfirm, setCancelConfirm] = useState(null);
 
   const [showParkForm, setShowParkForm] = useState(false);
-  const [parkForm, setParkForm] = useState({ slotId: "", mode: "VEHICLE", vehicleId: "", renterName: "", renterPhone: "", monthlyFee: "", startDate: "", endDate: "" });
+  const [parkForm, setParkForm] = useState({ slotId: "", vehicleId: "", monthlyFee: "", startDate: "", endDate: "" });
   const [parkError, setParkError] = useState("");
 
   const showToast = (message, tone = "green") => {
@@ -157,24 +157,18 @@ function AdminVehicles() {
   };
 
   const openParkForm = (slot) => {
-    setParkForm({ slotId: String(slot.id), mode: "VEHICLE", vehicleId: "", renterName: "", renterPhone: "", monthlyFee: "", startDate: "", endDate: "" });
+    setParkForm({ slotId: String(slot.id), vehicleId: "", monthlyFee: "", startDate: "", endDate: "" });
     setParkError("");
     setShowParkForm(true);
   };
 
   const handleCreateRegistration = async () => {
-    const payload = { slotId: Number(parkForm.slotId) };
-    if (parkForm.mode === "VEHICLE") {
-      if (!parkForm.vehicleId) { setParkError("Nhập vehicleId của xe thuộc hộ"); return; }
-      payload.vehicleId = Number(parkForm.vehicleId);
-      if (parkForm.monthlyFee) payload.monthlyFee = Number(parkForm.monthlyFee);
-    } else {
-      if (!parkForm.renterName.trim()) { setParkError("Nhập tên người thuê"); return; }
-      if (!parkForm.monthlyFee) { setParkError("Nhập phí thuê hàng tháng"); return; }
-      payload.renterName = parkForm.renterName.trim();
-      if (parkForm.renterPhone.trim()) payload.renterPhone = parkForm.renterPhone.trim();
-      payload.monthlyFee = Number(parkForm.monthlyFee);
-    }
+    if (!parkForm.vehicleId) { setParkError("Nhập vehicleId của xe thuộc hộ"); return; }
+    const payload = {
+      slotId: Number(parkForm.slotId),
+      vehicleId: Number(parkForm.vehicleId),
+    };
+    if (parkForm.monthlyFee) payload.monthlyFee = Number(parkForm.monthlyFee);
     if (parkForm.startDate) payload.startDate = parkForm.startDate;
     if (parkForm.endDate) payload.endDate = parkForm.endDate;
 
@@ -201,11 +195,10 @@ function AdminVehicles() {
         <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ring-1 ${toast.tone === "red" ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>{toast.message}</div>
       )}
 
-      <div className="mb-5 grid gap-4 md:grid-cols-4">
+      <div className="mb-5 grid gap-4 md:grid-cols-3">
         <Card><p className="text-sm font-semibold text-slate-500">Tổng số chỗ</p><p className="mt-2 text-3xl font-black text-slate-950">{summary?.total ?? "—"}</p></Card>
         <Card><p className="text-sm font-semibold text-slate-500">Chỗ còn trống</p><p className="mt-2 text-3xl font-black text-emerald-600">{summary?.empty ?? "—"}</p></Card>
         <Card><p className="text-sm font-semibold text-slate-500">Đang gán xe hộ</p><p className="mt-2 text-3xl font-black text-sky-600">{summary?.used ?? "—"}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Đang cho thuê</p><p className="mt-2 text-3xl font-black text-violet-600">{summary?.rented ?? "—"}</p></Card>
       </div>
 
       {pageError && (
@@ -267,7 +260,10 @@ function AdminVehicles() {
       </Card>
 
       {/* Chỗ gửi xe */}
-      <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe hộ hoặc cho thuê)." />
+      {/* TODO (backend): ParkingSlotDTO chưa có licensePlate / householdCode.
+          Cần BE thêm 2 trường này (có thể join với ParkingRegistration khi status=USED).
+          Hiện tại hiển thị "—" cho 2 cột mới; khi BE cập nhật chỉ cần map thêm s.licensePlate và s.householdCode. */}
+      <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe của hộ)." />
       <Card className="!p-0">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -275,18 +271,23 @@ function AdminVehicles() {
               <tr>
                 <th className="px-5 py-4">Mã chỗ</th>
                 <th className="px-5 py-4">Loại</th>
+                <th className="px-5 py-4">Biển số xe</th>
+                <th className="px-5 py-4">Căn hộ sở hữu</th>
                 <th className="px-5 py-4">Trạng thái</th>
                 <th className="px-5 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {slots.length === 0 && (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Chưa có chỗ gửi nào.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Chưa có chỗ gửi nào.</td></tr>
               )}
               {slots.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{s.code}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(s.type)}</td>
+                  {/* TODO (backend): cần BE bổ sung licensePlate & householdCode vào ParkingSlotDTO */}
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">{s.licensePlate ?? "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">{s.householdCode ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{slotStatusBadge(s.status)}</td>
                   <td className="px-5 py-4 text-right">
                     {s.status === "EMPTY" ? (
@@ -349,28 +350,14 @@ function AdminVehicles() {
         </div>
       )}
 
-      {/* MODAL: tạo lượt gửi xe */}
+      {/* MODAL: tạo lượt gửi xe (chỉ hỗ trợ gán xe của hộ) */}
       {showParkForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 className="mb-4 text-lg font-bold">Tạo lượt gửi xe</h3>
+            <h3 className="mb-4 text-lg font-bold">Gán xe hộ vào chỗ gửi</h3>
             <div className="space-y-4">
-              <Select label="Hình thức" value={parkForm.mode} onChange={(e) => setParkForm({ ...parkForm, mode: e.target.value })}>
-                <option value="VEHICLE">Gán xe của hộ</option>
-                <option value="RENT">Cho người ngoài thuê</option>
-              </Select>
-              {parkForm.mode === "VEHICLE" ? (
-                <>
-                  <Input label="Mã xe (vehicleId)" placeholder="VD: 5" value={parkForm.vehicleId} onChange={(e) => setParkForm({ ...parkForm, vehicleId: e.target.value })} />
-                  <Input label="Phí tháng (đ) — bỏ trống để dùng phí mặc định" type="number" value={parkForm.monthlyFee} onChange={(e) => setParkForm({ ...parkForm, monthlyFee: e.target.value })} />
-                </>
-              ) : (
-                <>
-                  <Input label="Tên người thuê" value={parkForm.renterName} onChange={(e) => setParkForm({ ...parkForm, renterName: e.target.value })} />
-                  <Input label="SĐT người thuê" value={parkForm.renterPhone} onChange={(e) => setParkForm({ ...parkForm, renterPhone: e.target.value })} />
-                  <Input label="Phí tháng (đ)" type="number" value={parkForm.monthlyFee} onChange={(e) => setParkForm({ ...parkForm, monthlyFee: e.target.value })} />
-                </>
-              )}
+              <Input label="Mã xe (vehicleId)" placeholder="VD: 5" value={parkForm.vehicleId} onChange={(e) => setParkForm({ ...parkForm, vehicleId: e.target.value })} />
+              <Input label="Phí tháng (đ) — bỏ trống để dùng phí mặc định" type="number" value={parkForm.monthlyFee} onChange={(e) => setParkForm({ ...parkForm, monthlyFee: e.target.value })} />
               <div className="grid gap-4 md:grid-cols-2">
                 <Input label="Từ ngày" type="date" value={parkForm.startDate} onChange={(e) => setParkForm({ ...parkForm, startDate: e.target.value })} />
                 <Input label="Đến ngày" type="date" value={parkForm.endDate} onChange={(e) => setParkForm({ ...parkForm, endDate: e.target.value })} />

@@ -123,9 +123,32 @@ export function Apartments() {
           onChange={(e) => setFilters({ ...filters, floor: e.target.value })}
         >
           <option>Tất cả tầng</option>
+          <option>Tầng 1</option>
+          <option>Tầng 2</option>
+          <option>Tầng 3</option>
+          <option>Tầng 4</option>
+          <option>Tầng 5</option>
+          <option>Tầng 6</option>
+          <option>Tầng 7</option>
+          <option>Tầng 8</option>
+          <option>Tầng 9</option>
+          <option>Tầng 10</option>
+          <option>Tầng 11</option>
           <option>Tầng 12</option>
+          <option>Tầng 13</option>
+          <option>Tầng 14</option>
+          <option>Tầng 15</option>
+          <option>Tầng 16</option>
+          <option>Tầng 17</option>
           <option>Tầng 18</option>
+          <option>Tầng 19</option>
+          <option>Tầng 20</option>
+          <option>Tầng 21</option>
+          <option>Tầng 22</option>
+          <option>Tầng 23</option>
           <option>Tầng 24</option>
+          <option>Tầng 25</option>
+          <option>Tầng 26</option>
         </Select>
         <Select
           label="Trạng thái"

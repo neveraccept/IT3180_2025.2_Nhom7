@@ -42,6 +42,9 @@ export function Complaints({
   const [detailError, setDetailError] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Inline status update (admin table row)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
+
   // Create form
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newComplaint, setNewComplaint] = useState({ title: "", category: "FEE", content: "" });
@@ -90,6 +93,27 @@ export function Complaints({
     setHandlingContent("");
     setHandlingStatus("IN_PROGRESS");
     setDetailError("");
+  };
+
+  // Admin: cập nhật trạng thái trực tiếp từ bảng danh sách (không cần mở chi tiết)
+  const handleInlineStatusChange = async (complaint, newStatus) => {
+    if (newStatus === complaint.status || updatingStatusId === complaint.id) return;
+    setUpdatingStatusId(complaint.id);
+    const res = await respondComplaintAPI(complaint.id, {
+      response: complaint.response || "",
+      status: newStatus,
+    });
+    setUpdatingStatusId(null);
+    if (res.success) {
+      setComplaints((prev) =>
+        prev.map((c) => (c.id === complaint.id ? { ...c, status: newStatus } : c))
+      );
+      setSuccessMsg("Đã cập nhật trạng thái khiếu nại thành công");
+      setTimeout(() => setSuccessMsg(""), 3500);
+    } else {
+      setPageError(res.message || "Cập nhật trạng thái thất bại. Vui lòng thử lại.");
+      setTimeout(() => setPageError(""), 3500);
+    }
   };
 
   // Admin: lưu phản hồi
@@ -295,7 +319,22 @@ export function Complaints({
                   </td>
                   <td className="px-5 py-4 text-slate-600">{formatDate(complaint.createdAt)}</td>
                   <td className="px-5 py-4">
-                    <StatusBadge status={complaint.status} />
+                    {role === "ADMIN" ? (
+                      <select
+                        value={complaint.status}
+                        disabled={updatingStatusId === complaint.id}
+                        onChange={(e) => handleInlineStatusChange(complaint, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="NEW">Mới gửi</option>
+                        <option value="IN_PROGRESS">Đang xử lý</option>
+                        <option value="RESOLVED">Đã giải quyết</option>
+                        <option value="REJECTED">Từ chối</option>
+                      </select>
+                    ) : (
+                      <StatusBadge status={complaint.status} />
+                    )}
                   </td>
                   <td className="px-5 py-4 text-right">
                     <button

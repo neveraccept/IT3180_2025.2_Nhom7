@@ -286,7 +286,6 @@ export function Residents() {
                 >
                   <option value="PERMANENT">Thường trú</option>
                   <option value="TEMPORARY">Tạm trú</option>
-                  <option value="ABSENT">Tạm vắng</option>
                 </Select>
               )}
               {formError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{formError}</div>}
@@ -407,7 +406,6 @@ export function Residents() {
           <option value="">Tất cả</option>
           <option value="PERMANENT">Thường trú</option>
           <option value="TEMPORARY">Tạm trú</option>
-          <option value="ABSENT">Tạm vắng</option>
         </Select>
       </div>
       <div className="mb-5 flex gap-3">
