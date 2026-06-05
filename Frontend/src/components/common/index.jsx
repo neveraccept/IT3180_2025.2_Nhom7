@@ -50,6 +50,7 @@ export function StatusBadge({ status }) {
     NEW: ["Mới gửi", "red"],
     IN_PROGRESS: ["Đang xử lý", "yellow"],
     RESOLVED: ["Đã giải quyết", "green"],
+    REJECTED: ["Từ chối", "red"],
     ACTIVE: ["Đang dùng", "green"],
     ENDED: ["Kết thúc", "gray"],
   };

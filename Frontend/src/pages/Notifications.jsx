@@ -1,110 +1,101 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Bell, Plus, CheckCircle2, AlertCircle } from "lucide-react";
+import { Bell, Plus, CheckCircle2, AlertCircle, RefreshCw, Search } from "lucide-react";
 import { Badge, Button, Card, Input, Select } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
+import {
+  createNotificationAPI,
+  listMyNotificationsAPI,
+  markNotificationReadAPI,
+  SCOPE_LABEL,
+} from "../api/notificationApi";
+import { searchApartmentsAPI, getApartmentDetailAPI } from "../api/apartmentApi";
 
-export function Notifications({ role, notificationList, setNotificationList, initialNotificationId, onInitialNotificationHandled }) {
-  const floors = Array.from({ length: 30 }, (_, index) => index + 1);
+const floors = Array.from({ length: 30 }, (_, i) => i + 1);
 
-  const getFloorType = (floor) => {
-    const floorNumber = Number(floor);
-    if (floorNumber === 1) return "Kiot";
-    if (floorNumber >= 2 && floorNumber <= 5) return "Tầng đế";
-    if (floorNumber >= 6 && floorNumber <= 29) return "Tầng nhà ở";
-    return "Penthouse";
-  };
+const getFloorType = (floor) => {
+  const f = Number(floor);
+  if (f === 1) return "Kiot";
+  if (f >= 2 && f <= 5) return "Tầng đế";
+  if (f >= 6 && f <= 29) return "Tầng nhà ở";
+  return "Penthouse";
+};
 
-  const getRoomsByFloor = (floor) => {
-    const floorNumber = Number(floor);
-    return Array.from({ length: 10 }, (_, index) => {
-      const roomNumber = String(index + 1).padStart(2, "0");
-      if (floorNumber === 1) return `K${roomNumber}`;
-      if (floorNumber >= 2 && floorNumber <= 5) return `D${floorNumber}${roomNumber}`;
-      if (floorNumber === 30) return `PH${roomNumber}`;
-      return `${floorNumber}${roomNumber}`;
-    });
-  };
+const formatDate = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("vi-VN");
+};
 
-  const firstFloor = "1";
-  const firstRoom = getRoomsByFloor(firstFloor)[0];
+export function Notifications({
+  role,
+  // mock data props giữ để không break Layout, không dùng
+  // eslint-disable-next-line no-unused-vars
+  notificationList: _notifList,
+  // eslint-disable-next-line no-unused-vars
+  setNotificationList: _setNotifList,
+  initialNotificationId,
+  onInitialNotificationHandled,
+}) {
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
+  // Detail modal
+  const [selectedNotificationId, setSelectedNotificationId] = useState(
+    initialNotificationId || null
+  );
+  const [markingRead, setMarkingRead] = useState(false);
+
+  // Compose form (Admin)
   const [showCompose, setShowCompose] = useState(false);
-  const [selectedNotificationId, setSelectedNotificationId] = useState(initialNotificationId || null);
-  const [error, setError] = useState("");
   const [composeData, setComposeData] = useState({
     title: "",
     content: "",
     scope: "ALL",
-    floor: firstFloor,
-    room: firstRoom,
+    floor: "1",
   });
+  const [composeError, setComposeError] = useState("");
+  const [sendLoading, setSendLoading] = useState(false);
 
-  const selectedNotification = notificationList.find((item) => item.id === selectedNotificationId);
+  // BY_HOUSEHOLD: tìm kiếm căn hộ
+  const [aptCodeInput, setAptCodeInput] = useState("");
+  const [aptSearching, setAptSearching] = useState(false);
+  const [foundHousehold, setFoundHousehold] = useState(null); // { householdId, householdCode, aptCode }
+  const [aptSearchError, setAptSearchError] = useState("");
 
-  const handleScopeChange = (value) => {
-    const rooms = getRoomsByFloor(composeData.floor);
-    setComposeData({
-      ...composeData,
-      scope: value,
-      room: rooms[0],
-    });
-  };
-
-  const handleFloorChange = (value) => {
-    const rooms = getRoomsByFloor(value);
-    setComposeData({
-      ...composeData,
-      floor: value,
-      room: rooms[0],
-    });
-  };
-
-  const getScopeLabel = () => {
-    if (composeData.scope === "ALL") return "Toàn chung cư";
-    if (composeData.scope === "FLOOR") {
-      return `Tầng ${composeData.floor} - ${getFloorType(composeData.floor)}`;
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setPageError("");
+    const res = await listMyNotificationsAPI();
+    if (res.success && res.data) {
+      setNotifications(res.data.items || []);
+    } else {
+      setPageError(res.message || "Không tải được danh sách thông báo.");
+      setNotifications([]);
     }
-    return `Tầng ${composeData.floor} - ${getFloorType(composeData.floor)} • Phòng ${composeData.room}`;
-  };
+    setLoading(false);
+  }, []);
 
-  const handleSendNotification = () => {
-    if (!composeData.title.trim() || !composeData.content.trim()) {
-      setError("Vui lòng nhập tiêu đề và nội dung thông báo");
-      return;
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const selectedNotification = notifications.find((n) => n.id === selectedNotificationId) || null;
+
+  // Đánh dấu đã đọc
+  const handleMarkRead = async () => {
+    if (!selectedNotification || selectedNotification.isRead) return;
+    setMarkingRead(true);
+    const res = await markNotificationReadAPI(selectedNotification.id);
+    if (res.success) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === selectedNotification.id ? { ...n, isRead: true } : n))
+      );
     }
-
-    const newNotification = {
-      id: Date.now(),
-      title: composeData.title.trim(),
-      content: composeData.content.trim(),
-      scope: getScopeLabel(),
-      date: new Date().toLocaleDateString("vi-VN"),
-      read: false,
-    };
-
-    setNotificationList((prev) => [newNotification, ...prev]);
-    setComposeData({
-      title: "",
-      content: "",
-      scope: "ALL",
-      floor: firstFloor,
-      room: firstRoom,
-    });
-    setError("");
-    setShowCompose(false);
-  };
-
-  const handleCancelCompose = () => {
-    setComposeData({
-      title: "",
-      content: "",
-      scope: "ALL",
-      floor: firstFloor,
-      room: firstRoom,
-    });
-    setError("");
-    setShowCompose(false);
+    setMarkingRead(false);
+    setSelectedNotificationId(null);
+    onInitialNotificationHandled?.();
   };
 
   const closeDetail = () => {
@@ -112,25 +103,105 @@ export function Notifications({ role, notificationList, setNotificationList, ini
     onInitialNotificationHandled?.();
   };
 
-  const handleToggleRead = () => {
-    if (!selectedNotification) return;
+  // Tìm hộ theo mã căn hộ (BY_HOUSEHOLD)
+  const handleSearchApartment = async () => {
+    if (!aptCodeInput.trim()) {
+      setAptSearchError("Vui lòng nhập mã căn hộ");
+      return;
+    }
+    setAptSearching(true);
+    setAptSearchError("");
+    setFoundHousehold(null);
 
-    setNotificationList((prev) =>
-      prev.map((item) =>
-        item.id === selectedNotification.id
-          ? { ...item, read: !selectedNotification.read }
-          : item
-      )
-    );
-    setSelectedNotificationId(null);
-    onInitialNotificationHandled?.();
+    const searchRes = await searchApartmentsAPI({ code: aptCodeInput.trim(), size: 5 });
+    if (!searchRes.success || !searchRes.data?.items?.length) {
+      setAptSearchError("Không tìm thấy căn hộ với mã này.");
+      setAptSearching(false);
+      return;
+    }
+
+    const apt = searchRes.data.items[0];
+    const detailRes = await getApartmentDetailAPI(apt.id);
+    if (!detailRes.success || !detailRes.data?.currentHousehold) {
+      setAptSearchError("Căn hộ này hiện không có hộ đang ở.");
+      setAptSearching(false);
+      return;
+    }
+
+    const hh = detailRes.data.currentHousehold;
+    setFoundHousehold({
+      householdId: hh.id,
+      householdCode: hh.code,
+      aptCode: apt.code,
+    });
+    setAptSearching(false);
+  };
+
+  const resetComposeForm = () => {
+    setComposeData({ title: "", content: "", scope: "ALL", floor: "1" });
+    setComposeError("");
+    setAptCodeInput("");
+    setFoundHousehold(null);
+    setAptSearchError("");
+  };
+
+  const handleScopeChange = (value) => {
+    setComposeData((prev) => ({ ...prev, scope: value }));
+    setFoundHousehold(null);
+    setAptCodeInput("");
+    setAptSearchError("");
+  };
+
+  // Admin: gửi thông báo
+  const handleSendNotification = async () => {
+    if (!composeData.title.trim() || !composeData.content.trim()) {
+      setComposeError("Vui lòng nhập tiêu đề và nội dung thông báo");
+      return;
+    }
+
+    const payload = {
+      title: composeData.title.trim(),
+      content: composeData.content.trim(),
+      scope: composeData.scope,
+    };
+
+    if (composeData.scope === "BY_FLOOR") {
+      payload.floors = [parseInt(composeData.floor, 10)];
+    } else if (composeData.scope === "BY_HOUSEHOLD") {
+      if (!foundHousehold) {
+        setComposeError("Vui lòng tìm và xác nhận căn hộ trước khi gửi.");
+        return;
+      }
+      payload.householdIds = [foundHousehold.householdId];
+    }
+
+    setSendLoading(true);
+    setComposeError("");
+    const res = await createNotificationAPI(payload);
+    if (res.success) {
+      const recipientCount = res.data?.recipientCount ?? res.message?.match(/\d+/)?.[0];
+      resetComposeForm();
+      setShowCompose(false);
+      await fetchNotifications();
+      setSuccessMsg(
+        `Đã gửi thông báo thành công${recipientCount ? ` tới ${recipientCount} người nhận` : ""}`
+      );
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } else {
+      setComposeError(res.message || "Không thể gửi thông báo. Vui lòng thử lại.");
+    }
+    setSendLoading(false);
   };
 
   return (
     <>
       <SectionHeader
         title="Gửi/Xem thông báo"
-        desc={role === "ADMIN" ? "Admin soạn thông báo và xem lại danh sách thông báo đã gửi." : "Cư dân xem thông báo nhận được từ Ban quản trị."}
+        desc={
+          role === "ADMIN"
+            ? "Admin soạn thông báo cho cư dân và xem lại danh sách thông báo đã gửi."
+            : "Cư dân xem thông báo nhận được từ Ban quản trị."
+        }
         action={
           role === "ADMIN" ? (
             <Button onClick={() => setShowCompose(true)}>
@@ -140,6 +211,14 @@ export function Notifications({ role, notificationList, setNotificationList, ini
         }
       />
 
+      {/* Thông báo thành công */}
+      {successMsg && (
+        <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+          {successMsg}
+        </div>
+      )}
+
+      {/* Form soạn thông báo (Admin) */}
       {role === "ADMIN" && showCompose && (
         <Card className="mb-5">
           <h3 className="mb-4 text-lg font-black">Soạn thông báo mới</h3>
@@ -157,56 +236,64 @@ export function Notifications({ role, notificationList, setNotificationList, ini
               onChange={(e) => handleScopeChange(e.target.value)}
             >
               <option value="ALL">Toàn chung cư</option>
-              <option value="FLOOR">Theo tầng</option>
-              <option value="APARTMENT">Theo hộ</option>
+              <option value="BY_FLOOR">Theo tầng</option>
+              <option value="BY_HOUSEHOLD">Theo hộ</option>
             </Select>
 
-            {composeData.scope === "FLOOR" && (
+            {composeData.scope === "BY_FLOOR" && (
               <Select
                 label="Chọn tầng"
                 value={composeData.floor}
-                onChange={(e) => handleFloorChange(e.target.value)}
+                onChange={(e) => setComposeData({ ...composeData, floor: e.target.value })}
               >
-                {floors.map((floor) => (
-                  <option key={floor} value={floor}>
-                    Tầng {floor} - {getFloorType(floor)}
+                {floors.map((f) => (
+                  <option key={f} value={String(f)}>
+                    Tầng {f} — {getFloorType(f)}
                   </option>
                 ))}
               </Select>
             )}
 
-            {composeData.scope === "APARTMENT" && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Select
-                  label="Chọn tầng"
-                  value={composeData.floor}
-                  onChange={(e) => handleFloorChange(e.target.value)}
-                >
-                  {floors.map((floor) => (
-                    <option key={floor} value={floor}>
-                      Tầng {floor} - {getFloorType(floor)}
-                    </option>
-                  ))}
-                </Select>
-
-                <Select
-                  label="Chọn phòng"
-                  value={composeData.room}
-                  onChange={(e) => setComposeData({ ...composeData, room: e.target.value })}
-                >
-                  {getRoomsByFloor(composeData.floor).map((room) => (
-                    <option key={room} value={room}>
-                      Phòng {room}
-                    </option>
-                  ))}
-                </Select>
+            {composeData.scope === "BY_HOUSEHOLD" && (
+              <div className="space-y-2">
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Tìm căn hộ theo mã
+                </span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nhập mã căn hộ (VD: 1201)"
+                    value={aptCodeInput}
+                    onChange={(e) => {
+                      setAptCodeInput(e.target.value);
+                      setFoundHousehold(null);
+                      setAptSearchError("");
+                    }}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={handleSearchApartment}
+                    disabled={aptSearching}
+                  >
+                    <Search className="h-4 w-4" />
+                    {aptSearching ? "Đang tìm..." : "Tìm"}
+                  </Button>
+                </div>
+                {aptSearchError && (
+                  <p className="text-sm text-rose-600">{aptSearchError}</p>
+                )}
+                {foundHousehold && (
+                  <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                    Đã tìm thấy: Căn hộ {foundHousehold.aptCode} — Hộ{" "}
+                    {foundHousehold.householdCode}
+                  </div>
+                )}
               </div>
             )}
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Nội dung
-              </span>
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Nội dung</span>
               <textarea
                 rows={5}
                 value={composeData.content}
@@ -216,56 +303,98 @@ export function Notifications({ role, notificationList, setNotificationList, ini
               />
             </label>
 
-            {error && (
+            {composeError && (
               <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
-                {error}
+                {composeError}
               </div>
             )}
 
             <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={handleCancelCompose}>Hủy</Button>
-              <Button onClick={handleSendNotification}>Gửi thông báo</Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  resetComposeForm();
+                  setShowCompose(false);
+                }}
+              >
+                Hủy
+              </Button>
+              <Button onClick={handleSendNotification} disabled={sendLoading}>
+                {sendLoading ? "Đang gửi..." : "Gửi thông báo"}
+              </Button>
             </div>
           </div>
         </Card>
       )}
 
+      {/* Nút làm mới */}
+      <div className="mb-3 flex justify-end">
+        <Button variant="secondary" onClick={fetchNotifications} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          {loading ? "Đang tải..." : "Làm mới"}
+        </Button>
+      </div>
+
+      {/* Lỗi tải */}
+      {pageError && (
+        <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+          {pageError}
+        </div>
+      )}
+
+      {/* Danh sách thông báo */}
       <Card>
         <div className="space-y-3">
-          {notificationList.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setSelectedNotificationId(item.id);
-                onInitialNotificationHandled?.();
-              }}
-              className="flex w-full items-start justify-between rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
-            >
-              <div className="flex gap-3">
-                {role === "ADMIN" ? (
-                  <Bell className="mt-1 h-5 w-5 text-sky-600" />
-                ) : item.read ? (
-                  <CheckCircle2 className="mt-1 h-5 w-5 text-emerald-600" />
-                ) : (
-                  <AlertCircle className="mt-1 h-5 w-5 text-sky-600" />
-                )}
-                <div>
-                  <p className="font-black text-slate-900">{item.title}</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {item.scope} • {item.date}
-                  </p>
+          {loading && (
+            <p className="py-8 text-center text-sm font-semibold text-slate-500">Đang tải...</p>
+          )}
+          {!loading && notifications.length === 0 && (
+            <p className="py-8 text-center text-sm font-semibold text-slate-500">
+              Chưa có thông báo nào.
+            </p>
+          )}
+          {!loading &&
+            notifications.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setSelectedNotificationId(item.id);
+                  onInitialNotificationHandled?.();
+                }}
+                className="flex w-full items-start justify-between rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
+              >
+                <div className="flex gap-3">
+                  {role === "ADMIN" ? (
+                    <Bell className="mt-1 h-5 w-5 text-sky-600" />
+                  ) : item.isRead ? (
+                    <CheckCircle2 className="mt-1 h-5 w-5 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="mt-1 h-5 w-5 text-sky-600" />
+                  )}
+                  <div>
+                    <p className="font-black text-slate-900">{item.title}</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {SCOPE_LABEL[item.scope] || item.scope} • {formatDate(item.sentAt)}
+                      {item.senderName ? ` • ${item.senderName}` : ""}
+                    </p>
+                    {role === "ADMIN" && item.recipientCount != null && (
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {item.recipientCount} người nhận
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {role !== "ADMIN" && (
-                <Badge tone={item.read ? "green" : "blue"}>
-                  {item.read ? "Đã đọc" : "Chưa đọc"}
-                </Badge>
-              )}
-            </button>
-          ))}
+                {role !== "ADMIN" && (
+                  <Badge tone={item.isRead ? "green" : "blue"}>
+                    {item.isRead ? "Đã đọc" : "Chưa đọc"}
+                  </Badge>
+                )}
+              </button>
+            ))}
         </div>
       </Card>
 
+      {/* Modal chi tiết */}
       {selectedNotification && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -283,17 +412,21 @@ export function Notifications({ role, notificationList, setNotificationList, ini
                   {selectedNotification.title}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  {selectedNotification.scope} • {selectedNotification.date}
+                  {SCOPE_LABEL[selectedNotification.scope] || selectedNotification.scope} •{" "}
+                  {formatDate(selectedNotification.sentAt)}
+                  {selectedNotification.senderName
+                    ? ` • ${selectedNotification.senderName}`
+                    : ""}
                 </p>
               </div>
               {role !== "ADMIN" && (
-                <Badge tone={selectedNotification.read ? "green" : "blue"}>
-                  {selectedNotification.read ? "Đã đọc" : "Chưa đọc"}
+                <Badge tone={selectedNotification.isRead ? "green" : "blue"}>
+                  {selectedNotification.isRead ? "Đã đọc" : "Chưa đọc"}
                 </Badge>
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 whitespace-pre-wrap">
               {selectedNotification.content}
             </div>
 
@@ -301,18 +434,15 @@ export function Notifications({ role, notificationList, setNotificationList, ini
               <Button variant="secondary" onClick={closeDetail}>
                 Đóng
               </Button>
-              {role !== "ADMIN" && (
-                <Button onClick={handleToggleRead}>
-                  {selectedNotification.read ? "Đánh dấu là chưa đọc" : "Đã đọc"}
+              {role !== "ADMIN" && !selectedNotification.isRead && (
+                <Button onClick={handleMarkRead} disabled={markingRead}>
+                  {markingRead ? "Đang đánh dấu..." : "Đã đọc"}
                 </Button>
               )}
             </div>
-
-
           </motion.div>
         </div>
       )}
     </>
   );
 }
-
