@@ -43,30 +43,23 @@ public class SecurityConfig {
 
                         // NHÓM PUBLIC: Các API không cần token
                         .requestMatchers(
-                                "/api/auth/login",
-                                "/api/auth/register",
-                                "/api/auth/register/send-otp",
-                                "/api/auth/register/verify-otp",
-                                "/api/auth/forgot-password/**",
-                                "/api/auth/reset-password",
+                                "/api/auth/**",
                                 "/api/payments/vnpay/return",
                                 "/api/payments/vnpay/ipn"
                         ).permitAll()
 
                         // NHÓM CÁ NHÂN: Yêu cầu đăng nhập (dành cho cả ADMIN và RESIDENT tự thao tác)
                         .requestMatchers(
+                                "/api/me/**",
                                 "/api/payments/my-household",
                                 "/api/utility-bills/my-household",
                                 "/api/payments/vnpay/create",
-                                "/api/payments/vnpay/my-history",
-                                "/api/auth/me/password",
-                                "/api/auth/me/profile"
+                                "/api/payments/vnpay/my-history"
                         ).authenticated()
 
                         // NHÓM ADMIN: Yêu cầu quyền quản trị viên
                         .requestMatchers(
-                                "/api/auth/createAccount",  // tạo tài khoản nội bộ
-                                "/api/auth/*/approve",      // duyệt tài khoản (approve/reject)
+                                "/api/users/**",            // Quản lý tài khoản
                                 "/api/apartments/**",       // Quản lý căn hộ
                                 "/api/households/**",       // Quản lý hộ dân
                                 "/api/residents/**",        // Quản lý nhân khẩu

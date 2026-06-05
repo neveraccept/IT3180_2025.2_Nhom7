@@ -1,5 +1,7 @@
 package org.example.backend.dto.response;
 
+import org.example.backend.dto.UserDTO;
+
 public record ApiResponse<T>(
         boolean success,
         T data,

@@ -25,8 +25,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	boolean existsByEmail(String email);
 
 	// Phục vụ màn hình Admin lấy danh sách tài khoản chờ duyệt
-	// (Tài khoản có active = false và chưa được gán household_id)
-	// List<User> findByActiveFalseAndHouseholdIsNull();
+	@Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.active = false AND u.household IS NULL")
+	List<User> findPendingApprovals();
 
 	@Query("""
             SELECT u FROM User u

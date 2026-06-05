@@ -1,13 +1,13 @@
 package org.example.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
 
-@Data
-public class UpdateProfileRequest {
+public record UpdateProfileRequest (
 
     @NotBlank(message = "Username không được để trống")
-    private String username;
+    String username,
     
-    private String phone;
+    String phone
+) {
+
 }
