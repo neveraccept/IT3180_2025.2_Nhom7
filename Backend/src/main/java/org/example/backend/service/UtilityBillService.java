@@ -5,6 +5,7 @@ import org.example.backend.dto.UtilityBillDTO;
 import org.example.backend.dto.request.CreateUtilityBillRequest;
 import org.example.backend.dto.request.UpdateUtilityBillRequest;
 import org.example.backend.entity.Household;
+import org.example.backend.entity.SystemConfig;
 import org.example.backend.entity.UtilityBill;
 import org.example.backend.entity.enums.PaymentMethod;
 import org.example.backend.entity.enums.UtilityBillStatus;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -37,15 +39,18 @@ public class UtilityBillService {
     private final HouseholdRepository householdRepository;
     private final UtilityBillMapper mapper;
     private final CurrentUserService currentUserService;
+    private final SystemConfigService systemConfigService;
 
     public UtilityBillService(UtilityBillRepository billRepository,
                               HouseholdRepository householdRepository,
                               UtilityBillMapper mapper,
-                              CurrentUserService currentUserService) {
+                              CurrentUserService currentUserService,
+                              SystemConfigService systemConfigService) {
         this.billRepository = billRepository;
         this.householdRepository = householdRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
+        this.systemConfigService = systemConfigService;
     }
 
     // F7.1 - Nhập hoá đơn.
@@ -66,11 +71,43 @@ public class UtilityBillService {
         b.setType(req.type());
         b.setMonth(req.month());
         b.setYear(req.year());
-        b.setAmount(req.amount());
+        b.setOldIndex(req.oldIndex());
+        b.setNewIndex(req.newIndex());
+        // Điện/nước: tự tính từ chỉ số & đơn giá; internet: lấy giá gói hoặc số tiền nhập tay.
+        b.setAmount(computeAmount(req.type(), req.oldIndex(), req.newIndex(), req.amount()));
         b.setStatus(UtilityBillStatus.UNPAID);
         billRepository.save(b);
 
         return mapper.toDto(b);
+    }
+
+    /**
+     * Tính số tiền hoá đơn sinh hoạt.
+     * - ĐIỆN/NƯỚC: amount = (newIndex - oldIndex) * đơn giá (SystemConfig).
+     * - INTERNET: dùng số tiền nhập tay nếu có, ngược lại lấy giá gói trong SystemConfig.
+     */
+    private BigDecimal computeAmount(UtilityType type, Integer oldIndex, Integer newIndex, BigDecimal amount) {
+        if (type == UtilityType.ELECTRICITY || type == UtilityType.WATER) {
+            if (oldIndex == null || newIndex == null) {
+                throw new BadRequestException("UTILITY_INDEX_REQUIRED",
+                        "Hoá đơn điện/nước cần nhập chỉ số cũ và chỉ số mới");
+            }
+            if (newIndex < oldIndex) {
+                throw new BadRequestException("UTILITY_INDEX_INVALID",
+                        "Chỉ số mới phải lớn hơn hoặc bằng chỉ số cũ");
+            }
+            String key = type == UtilityType.ELECTRICITY
+                    ? SystemConfig.ELECTRICITY_UNIT_PRICE
+                    : SystemConfig.WATER_UNIT_PRICE;
+            BigDecimal unitPrice = systemConfigService.getValue(key);
+            return unitPrice.multiply(BigDecimal.valueOf((long) newIndex - oldIndex));
+        }
+
+        // INTERNET
+        if (amount != null) {
+            return amount;
+        }
+        return systemConfigService.getValue(SystemConfig.INTERNET_PRICE);
     }
 
     // F7.2 - Sửa hoá đơn (chỉ khi UNPAID).
@@ -95,7 +132,20 @@ public class UtilityBillService {
         b.setType(newType);
         b.setMonth(newMonth);
         b.setYear(newYear);
-        if (req.amount() != null) b.setAmount(req.amount());
+
+        // Chỉ số cũ/mới: null = giữ nguyên.
+        Integer newOldIndex = req.oldIndex() != null ? req.oldIndex() : b.getOldIndex();
+        Integer newNewIndex = req.newIndex() != null ? req.newIndex() : b.getNewIndex();
+        b.setOldIndex(newOldIndex);
+        b.setNewIndex(newNewIndex);
+
+        // Điện/nước: tính lại từ chỉ số & đơn giá hiện hành.
+        // Internet: dùng số tiền nhập tay nếu có, ngược lại giữ nguyên số tiền cũ.
+        if (newType == UtilityType.ELECTRICITY || newType == UtilityType.WATER) {
+            b.setAmount(computeAmount(newType, newOldIndex, newNewIndex, null));
+        } else if (req.amount() != null) {
+            b.setAmount(req.amount());
+        }
         billRepository.save(b);
 
         return mapper.toDto(b);

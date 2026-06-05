@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -71,13 +72,23 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public FeePeriodStatisticsDTO getFeePeriodStatistics(Long feePeriodId) {
+        return getFeePeriodStatistics(feePeriodId, null, null);
+    }
+
+    /**
+     * F10.1 có lọc theo khoảng ngày thanh toán [from, to] (null = không giới hạn).
+     * Tổng số hộ phải nộp & tổng phải thu giữ nguyên; số hộ đã nộp và tiền đã thu
+     * chỉ tính các phiếu có ngày thanh toán nằm trong khoảng.
+     */
+    @Transactional(readOnly = true)
+    public FeePeriodStatisticsDTO getFeePeriodStatistics(Long feePeriodId, LocalDate from, LocalDate to) {
         FeePeriod period = requireFeePeriod(feePeriodId);
 
         long total = paymentRepository.countByFeePeriodId(feePeriodId);
-        long paid = paymentRepository.countByFeePeriodIdAndStatus(feePeriodId, Payment.STATUS_PAID);
-        long unpaid = paymentRepository.countByFeePeriodIdAndStatus(feePeriodId, Payment.STATUS_UNPAID);
+        long paid = paymentRepository.countPaidByFeePeriodInRange(feePeriodId, from, to);
+        long unpaid = total - paid;
         BigDecimal due = nz(paymentRepository.sumAmountDueByFeePeriod(feePeriodId));
-        BigDecimal collected = nz(paymentRepository.sumAmountPaidByFeePeriod(feePeriodId));
+        BigDecimal collected = nz(paymentRepository.sumAmountPaidByFeePeriodInRange(feePeriodId, from, to));
         BigDecimal outstanding = due.subtract(collected);
         double rate = total == 0 ? 0d
                 : BigDecimal.valueOf(paid)
@@ -132,7 +143,13 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public List<HouseholdPaymentSummaryDTO> getHouseholdStatistics() {
-        List<HouseholdPaymentProjection> raw = paymentRepository.aggregateByHousehold();
+        return getHouseholdStatistics(null, null);
+    }
+
+    /** F10.3 có lọc theo khoảng ngày thanh toán [from, to] (null = không giới hạn). */
+    @Transactional(readOnly = true)
+    public List<HouseholdPaymentSummaryDTO> getHouseholdStatistics(LocalDate from, LocalDate to) {
+        List<HouseholdPaymentProjection> raw = paymentRepository.aggregateByHouseholdInRange(from, to);
         List<HouseholdPaymentSummaryDTO> result = new ArrayList<>();
         for (HouseholdPaymentProjection p : raw) {
             BigDecimal due = nz(p.getTotalDue());
@@ -157,17 +174,26 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public ResidentStatisticsDTO getResidentStatistics() {
-        long activeHouseholds = householdRepository.countByStatus(HouseholdStatus.ACTIVE);
-        long activeResidents = residentRepository.countByStatus(ResidentStatus.ACTIVE);
-        long permanent = residentRepository.countByStatusAndResidencyStatus(
-                ResidentStatus.ACTIVE, ResidencyStatus.PERMANENT);
-        long temporary = residentRepository.countByStatusAndResidencyStatus(
-                ResidentStatus.ACTIVE, ResidencyStatus.TEMPORARY);
-        long absent = residentRepository.countByStatusAndResidencyStatus(
-                ResidentStatus.ACTIVE, ResidencyStatus.ABSENT);
-        long male = residentRepository.countByStatusAndGender(ResidentStatus.ACTIVE, Gender.MALE);
-        long female = residentRepository.countByStatusAndGender(ResidentStatus.ACTIVE, Gender.FEMALE);
-        long other = residentRepository.countByStatusAndGender(ResidentStatus.ACTIVE, Gender.OTHER);
+        return getResidentStatistics(null, null);
+    }
+
+    /**
+     * F10.4 có lọc theo khoảng ngày [from, to] (null = không giới hạn).
+     * Mốc thời gian dùng ngày chuyển vào của hộ (household.moveInDate).
+     */
+    @Transactional(readOnly = true)
+    public ResidentStatisticsDTO getResidentStatistics(LocalDate from, LocalDate to) {
+        long activeHouseholds = householdRepository.countByStatusInRange(HouseholdStatus.ACTIVE, from, to);
+        long activeResidents = residentRepository.countByStatusInRange(ResidentStatus.ACTIVE, from, to);
+        long permanent = residentRepository.countByStatusAndResidencyStatusInRange(
+                ResidentStatus.ACTIVE, ResidencyStatus.PERMANENT, from, to);
+        long temporary = residentRepository.countByStatusAndResidencyStatusInRange(
+                ResidentStatus.ACTIVE, ResidencyStatus.TEMPORARY, from, to);
+        long absent = residentRepository.countByStatusAndResidencyStatusInRange(
+                ResidentStatus.ACTIVE, ResidencyStatus.ABSENT, from, to);
+        long male = residentRepository.countByStatusAndGenderInRange(ResidentStatus.ACTIVE, Gender.MALE, from, to);
+        long female = residentRepository.countByStatusAndGenderInRange(ResidentStatus.ACTIVE, Gender.FEMALE, from, to);
+        long other = residentRepository.countByStatusAndGenderInRange(ResidentStatus.ACTIVE, Gender.OTHER, from, to);
 
         return new ResidentStatisticsDTO(
                 activeHouseholds, activeResidents,

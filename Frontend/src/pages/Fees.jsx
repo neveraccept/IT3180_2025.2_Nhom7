@@ -21,12 +21,21 @@ import {
 //  Mapping FeeDTO: { name, type(MANDATORY|DONATION), unitPrice, unit, description, active }.
 //  (Backend không có "cách tính" hay "lịch sử chỉnh sửa" → đã lược bỏ.)
 // ============================================================
+// Đơn vị tính cho khoản thu BẮT BUỘC. Mã trùng với backend (Fee.unit).
+const UNIT_OPTIONS = [
+  { value: "PER_M2", label: "Theo m² (diện tích căn hộ)", suffix: "đ/m²" },
+  { value: "PER_PERSON", label: "Theo số người", suffix: "đ/người" },
+  { value: "PER_HOUSEHOLD", label: "Theo hộ gia đình", suffix: "đ/hộ" },
+];
+const unitSuffix = (unit) =>
+  unit === "NONE" ? "" : UNIT_OPTIONS.find((u) => u.value === unit)?.suffix || unit || "";
+
 export function Fees() {
   const emptyForm = {
     name: "",
     type: "MANDATORY",
     unitPrice: "",
-    unit: "đ/m²",
+    unit: "PER_M2",
     description: "",
     active: true,
   };
@@ -56,8 +65,9 @@ export function Fees() {
   const getStatusLabel = (active) => (active ? "Đang dùng" : "Ngừng dùng");
   const getStatusTone = (active) => (active ? "green" : "gray");
   const formatUnitPrice = (fee) => {
+    if (fee.type === "DONATION") return "Tự nguyện (cư dân tự nhập)";
     if (!fee.unitPrice || Number(fee.unitPrice) <= 0) return "__";
-    return `${new Intl.NumberFormat("vi-VN").format(Number(fee.unitPrice))} ${fee.unit || ""}`.trim();
+    return `${new Intl.NumberFormat("vi-VN").format(Number(fee.unitPrice))} ${unitSuffix(fee.unit)}`.trim();
   };
   const getPeriodStatusLabel = (status) => (status === "OPEN" ? "Đang mở" : "Đã đóng");
   const getPeriodStatusTone = (status) => (status === "OPEN" ? "green" : "gray");
@@ -142,8 +152,9 @@ export function Fees() {
     const payload = {
       name,
       type: formData.type,
+      // Tự nguyện: đơn vị NONE + không đơn giá; cư dân tự nhập số tiền khi thanh toán.
       unitPrice: formData.type === "DONATION" ? 0 : unitPrice,
-      unit: formData.unit.trim(),
+      unit: formData.type === "DONATION" ? "NONE" : formData.unit,
       description: formData.description.trim(),
       active: !!formData.active,
     };
@@ -228,7 +239,7 @@ export function Fees() {
     <>
       <SectionHeader
         title="Quản lý khoản thu"
-        desc="Quản lý danh mục khoản thu và các đợt thu phí. Dữ liệu được đồng bộ trực tiếp với hệ thống."
+        desc="Tạo khoản thu cho các khoản phát sinh sau này. Khoản thu định kỳ (phí dịch vụ, phí quản lý) được phát hành qua mục Đợt thu phí bên dưới."
         action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Tạo khoản thu</Button>}
       />
 
@@ -303,7 +314,7 @@ export function Fees() {
       <div className="mt-8">
         <SectionHeader
           title="Đợt thu phí"
-          desc="Mỗi đợt thu gắn với một khoản thu, có khoảng thời gian áp dụng. Đóng đợt thu khi đã thu xong."
+          desc="Khoản thu định kỳ lặp lại theo thời gian. Khi tạo một đợt thu, hệ thống tự phát hành phiếu thu cho mọi hộ với số tiền tính theo đơn giá hiện hành của khoản thu."
           action={<Button onClick={openPeriodForm} disabled={fees.length === 0}><Plus className="h-4 w-4" /> Tạo đợt thu</Button>}
         />
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -353,7 +364,20 @@ export function Fees() {
             <div className="space-y-4">
               <Input label="Tên khoản thu" placeholder="VD: Phí quản lý chung cư" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
               <div className="grid gap-4 md:grid-cols-2">
-                <Select label="Loại" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value, unitPrice: e.target.value === "DONATION" ? "" : formData.unitPrice })}>
+                <Select
+                  label="Loại"
+                  value={formData.type}
+                  onChange={(e) => {
+                    const type = e.target.value;
+                    setFormData({
+                      ...formData,
+                      type,
+                      // Tự nguyện: bỏ đơn giá & đơn vị; Bắt buộc: mặc định theo m².
+                      unitPrice: type === "DONATION" ? "" : formData.unitPrice,
+                      unit: type === "DONATION" ? "NONE" : (formData.unit === "NONE" ? "PER_M2" : formData.unit),
+                    });
+                  }}
+                >
                   <option value="MANDATORY">Bắt buộc</option>
                   <option value="DONATION">Tự nguyện</option>
                 </Select>
@@ -362,10 +386,26 @@ export function Fees() {
                   <option value="INACTIVE">Ngừng dùng</option>
                 </Select>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input label="Đơn giá" placeholder="VD: 7000" type="number" value={formData.unitPrice} disabled={formData.type === "DONATION"} onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })} />
-                <Input label="Đơn vị tính" placeholder="VD: đ/m², đ/hộ" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} />
-              </div>
+              {formData.type === "DONATION" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input label="Đơn giá" value="" placeholder="Không áp dụng" disabled />
+                  <Input label="Đơn vị tính" value="VND" disabled />
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input label="Đơn giá" placeholder="VD: 7000" type="number" value={formData.unitPrice} onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })} />
+                  <Select label="Đơn vị tính" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })}>
+                    {UNIT_OPTIONS.map((u) => (
+                      <option key={u.value} value={u.value}>{u.label}</option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {formData.type === "DONATION" && (
+                <p className="-mt-1 text-xs font-medium text-violet-700">
+                  Khoản tự nguyện: mặc định VND, không có đơn giá — cư dân chủ động nhập số tiền khi thanh toán.
+                </p>
+              )}
               <label className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-slate-700">Mô tả</span>
                 <textarea rows={4} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100" placeholder="Nhập mô tả khoản thu..." />
@@ -414,6 +454,9 @@ export function Fees() {
                 <Input label="Từ ngày" type="date" value={periodForm.startDate} onChange={(e) => setPeriodForm({ ...periodForm, startDate: e.target.value })} />
                 <Input label="Đến ngày" type="date" value={periodForm.endDate} onChange={(e) => setPeriodForm({ ...periodForm, endDate: e.target.value })} />
               </div>
+              <p className="rounded-xl bg-sky-50 px-4 py-3 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
+                Khi lưu, hệ thống sẽ tự phát hành phiếu thu cho tất cả các hộ đang hoạt động, số tiền tính theo đơn giá hiện hành của khoản thu.
+              </p>
               {periodError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{periodError}</div>}
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="secondary" onClick={() => setShowPeriodForm(false)}>Hủy</Button>

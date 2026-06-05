@@ -12,8 +12,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ResidentRepository extends JpaRepository<Resident, Long>, JpaSpecificationExecutor<Resident> {
     boolean existsByIdCard(String idCard);
-    
+
     boolean existsByIdCardAndIdNot(String idCard, Long id);
+
+    // Đếm số nhân khẩu đang hoạt động của hộ (phục vụ tính phí theo người - PER_PERSON).
+    long countByHousehold_IdAndStatus(Long householdId, ResidentStatus status);
 
     @Modifying
     @Query("""

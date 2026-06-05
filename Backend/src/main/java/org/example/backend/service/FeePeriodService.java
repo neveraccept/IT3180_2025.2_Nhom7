@@ -3,14 +3,25 @@ package org.example.backend.service;
 import org.example.backend.dto.FeePeriodDTO;
 import org.example.backend.entity.Fee;
 import org.example.backend.entity.FeePeriod;
+import org.example.backend.entity.Household;
+import org.example.backend.entity.Payment;
+import org.example.backend.entity.enums.HouseholdStatus;
+import org.example.backend.entity.enums.ResidentStatus;
 import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
+import org.example.backend.repository.HouseholdRepository;
+import org.example.backend.repository.PaymentRepository;
+import org.example.backend.repository.ResidentRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class FeePeriodService {
@@ -20,6 +31,15 @@ public class FeePeriodService {
 
     @Autowired
     private FeeRepository feeRepository;
+
+    @Autowired
+    private HouseholdRepository householdRepository;
+
+    @Autowired
+    private ResidentRepository residentRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     public Page<FeePeriodDTO> getAllFeePeriods(Pageable pageable) {
         return feePeriodRepository.findAll(pageable).map(this::convertToDto);
@@ -42,9 +62,57 @@ public class FeePeriodService {
         feePeriod.setStatus("OPEN");
         feePeriod = feePeriodRepository.save(feePeriod);
 
-        // TODO: Generate Payments for MANDATORY fees for all active households
+        // Tự sinh phiếu thu (Payment) cho toàn bộ hộ đang hoạt động.
+        // Số tiền (amountDue) tính theo đơn giá hiện hành của khoản thu -> sửa unitPrice ở Fee
+        // sẽ tự động áp dụng cho các đợt thu tạo về sau.
+        generatePayments(feePeriod, fee);
 
         return convertToDto(feePeriod);
+    }
+
+    /**
+     * Sinh phiếu thu cho mọi hộ ACTIVE dựa trên đơn vị tính của khoản thu:
+     *  - PER_M2: diện tích căn hộ * đơn giá
+     *  - PER_PERSON: số nhân khẩu ACTIVE * đơn giá
+     *  - PER_HOUSEHOLD / FIXED: đơn giá (cố định theo hộ)
+     *  - Khoản tự nguyện (DONATION) / NONE: amountDue = 0 (cư dân tự nhập khi đóng góp)
+     */
+    private void generatePayments(FeePeriod feePeriod, Fee fee) {
+        List<Household> households = householdRepository.findByStatus(HouseholdStatus.ACTIVE);
+        List<Payment> payments = new ArrayList<>(households.size());
+        for (Household household : households) {
+            Payment p = new Payment();
+            p.setFeePeriod(feePeriod);
+            p.setHousehold(household);
+            p.setAmountDue(computeAmountDue(fee, household));
+            p.setAmountPaid(BigDecimal.ZERO);
+            p.setStatus(Payment.STATUS_UNPAID);
+            payments.add(p);
+        }
+        paymentRepository.saveAll(payments);
+    }
+
+    private BigDecimal computeAmountDue(Fee fee, Household household) {
+        BigDecimal unitPrice = fee.getUnitPrice() == null ? BigDecimal.ZERO : fee.getUnitPrice();
+        if ("DONATION".equals(fee.getType())) {
+            return BigDecimal.ZERO;
+        }
+        String unit = fee.getUnit() == null ? "" : fee.getUnit();
+        return switch (unit) {
+            case "PER_M2" -> {
+                BigDecimal area = household.getApartment() != null && household.getApartment().getArea() != null
+                        ? household.getApartment().getArea()
+                        : BigDecimal.ZERO;
+                yield unitPrice.multiply(area);
+            }
+            case "PER_PERSON" -> {
+                long members = residentRepository.countByHousehold_IdAndStatus(
+                        household.getId(), ResidentStatus.ACTIVE);
+                yield unitPrice.multiply(BigDecimal.valueOf(members));
+            }
+            // PER_HOUSEHOLD, FIXED, PER_VEHICLE, NONE... -> cố định theo đơn giá.
+            default -> unitPrice;
+        };
     }
 
     @Transactional

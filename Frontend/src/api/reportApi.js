@@ -24,17 +24,25 @@ export function downloadBlob(blob, filename) {
 //  Thống kê (JSON)
 // ============================================================
 
-export const getFeePeriodStatisticsAPI = (feePeriodId) =>
-  callApi(axiosClient.get(`/api/reports/fee-periods/${feePeriodId}/statistics`));
+// Bộ lọc thời gian (from/to dạng YYYY-MM-DD) là tuỳ chọn; bỏ qua khi rỗng.
+const dateParams = ({ from, to } = {}) => {
+  const params = {};
+  if (from) params.from = from;
+  if (to) params.to = to;
+  return params;
+};
+
+export const getFeePeriodStatisticsAPI = (feePeriodId, range = {}) =>
+  callApi(axiosClient.get(`/api/reports/fee-periods/${feePeriodId}/statistics`, { params: dateParams(range) }));
 
 export const getDonationStatisticsAPI = (feePeriodId) =>
   callApi(axiosClient.get(`/api/reports/donations/${feePeriodId}/statistics`));
 
-export const getHouseholdStatisticsAPI = () =>
-  callApi(axiosClient.get("/api/reports/households/statistics"));
+export const getHouseholdStatisticsAPI = (range = {}) =>
+  callApi(axiosClient.get("/api/reports/households/statistics", { params: dateParams(range) }));
 
-export const getResidentStatisticsAPI = () =>
-  callApi(axiosClient.get("/api/reports/residents/statistics"));
+export const getResidentStatisticsAPI = (range = {}) =>
+  callApi(axiosClient.get("/api/reports/residents/statistics", { params: dateParams(range) }));
 
 // ============================================================
 //  Xuất Excel (responseType: 'blob')

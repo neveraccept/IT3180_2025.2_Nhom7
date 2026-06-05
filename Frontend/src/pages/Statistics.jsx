@@ -50,16 +50,27 @@ export function Statistics({ paymentRecords = [] }) {
     if (type !== "info") setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // ---- Tải thống kê tổng hợp khi mount ----
-  useEffect(() => {
+  // ---- Tải thống kê tổng hợp (có thể lọc theo khoảng ngày) ----
+  const loadStats = useCallback((range = {}) => {
     setLoading(true);
-    Promise.all([getHouseholdStatisticsAPI(), getResidentStatisticsAPI()])
+    Promise.all([getHouseholdStatisticsAPI(range), getResidentStatisticsAPI(range)])
       .then(([h, r]) => {
         if (h.success) setHouseholds(h.data || []);
         if (r.success) setResidentStats(r.data);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  const handleApplyStatFilter = () => loadStats({ from: dateFrom || undefined, to: dateTo || undefined });
+  const handleResetStatFilter = () => {
+    setDateFrom("");
+    setDateTo("");
+    loadStats();
+  };
 
   // ---- Tải danh sách đợt thu khi cần ----
   useEffect(() => {
@@ -232,6 +243,20 @@ export function Statistics({ paymentRecords = [] }) {
             <Download className="h-4 w-4" />
             {exporting ? "Đang xuất..." : "Xuất báo cáo"}
           </Button>
+        </div>
+      </Card>
+
+      {/* === Lọc thống kê theo thời gian === */}
+      <Card className="mb-6">
+        <h3 className="mb-1 text-base font-black text-slate-900">Lọc thống kê theo thời gian</h3>
+        <p className="mb-4 text-sm text-slate-500">
+          Áp dụng cho bảng tổng hợp theo hộ (theo ngày thanh toán) và thống kê dân cư (theo ngày chuyển vào của hộ).
+        </p>
+        <div className="grid items-end gap-4 md:grid-cols-4">
+          <Input label="Từ ngày" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <Input label="Đến ngày" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <Button onClick={handleApplyStatFilter}>Áp dụng</Button>
+          <Button variant="secondary" onClick={handleResetStatFilter}>Đặt lại</Button>
         </div>
       </Card>
 

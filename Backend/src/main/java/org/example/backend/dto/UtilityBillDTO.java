@@ -15,6 +15,8 @@ public record UtilityBillDTO(
         UtilityType type,
         Integer month,
         Integer year,
+        Integer oldIndex,
+        Integer newIndex,
         BigDecimal amount,
         UtilityBillStatus status,
         LocalDate paidDate,

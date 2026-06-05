@@ -46,6 +46,14 @@ public class UtilityBill {
     @Column(name = "year", nullable = false)
     private Integer year;
 
+    /** Chỉ số đồng hồ kỳ trước (điện/nước). NULL với hoá đơn INTERNET. */
+    @Column(name = "old_index")
+    private Integer oldIndex;
+
+    /** Chỉ số đồng hồ kỳ này (điện/nước). NULL với hoá đơn INTERNET. */
+    @Column(name = "new_index")
+    private Integer newIndex;
+
     @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 

@@ -52,6 +52,7 @@ public class InitialDataConfig implements CommandLineRunner {
     private final FeeRepository feeRepository;
     private final FeePeriodRepository feePeriodRepository;
     private final UtilityBillRepository utilityBillRepository;
+    private final SystemConfigRepository systemConfigRepository;
     private final ComplaintRepository complaintRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationRecipientRepository notificationRecipientRepository;
@@ -74,6 +75,7 @@ public class InitialDataConfig implements CommandLineRunner {
                              FeeRepository feeRepository,
                              FeePeriodRepository feePeriodRepository,
                              UtilityBillRepository utilityBillRepository,
+                             SystemConfigRepository systemConfigRepository,
                              ComplaintRepository complaintRepository,
                              NotificationRepository notificationRepository,
                              NotificationRecipientRepository notificationRecipientRepository,
@@ -89,6 +91,7 @@ public class InitialDataConfig implements CommandLineRunner {
         this.feeRepository = feeRepository;
         this.feePeriodRepository = feePeriodRepository;
         this.utilityBillRepository = utilityBillRepository;
+        this.systemConfigRepository = systemConfigRepository;
         this.complaintRepository = complaintRepository;
         this.notificationRepository = notificationRepository;
         this.notificationRecipientRepository = notificationRecipientRepository;
@@ -100,6 +103,10 @@ public class InitialDataConfig implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        // Đơn giá hệ thống luôn được đảm bảo tồn tại (idempotent), kể cả khi DB đã có dữ liệu cũ
+        // -> hoá đơn điện/nước/internet luôn có đơn giá để tính tiền.
+        seedSystemConfigs();
+
         // Chốt chặn idempotent: chỉ seed khi DB chưa có hạ tầng căn hộ.
         if (apartmentRepository.count() > 0) {
             System.out.println("[InitialDataConfig] Đã có dữ liệu căn hộ -> bỏ qua sinh dữ liệu mẫu.");
@@ -376,6 +383,22 @@ public class InitialDataConfig implements CommandLineRunner {
 
         System.out.printf("[InitialDataConfig] Đã tạo %d loại phí, %d kỳ thu phí, %d hoá đơn sinh hoạt.%n",
                 fees.size(), fees.size(), bills.size());
+    }
+
+    // Seed đơn giá gốc dùng chung cho hoá đơn điện/nước/internet.
+    private void seedSystemConfigs() {
+        saveConfigIfAbsent(SystemConfig.ELECTRICITY_UNIT_PRICE, BigDecimal.valueOf(3_500),
+                "Đơn giá 1 số điện (đ/kWh)");
+        saveConfigIfAbsent(SystemConfig.WATER_UNIT_PRICE, BigDecimal.valueOf(15_000),
+                "Đơn giá 1 khối nước (đ/m³)");
+        saveConfigIfAbsent(SystemConfig.INTERNET_PRICE, BigDecimal.valueOf(250_000),
+                "Giá gói internet/tháng (đ)");
+    }
+
+    private void saveConfigIfAbsent(String key, BigDecimal value, String description) {
+        if (!systemConfigRepository.existsByConfigKey(key)) {
+            systemConfigRepository.save(new SystemConfig(null, key, value, description));
+        }
     }
 
     private Fee buildFee(String name, String type, String unit, BigDecimal unitPrice, String description) {

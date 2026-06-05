@@ -43,11 +43,13 @@ public class ReportController {
 
     // ===================== THỐNG KÊ (JSON) =====================
 
-    // F10.1 - Thống kê tình trạng đợt thu
+    // F10.1 - Thống kê tình trạng đợt thu (lọc tuỳ chọn theo khoảng ngày thanh toán)
     @GetMapping("/fee-periods/{id}/statistics")
     public ResponseEntity<ApiResponse<FeePeriodStatisticsDTO>> feePeriodStatistics(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(reportService.getFeePeriodStatistics(id)));
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getFeePeriodStatistics(id, from, to)));
     }
 
     // F10.2 - Thống kê khoản đóng góp theo đợt
@@ -57,16 +59,20 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getDonationStatistics(feePeriodId)));
     }
 
-    // F10.3 - Thống kê theo hộ gia đình
+    // F10.3 - Thống kê theo hộ gia đình (lọc tuỳ chọn theo khoảng ngày thanh toán)
     @GetMapping("/households/statistics")
-    public ResponseEntity<ApiResponse<List<HouseholdPaymentSummaryDTO>>> householdStatistics() {
-        return ResponseEntity.ok(ApiResponse.ok(reportService.getHouseholdStatistics()));
+    public ResponseEntity<ApiResponse<List<HouseholdPaymentSummaryDTO>>> householdStatistics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getHouseholdStatistics(from, to)));
     }
 
-    // F10.4 - Thống kê dân cư
+    // F10.4 - Thống kê dân cư (lọc tuỳ chọn theo khoảng ngày chuyển vào của hộ)
     @GetMapping("/residents/statistics")
-    public ResponseEntity<ApiResponse<ResidentStatisticsDTO>> residentStatistics() {
-        return ResponseEntity.ok(ApiResponse.ok(reportService.getResidentStatistics()));
+    public ResponseEntity<ApiResponse<ResidentStatisticsDTO>> residentStatistics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getResidentStatistics(from, to)));
     }
 
     // ===================== XUáº¤T EXCEL (F10.5) =====================
