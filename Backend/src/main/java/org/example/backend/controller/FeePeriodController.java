@@ -1,10 +1,11 @@
 package org.example.backend.controller;
 
 import org.example.backend.dto.FeePeriodDTO;
+import org.example.backend.dto.response.ApiResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.service.FeePeriodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,32 +18,32 @@ public class FeePeriodController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<?> getAllFeePeriods(Pageable pageable) {
-        return ResponseEntity.ok(feePeriodService.getAllFeePeriods(pageable));
+    public ApiResponse<PageResponse<FeePeriodDTO>> getAllFeePeriods(Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(feePeriodService.getAllFeePeriods(pageable)));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
-    public ResponseEntity<?> getFeePeriodById(@PathVariable Long id) {
-        return ResponseEntity.ok(feePeriodService.getFeePeriodById(id));
+    public ApiResponse<FeePeriodDTO> getFeePeriodById(@PathVariable Long id) {
+        return ApiResponse.ok(feePeriodService.getFeePeriodById(id));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<?> createFeePeriod(@RequestBody FeePeriodDTO feePeriodDTO) {
-        return ResponseEntity.ok(feePeriodService.createFeePeriod(feePeriodDTO));
+    public ApiResponse<FeePeriodDTO> createFeePeriod(@RequestBody FeePeriodDTO feePeriodDTO) {
+        return ApiResponse.ok(feePeriodService.createFeePeriod(feePeriodDTO), "Tạo đợt thu thành công");
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateFeePeriod(@PathVariable Long id, @RequestBody FeePeriodDTO feePeriodDTO) {
-        return ResponseEntity.ok(feePeriodService.updateFeePeriod(id, feePeriodDTO));
+    public ApiResponse<FeePeriodDTO> updateFeePeriod(@PathVariable Long id, @RequestBody FeePeriodDTO feePeriodDTO) {
+        return ApiResponse.ok(feePeriodService.updateFeePeriod(id, feePeriodDTO), "Cập nhật đợt thu thành công");
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/close")
-    public ResponseEntity<?> closeFeePeriod(@PathVariable Long id) {
+    public ApiResponse<Void> closeFeePeriod(@PathVariable Long id) {
         feePeriodService.closeFeePeriod(id);
-        return ResponseEntity.ok().build();
+        return ApiResponse.ok(null, "Đã đóng đợt thu");
     }
 }

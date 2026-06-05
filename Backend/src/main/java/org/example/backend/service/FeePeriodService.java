@@ -7,6 +7,7 @@ import org.example.backend.entity.Household;
 import org.example.backend.entity.Payment;
 import org.example.backend.entity.enums.HouseholdStatus;
 import org.example.backend.entity.enums.ResidentStatus;
+import org.example.backend.exception.NotFoundException;
 import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
 import org.example.backend.repository.HouseholdRepository;
@@ -47,14 +48,14 @@ public class FeePeriodService {
 
     public FeePeriodDTO getFeePeriodById(Long id) {
         FeePeriod feePeriod = feePeriodRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Đợt thu phí không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_PERIOD_NOT_FOUND", "Đợt thu phí không tồn tại"));
         return convertToDto(feePeriod);
     }
 
     @Transactional
     public FeePeriodDTO createFeePeriod(FeePeriodDTO dto) {
         Fee fee = feeRepository.findById(dto.getFeeId())
-                .orElseThrow(() -> new RuntimeException("Khoản thu không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_NOT_FOUND", "Khoản thu không tồn tại"));
 
         FeePeriod feePeriod = new FeePeriod();
         BeanUtils.copyProperties(dto, feePeriod, "id");
@@ -118,7 +119,7 @@ public class FeePeriodService {
     @Transactional
     public FeePeriodDTO updateFeePeriod(Long id, FeePeriodDTO dto) {
         FeePeriod feePeriod = feePeriodRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Đợt thu phí không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_PERIOD_NOT_FOUND", "Đợt thu phí không tồn tại"));
 
         feePeriod.setName(dto.getName());
         feePeriod.setStartDate(dto.getStartDate());
@@ -129,7 +130,7 @@ public class FeePeriodService {
     @Transactional
     public void closeFeePeriod(Long id) {
         FeePeriod feePeriod = feePeriodRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Đợt thu phí không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_PERIOD_NOT_FOUND", "Đợt thu phí không tồn tại"));
         feePeriod.setStatus("CLOSED");
         feePeriodRepository.save(feePeriod);
     }

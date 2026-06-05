@@ -76,7 +76,7 @@ export function Statistics({ paymentRecords = [] }) {
   useEffect(() => {
     if ((reportType === "fee-period" || reportType === "donation") && feePeriods.length === 0) {
       listFeePeriodsAPI().then((res) => {
-        if (res.success) setFeePeriods(res.data || []);
+        if (res.success) setFeePeriods(res.data?.items || []);
       });
     }
   }, [reportType]);
