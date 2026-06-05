@@ -8,11 +8,10 @@ import jakarta.validation.constraints.Size;
  * Không cho đổi hộ sở hữu xe ở phiên bản này.
  */
 public record UpdateVehicleRequest(
-    @Size(max = 20, message = "Biển số tối đa 20 ký tự")
-    String licensePlate,
+        @Size(max = 20, message = "Biển số tối đa 20 ký tự")
+        String licensePlate,
 
-    VehicleType type,
+        VehicleType type,
 
-    Boolean active
-) {
-}
+        Boolean active
+) {}

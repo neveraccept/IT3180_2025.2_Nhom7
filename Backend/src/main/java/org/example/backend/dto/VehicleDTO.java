@@ -13,5 +13,4 @@ public record VehicleDTO(
         VehicleType type,
         LocalDate registeredDate,
         boolean active
-) {
-}
+) {}

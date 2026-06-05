@@ -5,12 +5,14 @@ import org.example.backend.dto.*;
 import org.example.backend.dto.request.*;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
+import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.AuthService;
 import org.example.backend.service.EmailService;
 import org.example.backend.service.OtpService;
 import org.example.backend.service.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -32,14 +34,14 @@ public class AuthController {
 	}
 
 	// 1. API Gửi mã OTP
-	@PostMapping("/send-otp")
+	@PostMapping("/register/send-otp")
 	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest request) {
 		try {
 			// Sinh mã OTP và băm lưu vào DB
-			String plainOtp = otpService.generateAndSaveOtp(request);
+			String plainOtp = otpService.generateAndSaveOtp(request, "REGISTER");
 
 			// Gửi email chứa mã OTP nguyên bản
-			emailService.sendOtpEmail(request.email(), plainOtp, request.purpose());
+			emailService.sendOtpEmail(request.email(), plainOtp, "REGISTER");
 
 			return ResponseEntity.ok(Map.of("message", "Mã OTP đã được gửi đến email của bạn."));
 		} catch (RuntimeException e) {
@@ -48,10 +50,10 @@ public class AuthController {
 	}
 
 	// 2. API Xác thực mã OTP
-	@PostMapping("/verify-otp")
+	@PostMapping("/register/verify-otp")
 	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
 		try {
-			boolean isValid = otpService.verifyOtp(request);
+			boolean isValid = otpService.verifyOtp(request, "REGISTER");
 			if (isValid) {
 				return ResponseEntity.ok(Map.of("message", "Xác thực OTP thành công."));
 			} else {
@@ -100,7 +102,8 @@ public class AuthController {
 		}
 	}
 
-	@PostMapping("createAccount")
+	// 4. API tạo tài khoản nội bộ
+	@PostMapping("/createAccount")
 	public ResponseEntity<?> createInternalAccount(@Valid @RequestBody AdminRegisterRequest req) {
 		try {
 			// 1. Gọi Service để tạo tài khoản
@@ -137,10 +140,7 @@ public class AuthController {
 		}
 	}
 
-	/**
-	 * PUT /api/users/{id}/approve
-	 * Mục đích: Admin duyệt tài khoản cư dân đăng ký
-	 */
+	// API duyệt tài khoản
 	@PutMapping("/{id}/approve")
 	public ResponseEntity<?> approveResidentAccount(@PathVariable Long id) {
 		try {
@@ -158,6 +158,7 @@ public class AuthController {
 		}
 	}
 
+	// API đăng nhập tài khoản
 	@PostMapping("/login")
 	public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
 		try {
@@ -177,6 +178,57 @@ public class AuthController {
 		} catch (Exception ex) {
 			// Các lỗi hệ thống khác
 			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"));
+		}
+	}
+
+	// API đổi mật khẩu
+	@PutMapping("/me/password")
+	public ResponseEntity<ApiResponse<Void>> changePassword(
+			@AuthenticationPrincipal CustomUserDetails currentUser,
+			@Valid @RequestBody ChangePasswordRequest request) {
+
+		// 1. Gọi Service Layer xử lý logic đổi mật khẩu
+		authService.changePassword(currentUser.getId(), request);
+
+		// 2. Bọc kết quả vào cấu trúc ApiResponse chuẩn hóa của dự án
+		ApiResponse<Void> response = new ApiResponse<>(
+				true,
+				null,
+				"Đổi mật khẩu thành công.",
+				"200"
+		);
+
+		return ResponseEntity.ok(response);
+	}
+
+	// 6. API Yêu cầu gửi OTP Quên mật khẩu
+	@PostMapping("/forgot-password/send-otp")
+	public ResponseEntity<?> sendForgotPasswordOtp(@RequestBody OtpRequest request) {
+		try {
+			String email = request.email();
+			if (email == null || email.isBlank()) {
+				return ResponseEntity.badRequest().body(Map.of("error", "Email không được để trống"));
+			}
+
+			authService.processForgotPasswordOtp(email);
+
+			// Luôn trả về thông báo này dù email có tồn tại hay không (Anti-enumeration)
+			return ResponseEntity.ok(Map.of("message", "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi đến bạn."));
+		} catch (RuntimeException e) {
+			return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	// 7. API Đặt lại mật khẩu bằng OTP
+	@PostMapping("/reset-password")
+	public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		try {
+			authService.resetPassword(request);
+			return ResponseEntity.ok(ApiResponse.ok(null, "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới."));
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(ApiResponse.error("RESET_FAILED", e.getMessage()));
+		} catch (RuntimeException e) {
+			return ResponseEntity.badRequest().body(ApiResponse.error("RESET_FAILED", e.getMessage()));
 		}
 	}
 }

@@ -11,9 +11,9 @@ public record VerifyOtpRequest(
 
         @NotBlank(message = "Mã OTP không được để trống")
         @Size(min = 6, max = 6, message = "Mã OTP phải có đúng 6 chữ số")
-        String otp,
+        String otp
 
-        @NotBlank(message = "Mục đích (purpose) không được để trống")
-        String purpose
+//        @NotBlank(message = "Mục đích (purpose) không được để trống")
+//        String purpose
 ) {
 }

@@ -2,6 +2,7 @@ package org.example.backend.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -9,48 +10,74 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter; // Bổ sung: Cần import lớp này
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     // Bổ sung: Khai báo và tiêm (Inject) JwtAuthenticationFilter
     private final JwtFilter jwtAuthenticationFilter;
 
     public SecurityConfig(JwtFilter jwtAuthenticationFilter) {
+
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Tắt CSRF vì hệ thống sử dụng JWT (Stateless)
+                // 1. Tắt CSRF vì hệ thống sử dụng JWT (stateless, không dùng cookie session)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // (Tuỳ chọn) Tắt CORS nếu bạn bị lỗi gọi từ trình duyệt React
-                // .cors(cors -> cors.disable())
+                // Bật CORS cho trình duyệt React 18 gọi API.
+                // Sử dụng CorsConfigurationSource bean (xem config/CorsConfig) thay vì cors.configure(http).
+                .cors(org.springframework.security.config.Customizer.withDefaults())
 
-                // 2. Cấu hình phân quyền các endpoint
+                // 2. Cấu hình session thành Stateless
+                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // 3. Cấu hình phân quyền các endpoint
                 .authorizeHttpRequests(auth -> auth
-                        // Chỉ cho phép admin tạo tài khoản nội bộ hoặc cư dân
-                        .requestMatchers("/api/auth/createAccount").hasAuthority("ROLE_ADMIN")
 
-                        // Cho phép tất cả mọi người truy cập vào các API thuộc nhóm auth (Login, Register, OTP...)
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // NHÓM PUBLIC: Các API không cần token
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/register/send-otp",
+                                "/api/auth/register/verify-otp",
+                                "/api/auth/forgot-password/**",
+                                "/api/auth/reset-password",
+                                "/api/payments/vnpay/return",
+                                "/api/payments/vnpay/ipn"
+                        ).permitAll()
 
-                        // Các endpoint liên quan đến VNPAY callback cũng phải là PUBLIC
-                        .requestMatchers("/api/payments/vnpay/return", "/api/payments/vnpay/ipn").permitAll()
+                        // NHÓM CÁ NHÂN: Yêu cầu đăng nhập (dành cho cả ADMIN và RESIDENT tự thao tác)
+                        .requestMatchers(
+                                "/api/payments/my-household",
+                                "/api/utility-bills/my-household",
+                                "/api/payments/vnpay/create",
+                                "/api/payments/vnpay/my-history",
+                                "/api/auth/me/password",
+                                "/api/auth/me/profile"
+                        ).authenticated()
 
-                        // Chỉ định rõ API duyệt tài khoản và tạo tài khoản nội bộ yêu cầu quyền ADMIN
-                        .requestMatchers("/api/auth/*/approve").hasAuthority("ROLE_ADMIN")
+                        // NHÓM ADMIN: Yêu cầu quyền quản trị viên
+                        .requestMatchers(
+                                "/api/auth/createAccount",  // tạo tài khoản nội bộ
+                                "/api/auth/*/approve",      // duyệt tài khoản (approve/reject)
+                                "/api/apartments/**",       // Quản lý căn hộ
+                                "/api/households/**",       // Quản lý hộ dân
+                                "/api/residents/**",        // Quản lý nhân khẩu
+                                "/api/fees/**",             // Quản lý danh mục khoản thu
+                                "/api/fee-periods/**",      // Quản lý đợt thu
+                                "/api/admin/**"             // Các API tra cứu / audit riêng cho admin
+                        ).hasRole("ADMIN")
 
-                        // Tất cả các request khác (quản lý user, hộ dân, khoản thu...) đều bắt buộc phải đăng nhập
+                        // Bắt buộc xác thực với mọi request khác (nếu có) mà chưa được liệt kê ở trên
                         .anyRequest().authenticated()
-                )
-
-                // 3. Đặt session management thành Stateless (Không lưu trạng thái session trên server)
-                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                );
 
         // Bổ sung QUAN TRỌNG NHẤT: Đặt "người gác cổng" của chúng ta lên trước bộ lọc đăng nhập mặc định của Spring Security
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

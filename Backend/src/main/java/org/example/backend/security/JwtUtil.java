@@ -52,6 +52,15 @@ public class JwtUtil {
         return claims.getSubject();
     }
 
+    // Lấy toàn bộ Claims từ chuỗi Token
+    public Claims getClaimsFromJWT(String token) {
+        return Jwts.parser()
+                .verifyWith(key())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
     /**
      * Kiểm tra tính hợp lệ của Token
      */

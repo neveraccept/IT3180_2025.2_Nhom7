@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 
 /**
- * M6 – F6.1, F6.2, F6.3: quản lý phương tiện (xe) của hộ dân.
+ * M6 - F6.1, F6.2, F6.3: quản lý phương tiện (xe) của hộ dân.
  * Việc gán/giải phóng chỗ gửi xe (ParkingRegistration) do {@link ParkingService} phụ trách;
  * khi huỷ xe, service này cũng đóng lượt đăng ký ACTIVE và trả chỗ về EMPTY.
  */
@@ -36,23 +36,20 @@ public class VehicleService {
     private final ParkingRegistrationRepository registrationRepository;
     private final VehicleMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public VehicleService(VehicleRepository vehicleRepository,
                           HouseholdRepository householdRepository,
                           ParkingRegistrationRepository registrationRepository,
                           VehicleMapper mapper,
-                          CurrentUserService currentUserService,
-                          AuditLogService auditLogService) {
+                          CurrentUserService currentUserService) {
         this.vehicleRepository = vehicleRepository;
         this.householdRepository = householdRepository;
         this.registrationRepository = registrationRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
-    // F6.1 – Đăng ký xe cho hộ.
+    // F6.1 - Đăng ký xe cho hộ.
     @Transactional
     public VehicleDTO register(RegisterVehicleRequest req) {
         String plate = req.licensePlate().trim();
@@ -72,12 +69,10 @@ public class VehicleService {
         v.setActive(true);
         vehicleRepository.save(v);
 
-        auditLogService.log("VEHICLE_REGISTER", "VEHICLE", v.getId(),
-                "Đăng ký xe " + plate + " (" + req.type() + ") cho hộ " + household.getCode());
         return mapper.toDto(v);
     }
 
-    // F6.2 – Cập nhật thông tin xe.
+    // F6.2 - Cập nhật thông tin xe.
     @Transactional
     public VehicleDTO update(Long id, UpdateVehicleRequest req) {
         Vehicle v = requireVehicle(id);
@@ -95,12 +90,10 @@ public class VehicleService {
         if (req.active() != null) v.setActive(req.active());
 
         vehicleRepository.save(v);
-        auditLogService.log("VEHICLE_UPDATE", "VEHICLE", v.getId(),
-                "Cập nhật thông tin xe " + v.getLicensePlate());
         return mapper.toDto(v);
     }
 
-    // F6.2 – Huỷ đăng ký xe (soft delete) + trả chỗ gửi về EMPTY.
+    // F6.2 - Huỷ đăng ký xe (soft delete) + trả chỗ gửi về EMPTY.
     @Transactional
     public void cancel(Long id) {
         Vehicle v = requireVehicle(id);
@@ -116,11 +109,9 @@ public class VehicleService {
                     registrationRepository.save(reg);
                 });
 
-        auditLogService.log("VEHICLE_CANCEL", "VEHICLE", v.getId(),
-                "Huỷ đăng ký gửi xe " + v.getLicensePlate());
     }
 
-    // F6.3 – Admin tra cứu xe theo hộ.
+    // F6.3 - Admin tra cứu xe theo hộ.
     @Transactional(readOnly = true)
     public PageResponse<VehicleDTO> listByHousehold(Long householdId, Pageable pageable) {
         if (!householdRepository.existsById(householdId)) {
@@ -133,7 +124,7 @@ public class VehicleService {
         return PageResponse.of(page);
     }
 
-    // F6.3 – Cư dân xem xe của hộ mình.
+    // F6.3 - Cư dân xem xe của hộ mình.
     @Transactional(readOnly = true)
     public PageResponse<VehicleDTO> listMyHousehold(Pageable pageable) {
         Long householdId = currentHouseholdId();

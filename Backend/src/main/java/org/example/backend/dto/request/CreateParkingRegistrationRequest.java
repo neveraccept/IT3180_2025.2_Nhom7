@@ -13,24 +13,21 @@ import java.time.LocalDate;
  *   - Cho thuê  : bỏ trống `vehicleId`, truyền `renterName` (+ `renterPhone`) và `monthlyFee`.
  */
 public record CreateParkingRegistrationRequest(
-    @NotNull(message = "slotId không được để trống")
-    Long slotId,
+        @NotNull(message = "slotId không được để trống")
+        Long slotId,
 
-    Long vehicleId,
+        Long vehicleId,
 
-    @Size(max = 100, message = "Tên người thuê tối đa 100 ký tự")
-    String renterName,
+        @Size(max = 100, message = "Tên người thuê tối đa 100 ký tự")
+        String renterName,
 
-    @Size(max = 20, message = "SĐT người thuê tối đa 20 ký tự")
-    String renterPhone,
+        @Size(max = 20, message = "SĐT người thuê tối đa 20 ký tự")
+        String renterPhone,
 
-    String renterLicensePlate,
+        LocalDate startDate,
 
-    LocalDate startDate,
+        LocalDate endDate,
 
-    LocalDate endDate,
-
-    /** Bắt buộc khi cho thuê; với xe hộ nếu null sẽ lấy phí mặc định theo loại xe. */
-    BigDecimal monthlyFee
-) {
-}
+        /** Bắt buộc khi cho thuê; với xe hộ nếu null sẽ lấy phí mặc định theo loại xe. */
+        BigDecimal monthlyFee
+) {}

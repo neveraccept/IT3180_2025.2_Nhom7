@@ -29,10 +29,9 @@ public class OtpService {
      * Sinh và lưu mã OTP mới vào cơ sở dữ liệu
      */
     @Transactional
-    public String generateAndSaveOtp(OtpRequest request) {
+    public String generateAndSaveOtp(OtpRequest request, String purposeRequest) {
         // Trích xuất dữ liệu trực tiếp từ DTO
         String email = request.email();
-        String purpose = request.purpose();
 
         // Áp dụng rate-limit: Tối đa 5 lần gửi trong 15 phút
         int recentRequests = emailOtpRepo.countRecentOtps(email);
@@ -50,7 +49,7 @@ public class OtpService {
         EmailOtp emailOtp = EmailOtp.builder()
                 .email(email)
                 .otpHash(hashedOtp)
-                .purpose(purpose)
+                .purpose(purposeRequest)
                 .expiredAt(LocalDateTime.now().plusMinutes(5))
                 .used(false)
                 .failedAttempts(0)
@@ -66,14 +65,13 @@ public class OtpService {
      * Xác thực mã OTP người dùng nhập vào
      */
     @Transactional
-    public boolean verifyOtp(VerifyOtpRequest request) {
+    public boolean verifyOtp(VerifyOtpRequest request, String purposeRequest) {
         // Trích xuất dữ liệu trực tiếp từ DTO
         String email = request.email();
         String plainOtp = request.otp();
-        String purpose = request.purpose();
 
         // Lấy mã OTP mới nhất theo email và mục đích sử dụng
-        Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purpose);
+        Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purposeRequest);
 
         if (optionalOtp.isEmpty()) {
             throw new RuntimeException("Không tìm thấy mã OTP cho email này.");

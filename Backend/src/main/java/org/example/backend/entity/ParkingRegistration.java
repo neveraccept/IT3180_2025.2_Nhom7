@@ -43,9 +43,6 @@ public class ParkingRegistration {
     @Column(name = "renter_phone", length = 20)
     private String renterPhone;
 
-    @Column(name = "renter_license_plate")
-    private String renterLicensePlate;
-
     @Column(name = "start_date")
     private LocalDate startDate;
 
