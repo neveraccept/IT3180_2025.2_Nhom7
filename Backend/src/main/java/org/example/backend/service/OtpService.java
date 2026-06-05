@@ -71,7 +71,8 @@ public class OtpService {
         String plainOtp = request.otp();
 
         // Lấy mã OTP mới nhất theo email và mục đích sử dụng
-        Optional<EmailOtp> optionalOtp = emailOtpRepo.findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purposeRequest);
+        Optional<EmailOtp> optionalOtp = emailOtpRepo
+                .findTopByEmailAndPurposeOrderByCreatedAtDesc(email, purposeRequest);
 
         if (optionalOtp.isEmpty()) {
             throw new RuntimeException("Không tìm thấy mã OTP cho email này.");

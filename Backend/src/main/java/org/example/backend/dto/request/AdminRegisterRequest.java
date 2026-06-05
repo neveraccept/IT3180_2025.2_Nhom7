@@ -28,6 +28,6 @@ public record AdminRegisterRequest(
     String requestedApartmentCode,
 
     @NotBlank(message = "Role không được để trống")
-    String role // Chỉ cần gửi tên role dạng chuỗi, VD: "ADMIN"
+    String role
 ) {
 }

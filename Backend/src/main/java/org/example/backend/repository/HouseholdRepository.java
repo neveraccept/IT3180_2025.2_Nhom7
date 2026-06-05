@@ -28,6 +28,7 @@ public interface HouseholdRepository extends JpaRepository<Household, Long> {
     List<Household> findByApartmentIdInAndStatus(Collection<Long> apartmentIds, HouseholdStatus status);
 
     boolean existsByApartmentIdAndStatus(Long apartmentId, HouseholdStatus status);
+
 }
 
 

@@ -23,7 +23,7 @@ public class NotificationController {
         this.notificationService = notificationService;
     }
 
-    // F9.1 + F9.2 - Admin soạn và gửi thông báo
+    // Admin soạn và gửi thông báo
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<NotificationDTO>> create(
@@ -33,7 +33,7 @@ public class NotificationController {
                 "Đã gửi thông báo tới " + created.recipientCount() + " người nhận"));
     }
 
-    // F9.3 - Xem thông báo gửi cho user hiện tại
+    // Xem thông báo gửi cho user hiện tại
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<NotificationDTO>>> myNotifications(

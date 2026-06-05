@@ -1,6 +1,7 @@
 package org.example.backend.controller;
 
 import jakarta.validation.Valid;
+import org.example.backend.dto.request.ChangePasswordRequest;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.request.UpdateProfileRequest;
 import org.example.backend.dto.UserProfileDTO;
@@ -13,7 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth/me/profile")
+@RequestMapping("/api/me")
 public class ProfileController {
 
     private final ProfileService profileService;
@@ -23,7 +24,7 @@ public class ProfileController {
     }
 
     // API: Lấy thông tin hồ sơ cá nhân
-    @GetMapping
+    @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserProfileDTO>> getMyProfile(
             @AuthenticationPrincipal CustomUserDetails currentUser) {
         // Lấy userId từ token JWT đã được filter parse vào CustomUserDetails
@@ -36,7 +37,7 @@ public class ProfileController {
         );    }
 
     // API: Cập nhật thông tin cá nhân
-    @PutMapping
+    @PutMapping("/profile/update")
     public ResponseEntity<ApiResponse<UserProfileDTO>> updateMyProfile(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody UpdateProfileRequest request) {
@@ -49,5 +50,27 @@ public class ProfileController {
         return ResponseEntity.ok(
                 ApiResponse.ok(updatedProfile, "Cập nhật thông tin cá nhân thành công")
         );
+    }
+
+
+
+    // API đổi mật khẩu
+    @PutMapping("/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        // 1. Gọi Service Layer xử lý logic đổi mật khẩu
+        profileService.changePassword(currentUser.getId(), request);
+
+        // 2. Bọc kết quả vào cấu trúc ApiResponse chuẩn hóa của dự án
+        ApiResponse<Void> response = new ApiResponse<>(
+                true,
+                null,
+                "Đổi mật khẩu thành công.",
+                "200"
+        );
+
+        return ResponseEntity.ok(response);
     }
 }
