@@ -26,6 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * M6 - F6.4 (quản lý chỗ gửi), F6.1 gán chỗ cho xe hộ và F6.5 cho thuê chỗ thừa.
@@ -59,10 +63,29 @@ public class ParkingService {
         this.currentUserService = currentUserService;
     }
 
-    // F6.4 - Danh sách chỗ gửi (có phân trang).
+    // F6.4 - Danh sách chỗ gửi (có phân trang), kèm biển số xe và mã căn hộ.
     @Transactional(readOnly = true)
     public PageResponse<ParkingSlotDTO> listSlots(Pageable pageable) {
-        Page<ParkingSlotDTO> page = slotRepository.findAll(pageable).map(mapper::toSlotDto);
+        Page<ParkingSlot> slotsPage = slotRepository.findAll(pageable);
+
+        // Thu thập slotId để batch-load lượt đăng ký ACTIVE trong 1 query (tránh N+1).
+        List<Long> slotIds = slotsPage.getContent().stream()
+                .map(ParkingSlot::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, ParkingRegistration> activeBySlotId = slotIds.isEmpty()
+                ? Collections.emptyMap()
+                : registrationRepository
+                        .findBySlotIdsAndStatusWithDetails(slotIds, ParkingRegistrationStatus.ACTIVE)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                r -> r.getSlot().getId(),
+                                r -> r,
+                                (a, b) -> a   // giữ bản ghi đầu nếu trùng (không nên xảy ra)
+                        ));
+
+        Page<ParkingSlotDTO> page = slotsPage.map(
+                s -> mapper.toSlotDto(s, activeBySlotId.get(s.getId())));
         return PageResponse.of(page);
     }
 

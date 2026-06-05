@@ -260,9 +260,6 @@ function AdminVehicles() {
       </Card>
 
       {/* Chỗ gửi xe */}
-      {/* TODO (backend): ParkingSlotDTO chưa có licensePlate / householdCode.
-          Cần BE thêm 2 trường này (có thể join với ParkingRegistration khi status=USED).
-          Hiện tại hiển thị "—" cho 2 cột mới; khi BE cập nhật chỉ cần map thêm s.licensePlate và s.householdCode. */}
       <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe của hộ)." />
       <Card className="!p-0">
         <div className="overflow-x-auto">
@@ -285,9 +282,8 @@ function AdminVehicles() {
                 <tr key={s.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{s.code}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(s.type)}</td>
-                  {/* TODO (backend): cần BE bổ sung licensePlate & householdCode vào ParkingSlotDTO */}
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">{s.licensePlate ?? "—"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">{s.householdCode ?? "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.licensePlate ?? "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.householdCode ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{slotStatusBadge(s.status)}</td>
                   <td className="px-5 py-4 text-right">
                     {s.status === "EMPTY" ? (
