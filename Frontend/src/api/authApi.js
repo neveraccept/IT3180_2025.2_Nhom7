@@ -51,3 +51,6 @@ export const approveAccountAPI = (id) => callApi(axiosClient.put(`/api/users/${i
 
 // DELETE /api/users/{id}/reject -> Admin từ chối & xóa tài khoản chờ duyệt
 export const rejectAccountAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}/reject`));
+
+// DELETE /api/users/{id} -> Admin xóa mềm tài khoản (đặt deleted = true ở backend)
+export const deleteUserAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}`));

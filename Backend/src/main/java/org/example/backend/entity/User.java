@@ -36,6 +36,11 @@ public class User {
 	@Column
 	private boolean active = false;
 
+	// Cờ xóa mềm (Soft Delete): true = tài khoản đã bị Admin xóa, ẩn khỏi mọi danh sách.
+	// Dùng cột riêng thay vì tái sử dụng `active` vì active=false còn mang nghĩa "chờ duyệt".
+	@Column(nullable = false)
+	private boolean deleted = false;
+
 	@Column(name = "email_verified")
 	private boolean emailVerified = false;
 

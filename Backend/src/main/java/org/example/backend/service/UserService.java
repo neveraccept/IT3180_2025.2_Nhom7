@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.UserDTO;
 import org.example.backend.dto.request.AdminRegisterRequest;
 import org.example.backend.dto.request.AdminUpdateRegisterRequest;
@@ -49,6 +50,7 @@ public class UserService {
     }
 
     //Admin tạo tài khoản nội bộ
+    @LogAdminAction(entity = "User", action = "CREATE", description = "Tạo tài khoản nội bộ")
     @Transactional
     public User createInternalAccount(AdminRegisterRequest req) {
         if (userRepo.existsByUsername(req.username())) {
@@ -98,6 +100,7 @@ public class UserService {
     }
 
     // Duyệt tài khoản cư dân đã đăng ký
+    @LogAdminAction(entity = "User", action = "UPDATE", description = "Duyệt tài khoản cư dân")
     @Transactional
     public User approvePendingAccount(Long id) {
         // 1. Tìm tài khoản cư dân theo ID
@@ -124,6 +127,7 @@ public class UserService {
      * Từ chối tài khoản đăng ký: Xóa hoàn toàn khỏi database.
      * Chỉ áp dụng cho tài khoản chưa được duyệt (active = false).
      */
+    @LogAdminAction(entity = "User", action = "DELETE", description = "Từ chối & xóa tài khoản chờ duyệt")
     @Transactional
     public void rejectPendingAccount(Long id) {
         // 1. Tìm tài khoản theo ID
@@ -212,5 +216,24 @@ public class UserService {
         return userRepo.findAllWithRole().stream()
                 .map(userMapper::toDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Xóa mềm tài khoản (Admin): đặt deleted = true và active = false.
+     * Không xóa cứng để tránh lỗi khóa ngoại với hóa đơn, khiếu nại, xe... đang tham chiếu tới user.
+     */
+    @LogAdminAction(entity = "User", action = "DELETE", description = "Xóa mềm tài khoản")
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
+
+        if (user.isDeleted()) {
+            throw new IllegalArgumentException("Tài khoản này đã bị xóa trước đó!");
+        }
+
+        user.setDeleted(true);
+        user.setActive(false);
+        userRepo.saveAndFlush(user);
     }
 }

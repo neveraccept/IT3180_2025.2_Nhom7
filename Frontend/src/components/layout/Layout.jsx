@@ -14,6 +14,7 @@ import { Utilities } from "../../pages/Utilities";
 import { Complaints } from "../../pages/Complaints";
 import { Notifications } from "../../pages/Notifications";
 import { Statistics } from "../../pages/Statistics";
+import { AuditLogs } from "../../pages/AuditLogs";
 import { MyFees } from "../../pages/MyFees";
 import { Profile } from "../../pages/Profile";
 
@@ -148,6 +149,7 @@ export function Page({
     );
   }
   if (active === "statistics") return <Statistics />;
+  if (active === "auditLogs") return <AuditLogs />;
   if (active === "myFees") return <MyFees user={user} />;
   if (active === "profile") return <Profile user={user} setUser={setUser} />;
   return (

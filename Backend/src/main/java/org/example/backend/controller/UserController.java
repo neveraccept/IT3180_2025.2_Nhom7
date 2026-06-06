@@ -95,6 +95,19 @@ public class UserController {
         );
     }
 
+    // API xóa mềm tài khoản (Admin). Đặt deleted = true thay vì xóa cứng để tránh lỗi khóa ngoại.
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
+        try {
+            userService.deleteUser(id);
+            return ResponseEntity.ok(ApiResponse.ok(null, "Xóa tài khoản thành công!"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("DELETE_USER_FAILED", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống khi xóa tài khoản"));
+        }
+    }
+
     // API cập nhật thông tin đăng ký của tài khoản cư dân đang chờ duyệt (Admin có thể chỉnh sửa lại thông tin trước khi duyệt)
     @PutMapping("{id}")
     public ResponseEntity<ApiResponse<UserDTO>> updatePendingResident(

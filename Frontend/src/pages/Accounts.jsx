@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus } from "lucide-react";
-import { getAllUsersAPI, createInternalAccountAPI } from "../api/authApi";
+import { Search, Plus, Trash2 } from "lucide-react";
+import { getAllUsersAPI, createInternalAccountAPI, deleteUserAPI } from "../api/authApi";
 import { Badge, Button, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
@@ -42,6 +42,17 @@ export function Accounts() {
   const [formData, setFormData] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
+
+  // Tài khoản đang xem chi tiết (cần id để gọi API xóa).
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, tone = "green") => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Tải danh sách tài khoản thật từ backend (GET /api/users)
   const fetchUsers = async () => {
@@ -88,6 +99,7 @@ export function Accounts() {
   };
 
   const openDetail = (account) => {
+    setSelectedAccount(account);
     setFormData({
       fullName: account.fullName || "",
       username: account.username || "",
@@ -101,6 +113,23 @@ export function Accounts() {
     setMode("view");
     setError("");
     setShowForm(true);
+  };
+
+  // Gọi API xóa mềm tài khoản đang xem, sau đó tải lại danh sách.
+  const handleDelete = async () => {
+    if (!selectedAccount?.id) return;
+    setDeleting(true);
+    const res = await deleteUserAPI(selectedAccount.id);
+    setDeleting(false);
+    if (!res.success) {
+      setConfirmDelete(false);
+      showToast(res.message || "Xóa tài khoản thất bại.", "red");
+      return;
+    }
+    setConfirmDelete(false);
+    handleCancel();
+    showToast("Đã xóa tài khoản thành công.", "green");
+    fetchUsers();
   };
 
   const handleCancel = () => {
@@ -252,14 +281,61 @@ export function Accounts() {
 
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="secondary" onClick={handleCancel}>Đóng</Button>
-                {mode === "create" && (
-                  <Button onClick={handleCreate} disabled={saving}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</Button>
-                )}
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <div>
+                  {mode === "view" && (
+                    <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                      <Trash2 className="h-4 w-4" /> Xóa tài khoản
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="secondary" onClick={handleCancel}>Đóng</Button>
+                  {mode === "create" && (
+                    <Button onClick={handleCreate} disabled={saving}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</Button>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">Xác nhận xóa</h3>
+            </div>
+            <p className="mb-5 text-sm text-slate-600">
+              Bạn có chắc chắn muốn xóa tài khoản
+              {selectedAccount?.username ? ` "${selectedAccount.username}"` : ""} không?
+              Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={deleting}>Hủy</Button>
+              <Button variant="danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? "Đang xóa..." : "Xóa"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ring-1 ${
+          toast.tone === "red"
+            ? "bg-rose-50 text-rose-700 ring-rose-200"
+            : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+        }`}>
+          {toast.message}
         </div>
       )}
 
