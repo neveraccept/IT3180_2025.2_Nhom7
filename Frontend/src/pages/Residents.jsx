@@ -217,11 +217,11 @@ export function Residents() {
     setActionMsg("");
     const res = await registerPermanentResidenceAPI(id);
     if (res.success) {
-      setActionMsg(res.message || "Chuyển về thường trú thành công.");
+      setActionMsg(res.message || "Đăng ký thường trú thành công.");
       if (res.data) setDetail(res.data);
       loadPage(page);
     } else {
-      setDetailError(res.message || "Chuyển về thường trú thất bại.");
+      setDetailError(res.message || "Đăng ký thường trú thất bại.");
     }
   };
 
@@ -398,7 +398,7 @@ export function Residents() {
                         <Button variant="soft" onClick={() => handleRegisterTemporary(detail.id)}>Đăng ký tạm trú</Button>
                       )}
                       {detail.residencyStatus === "TEMPORARY" && (
-                        <Button variant="soft" onClick={() => handleRegisterPermanent(detail.id)}>Chuyển về thường trú</Button>
+                        <Button variant="soft" onClick={() => handleRegisterPermanent(detail.id)}>Đăng ký thường trú</Button>
                       )}
                       <Button variant="danger" onClick={() => openMoveOutConfirm(detail)}>Chuyển khỏi hộ</Button>
                     </>
