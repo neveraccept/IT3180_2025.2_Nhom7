@@ -162,6 +162,31 @@ public class HouseholdLifecycleService {
             }
             h.setHeadOfHousehold(newHead);
         }
+        if (req.memberRelations() != null) {
+            for (UpdateHouseholdRequest.MemberRelationUpdate relationUpdate : req.memberRelations()) {
+                if (relationUpdate == null || relationUpdate.residentId() == null) {
+                    continue;
+                }
+                Resident member = residentRepository.findById(relationUpdate.residentId())
+                        .orElseThrow(() -> new NotFoundException(
+                                "RESIDENT_NOT_FOUND",
+                                "Không tìm thấy nhân khẩu id=" + relationUpdate.residentId()));
+                if (member.getHousehold() == null
+                        || !member.getHousehold().getId().equals(h.getId())) {
+                    throw new BadRequestException(
+                            "MEMBER_NOT_IN_HOUSEHOLD",
+                            "Nhân khẩu không thuộc hộ này");
+                }
+                if (member.getStatus() != ResidentStatus.ACTIVE) {
+                    throw new BadRequestException(
+                            "MEMBER_NOT_ACTIVE",
+                            "Nhân khẩu đang ở trạng thái " + member.getStatus());
+                }
+                member.setRelationToHead(
+                        relationUpdate.relationToHead() == null ? null : relationUpdate.relationToHead().trim());
+                residentRepository.save(member);
+            }
+        }
         h = householdRepository.save(h);
 
         return mapper.toHouseholdSummary(h);

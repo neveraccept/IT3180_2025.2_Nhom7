@@ -14,6 +14,7 @@ import {
 } from "../api/residentApi";
 
 const PAGE_SIZE = 20;
+const HEAD_MOVE_OUT_MESSAGE = "Nhân khẩu này là chủ hộ. Vui lòng thao tác ở phần Căn hộ để đổi chủ hộ hoặc chuyển cả hộ đi.";
 
 const GENDER_LABEL = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
 const yearOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 4) : "—");
@@ -57,6 +58,7 @@ export function Residents() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
+  const [actionError, setActionError] = useState("");
 
   // Xác nhận chuyển khỏi hộ
   const [moveOutConfirm, setMoveOutConfirm] = useState(null);
@@ -103,6 +105,7 @@ export function Residents() {
     setDetail(null);
     setMoveOutConfirm(null);
     setActionMsg("");
+    setActionError("");
     setFormData(emptyForm);
     setEditingId(null);
     setFormError("");
@@ -113,6 +116,7 @@ export function Residents() {
     setDetail(null);
     setMoveOutConfirm(null);
     setActionMsg("");
+    setActionError("");
     setFormData({
       householdId: resident.householdId ?? "",
       fullName: resident.fullName || "",
@@ -186,6 +190,7 @@ export function Residents() {
     setDetail({ id });
     setDetailError("");
     setActionMsg("");
+    setActionError("");
     setDetailLoading(true);
     const res = await getResidentByIdAPI(id);
     if (res.success && res.data) {
@@ -203,6 +208,7 @@ export function Residents() {
 
   const handleRegisterTemporary = async (id) => {
     setActionMsg("");
+    setActionError("");
     const res = await registerTemporaryResidenceAPI(id);
     if (res.success) {
       setActionMsg(res.message || "Đăng ký tạm trú thành công.");
@@ -215,6 +221,7 @@ export function Residents() {
 
   const handleRegisterPermanent = async (id) => {
     setActionMsg("");
+    setActionError("");
     const res = await registerPermanentResidenceAPI(id);
     if (res.success) {
       setActionMsg(res.message || "Đăng ký thường trú thành công.");
@@ -226,9 +233,15 @@ export function Residents() {
   };
 
   const openMoveOutConfirm = (resident) => {
+    if (resident?.headOfHousehold) {
+      setActionMsg("");
+      setActionError(HEAD_MOVE_OUT_MESSAGE);
+      return;
+    }
     setDetail(null);
     setShowForm(false);
     setFormError("");
+    setActionError("");
     setMoveOutConfirm({ id: resident.id, name: resident.fullName });
   };
 
@@ -388,6 +401,9 @@ export function Residents() {
 
                 {actionMsg && (
                   <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">{actionMsg}</div>
+                )}
+                {actionError && (
+                  <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">{actionError}</div>
                 )}
 
                 <div className="mt-5 flex flex-wrap justify-end gap-3">

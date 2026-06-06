@@ -97,6 +97,15 @@ public class ResidentService {
     public ResidentDetailDTO moveOutResident(Long id) {
 
         Resident r = findActiveResidentOrThrow(id);
+        Household h = r.getHousehold();
+        if (h != null
+                && h.getHeadOfHousehold() != null
+                && h.getHeadOfHousehold().getId().equals(r.getId())) {
+            throw new BadRequestException(
+                    "HEAD_OF_HOUSEHOLD_CANNOT_MOVE_OUT",
+                    "Không thể chuyển chủ hộ khỏi hộ. Vui lòng thao tác ở phần căn hộ để đổi chủ hộ hoặc chuyển cả căn hộ đi.");
+        }
+
         r.setStatus(ResidentStatus.MOVED_OUT);
         Resident saved = residentRepository.save(r);
 

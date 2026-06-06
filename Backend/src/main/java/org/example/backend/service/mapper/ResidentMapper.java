@@ -10,6 +10,9 @@ public class ResidentMapper {
 
     public ResidentDetailDTO toDetail(Resident r) {
         Household h = r.getHousehold();
+        boolean headOfHousehold = h != null
+                && h.getHeadOfHousehold() != null
+                && h.getHeadOfHousehold().getId().equals(r.getId());
         return new ResidentDetailDTO(
                 r.getId(),
                 r.getFullName(),
@@ -21,7 +24,8 @@ public class ResidentMapper {
                 r.getStatus(),
                 h != null ? h.getId() : null,
                 h != null ? h.getCode() : null,
-                (h != null && h.getApartment() != null) ? h.getApartment().getCode() : null
+                (h != null && h.getApartment() != null) ? h.getApartment().getCode() : null,
+                headOfHousehold
         );
     }
 }

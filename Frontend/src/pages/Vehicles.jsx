@@ -73,8 +73,8 @@ function AdminVehicles() {
   const displayedSlots = useMemo(() => {
     const isOccupied = (s) => s.status !== "EMPTY";
     const filtered = slots.filter((s) => {
+      if (!isOccupied(s)) return false;
       if (slotFilter === "OCCUPIED") return isOccupied(s);
-      if (slotFilter === "EMPTY") return !isOccupied(s);
       return true;
     });
     return [...filtered].sort((a, b) => {
@@ -190,12 +190,6 @@ function AdminVehicles() {
     loadSlots();
   };
 
-  const openParkForm = (slot) => {
-    setParkForm({ slotId: String(slot.id), vehicleId: "", monthlyFee: "", startDate: "", endDate: "" });
-    setParkError("");
-    setShowParkForm(true);
-  };
-
   const handleCreateRegistration = async () => {
     if (!parkForm.vehicleId) { setParkError("Nhập vehicleId của xe thuộc hộ"); return; }
     const payload = {
@@ -269,7 +263,7 @@ function AdminVehicles() {
                 <th className="px-5 py-4">Hộ</th>
                 <th className="px-5 py-4">Ngày đăng ký</th>
                 <th className="px-5 py-4">Trạng thái</th>
-                <th className="px-5 py-4 text-right">Thao tác</th>
+                <th className="px-5 py-4 text-right">Chi tiết</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -299,9 +293,8 @@ function AdminVehicles() {
       {/* Bộ lọc trạng thái chỗ gửi */}
       <div className="mb-4 flex flex-wrap gap-2">
         {[
-          { key: "ALL", label: `Tất cả (${slots.length})` },
+          { key: "ALL", label: `Tat ca (${occupiedCount})` },
           { key: "OCCUPIED", label: `Đang có xe (${occupiedCount})` },
-          { key: "EMPTY", label: `Đang trống (${emptyCount})` },
         ].map((f) => (
           <button
             key={f.key}
@@ -327,13 +320,12 @@ function AdminVehicles() {
                 <th className="px-5 py-4">Biển số xe</th>
                 <th className="px-5 py-4">Căn hộ sở hữu</th>
                 <th className="px-5 py-4">Trạng thái</th>
-                <th className="px-5 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayedSlots.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
-                  {slots.length === 0 ? "Chưa có chỗ gửi nào." : "Không có chỗ gửi phù hợp với bộ lọc."}
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
+                  {slots.length === 0 ? "Chua co cho gui nao." : "Chua co cho gui nao dang gan xe."}
                 </td></tr>
               )}
               {pagedSlots.map((s) => (
@@ -343,13 +335,6 @@ function AdminVehicles() {
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.licensePlate ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.householdCode ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{slotStatusBadge(s.status)}</td>
-                  <td className="px-5 py-4 text-right">
-                    {s.status === "EMPTY" ? (
-                      <button onClick={() => openParkForm(s)} className="font-semibold text-sky-700 hover:text-sky-900">Tạo lượt gửi</button>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
                 </tr>
               ))}
             </tbody>

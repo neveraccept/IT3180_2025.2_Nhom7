@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Download } from "lucide-react";
 import { money } from "../utils/helpers";
-import { Button, Card, Input, Select, StatusBadge } from "../components/common";
+import { Button, Card, Input, Select, StatusBadge, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import {
   getHouseholdStatisticsAPI,
   getResidentStatisticsAPI,
+  getFeePeriodStatisticsAPI,
+  getDonationStatisticsAPI,
   exportHouseholdExcelAPI,
   exportHouseholdPdfAPI,
   exportResidentExcelAPI,
@@ -19,12 +21,23 @@ import {
   downloadBlob,
 } from "../api/reportApi";
 import { listFeePeriodsAPI } from "../api/feeApi";
+import { searchVnpayTransactionsAPI } from "../api/vnpayApi";
 
 // ============================================================
 //  Module 10 — Thống kê & xuất báo cáo (ADMIN only).
 //  Nguồn dữ liệu: ReportController /api/reports (Spring Boot).
 //  Giữ nguyên UI/Tailwind; thay toàn bộ logic mock bằng API thật.
 // ============================================================
+const REPORT_PAGE_SIZE = 20;
+
+const reportLabels = {
+  households: "Thong ke theo ho",
+  residents: "Thong ke dan cu",
+  "fee-period": "Thong ke dot thu",
+  donation: "Khoan dong gop",
+  transactions: "Giao dich online",
+};
+
 export function Statistics() {
   // Dữ liệu thống kê
   const [households, setHouseholds] = useState([]);
@@ -43,6 +56,9 @@ export function Statistics() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportPage, setReportPage] = useState(1);
+  const [reportResult, setReportResult] = useState(null);
 
   // ---- Toast helper ----
   const showToast = useCallback((message, type = "success") => {
@@ -65,10 +81,136 @@ export function Statistics() {
     loadStats();
   }, [loadStats]);
 
-  const handleApplyStatFilter = () => loadStats({ from: dateFrom || undefined, to: dateTo || undefined });
+  const buildReportTable = (type, data) => {
+    if (type === "households") {
+      return {
+        title: reportLabels[type],
+        columns: ["Can ho", "Chu ho", "Phai nop", "Da nop", "Con thieu", "So phieu", "Chua nop"],
+        rows: (data || []).map((h) => [
+          h.apartmentCode || h.householdCode || "?",
+          h.headName || "?",
+          money(h.totalDue || 0),
+          money(h.totalPaid || 0),
+          money(h.outstanding || 0),
+          h.paymentCount ?? 0,
+          h.unpaidCount ?? 0,
+        ]),
+      };
+    }
+
+    if (type === "residents") {
+      return {
+        title: reportLabels[type],
+        columns: ["Chi tieu", "Gia tri"],
+        rows: [
+          ["Ho dang hoat dong", data?.totalActiveHouseholds ?? 0],
+          ["Nhan khau", data?.totalActiveResidents ?? 0],
+          ["Thuong tru", data?.permanentCount ?? 0],
+          ["Tam tru", data?.temporaryCount ?? 0],
+          ["Tam vang", data?.absentCount ?? 0],
+          ["Nam", data?.maleCount ?? 0],
+          ["Nu", data?.femaleCount ?? 0],
+          ["Khac", data?.otherCount ?? 0],
+        ],
+      };
+    }
+
+    if (type === "fee-period") {
+      return {
+        title: `${reportLabels[type]}${data?.feePeriodName ? ` - ${data.feePeriodName}` : ""}`,
+        columns: ["Chi tieu", "Gia tri"],
+        rows: [
+          ["Ten dot thu", data?.feePeriodName || "?"],
+          ["Khoan thu", data?.feeName || "?"],
+          ["Trang thai", data?.periodStatus || "?"],
+          ["Tong so ho", data?.totalHouseholds ?? 0],
+          ["Da nop", data?.paidCount ?? 0],
+          ["Chua nop", data?.unpaidCount ?? 0],
+          ["Tong phai thu", money(data?.totalDue || 0)],
+          ["Da thu", money(data?.totalCollected || 0)],
+          ["Con thieu", money(data?.totalOutstanding || 0)],
+          ["Ti le thu", `${Number(data?.collectionRate || 0).toFixed(1)}%`],
+        ],
+      };
+    }
+
+    if (type === "donation") {
+      const rows = (data?.contributions || []).map((c) => [
+        c.apartmentCode || c.householdCode || "?",
+        c.headName || "?",
+        money(c.amount || 0),
+        c.paidDate || "?",
+      ]);
+      return {
+        title: `${reportLabels[type]}${data?.feePeriodName ? ` - ${data.feePeriodName}` : ""}`,
+        columns: ["Can ho", "Chu ho", "So tien", "Ngay nop"],
+        rows,
+        summary: `So ho dong gop: ${data?.contributorCount ?? rows.length} | Tong tien: ${money(data?.totalAmount || 0)}`,
+      };
+    }
+
+    return {
+      title: reportLabels[type],
+      columns: ["Ma giao dich", "Ho", "Noi dung", "So tien", "Trang thai", "Tao luc", "Thanh toan luc"],
+      rows: (data?.items || data || []).map((t) => [
+        t.transactionCode || `#${t.id}`,
+        t.householdCode || t.householdId || "?",
+        t.targetType || "?",
+        money(t.amount || 0),
+        t.status || "?",
+        t.createdAt || "?",
+        t.paidAt || t.vnpayPayDate || "?",
+      ]),
+    };
+  };
+
+  const handleApplyReport = async () => {
+    if ((reportType === "fee-period" || reportType === "donation") && !selectedPeriodId) {
+      showToast("Vui long chon dot thu.", "error");
+      return;
+    }
+
+    setReportLoading(true);
+    setReportPage(1);
+    const range = { from: dateFrom || undefined, to: dateTo || undefined };
+    let res;
+
+    if (reportType === "households") {
+      res = await getHouseholdStatisticsAPI(range);
+    } else if (reportType === "residents") {
+      res = await getResidentStatisticsAPI(range);
+    } else if (reportType === "fee-period") {
+      res = await getFeePeriodStatisticsAPI(selectedPeriodId, range);
+    } else if (reportType === "donation") {
+      res = await getDonationStatisticsAPI(selectedPeriodId);
+    } else {
+      res = await searchVnpayTransactionsAPI({
+        status: statusFilter || undefined,
+        fromDate: dateFrom || undefined,
+        toDate: dateTo || undefined,
+        page: 0,
+        size: 1000,
+      });
+    }
+
+    setReportLoading(false);
+    if (res.success) {
+      setReportResult(buildReportTable(reportType, res.data));
+    } else {
+      setReportResult(null);
+      showToast(res.message || "Khong tai duoc thong tin bao cao.", "error");
+    }
+  };
+
+  const handleApplyStatFilter = () => {
+    loadStats({ from: dateFrom || undefined, to: dateTo || undefined });
+    handleApplyReport();
+  };
   const handleResetStatFilter = () => {
     setDateFrom("");
     setDateTo("");
+    setReportPage(1);
+    setReportResult(null);
     loadStats();
   };
 
@@ -176,6 +318,8 @@ export function Statistics() {
             onChange={(e) => {
               setReportType(e.target.value);
               setSelectedPeriodId("");
+              setReportPage(1);
+              setReportResult(null);
             }}
           >
             <option value="households">Thống kê theo hộ</option>
@@ -238,13 +382,57 @@ export function Statistics() {
           </Select>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end gap-3">
+          <Button variant="secondary" onClick={handleApplyReport} disabled={reportLoading}>
+            {reportLoading ? "Dang tai..." : "Ap dung"}
+          </Button>
           <Button onClick={handleExport} disabled={exporting}>
             <Download className="h-4 w-4" />
             {exporting ? "Đang xuất..." : "Xuất báo cáo"}
           </Button>
         </div>
       </Card>
+
+
+      {reportResult && (
+        <Card className="mb-6 !p-0">
+          <div className="border-b border-slate-200 px-5 py-5">
+            <h3 className="font-black text-slate-900">{reportResult.title}</h3>
+            {reportResult.summary && <p className="mt-1 text-sm font-semibold text-slate-500">{reportResult.summary}</p>}
+          </div>
+          {reportResult.rows.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Khong co du lieu phu hop.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {reportResult.columns.map((column) => (
+                        <th key={column} className="px-5 py-4">{column}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {reportResult.rows
+                      .slice((reportPage - 1) * REPORT_PAGE_SIZE, reportPage * REPORT_PAGE_SIZE)
+                      .map((row, rowIndex) => (
+                        <tr key={rowIndex} className="hover:bg-slate-50/80">
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="whitespace-nowrap px-5 py-4 text-slate-700">{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t border-slate-200">
+                <Pagination page={reportPage} total={reportResult.rows.length} pageSize={REPORT_PAGE_SIZE} onPageChange={setReportPage} />
+              </div>
+            </>
+          )}
+        </Card>
+      )}
 
       {/* === Lọc thống kê theo thời gian === */}
       <Card className="mb-6">
