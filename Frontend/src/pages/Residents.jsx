@@ -14,6 +14,7 @@ import {
 } from "../api/residentApi";
 
 const PAGE_SIZE = 20;
+const VISIBLE_RESIDENT_STATUS = "ACTIVE";
 const HEAD_MOVE_OUT_MESSAGE = "Nhân khẩu này là chủ hộ. Vui lòng thao tác ở phần Căn hộ để đổi chủ hộ hoặc chuyển cả hộ đi.";
 
 const GENDER_LABEL = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
@@ -66,7 +67,12 @@ export function Residents() {
   const loadPage = async (targetPage = 0, applied = appliedFilters) => {
     setLoading(true);
     setError("");
-    const res = await searchResidentsAPI({ ...applied, page: targetPage, size: PAGE_SIZE });
+    const res = await searchResidentsAPI({
+      ...applied,
+      status: VISIBLE_RESIDENT_STATUS,
+      page: targetPage,
+      size: PAGE_SIZE,
+    });
     if (res.success && res.data) {
       setResidents(res.data.items || []);
       setTotalPages(res.data.totalPages || 0);
