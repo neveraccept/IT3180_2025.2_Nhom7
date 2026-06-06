@@ -78,6 +78,17 @@ export function Complaints({
     fetchComplaints();
   }, [fetchComplaints]);
 
+  // Sắp xếp hiển thị: ưu tiên Chờ xử lý (NEW) -> Đang xử lý (IN_PROGRESS),
+  // các khiếu nại Đã giải quyết / Từ chối đưa xuống dưới cùng.
+  // Cùng nhóm trạng thái: khiếu nại gửi sớm nhất xếp trước.
+  const STATUS_ORDER = { NEW: 0, IN_PROGRESS: 1, RESOLVED: 2, REJECTED: 2 };
+  const sortedComplaints = [...complaints].sort((a, b) => {
+    const ra = STATUS_ORDER[a.status] ?? 3;
+    const rb = STATUS_ORDER[b.status] ?? 3;
+    if (ra !== rb) return ra - rb;
+    return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+  });
+
   // Mở chi tiết khiếu nại
   const openDetail = (complaint) => {
     setSelectedComplaint(complaint);
@@ -308,7 +319,7 @@ export function Complaints({
                   </td>
                 </tr>
               )}
-              {!loading && complaints.map((complaint) => (
+              {!loading && sortedComplaints.map((complaint) => (
                 <tr key={complaint.id} className="hover:bg-slate-50/80">
                   <td className="px-5 py-4 text-slate-500">#{complaint.id}</td>
                   <td className="px-5 py-4 font-semibold text-slate-800">{complaint.title}</td>

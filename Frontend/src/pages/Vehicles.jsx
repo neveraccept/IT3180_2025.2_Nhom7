@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, AlertCircle } from "lucide-react";
 import { money } from "../utils/helpers";
-import { Badge, Button, Card, Input, Select } from "../components/common";
+import { Badge, Button, Card, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import {
   registerVehicleAPI,
@@ -65,6 +65,10 @@ function AdminVehicles() {
   // Bộ lọc chỗ gửi: ALL | OCCUPIED (đang có xe) | EMPTY (đang trống)
   const [slotFilter, setSlotFilter] = useState("ALL");
 
+  // Phân trang chỗ gửi xe: 20 chỗ/trang.
+  const [slotPage, setSlotPage] = useState(1);
+  const SLOT_PAGE_SIZE = 20;
+
   // Lọc + sắp xếp: ưu tiên chỗ đang có xe (USED/RENTED) lên trước chỗ trống (EMPTY).
   const displayedSlots = useMemo(() => {
     const isOccupied = (s) => s.status !== "EMPTY";
@@ -83,6 +87,14 @@ function AdminVehicles() {
 
   const occupiedCount = slots.filter((s) => s.status !== "EMPTY").length;
   const emptyCount = slots.length - occupiedCount;
+
+  // Cắt trang cho danh sách chỗ gửi đã lọc/sắp xếp.
+  const pagedSlots = displayedSlots.slice((slotPage - 1) * SLOT_PAGE_SIZE, slotPage * SLOT_PAGE_SIZE);
+
+  // Đổi bộ lọc -> quay về trang 1 để không rơi vào trang rỗng.
+  useEffect(() => {
+    setSlotPage(1);
+  }, [slotFilter]);
 
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
@@ -324,7 +336,7 @@ function AdminVehicles() {
                   {slots.length === 0 ? "Chưa có chỗ gửi nào." : "Không có chỗ gửi phù hợp với bộ lọc."}
                 </td></tr>
               )}
-              {displayedSlots.map((s) => (
+              {pagedSlots.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{s.code}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(s.type)}</td>
@@ -343,6 +355,11 @@ function AdminVehicles() {
             </tbody>
           </table>
         </div>
+        {displayedSlots.length > 0 && (
+          <div className="border-t border-slate-200">
+            <Pagination page={slotPage} total={displayedSlots.length} pageSize={SLOT_PAGE_SIZE} onPageChange={setSlotPage} />
+          </div>
+        )}
       </Card>
 
       {/* MODAL: đăng ký / sửa xe */}

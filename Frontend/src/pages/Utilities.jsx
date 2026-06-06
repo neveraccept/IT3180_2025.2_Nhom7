@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, AlertCircle } from "lucide-react";
 import { money } from "../utils/helpers";
-import { Button, Card, Input, Select, StatusBadge } from "../components/common";
+import { Button, Card, Input, Select, StatusBadge, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import {
   searchUtilityBillsAPI,
@@ -32,6 +32,11 @@ export function Utilities() {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
+
+  // Phân trang phía server: 20 hoá đơn/trang.
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 20;
 
   const [showForm, setShowForm] = useState(false);
   const [editingBill, setEditingBill] = useState(null);
@@ -87,7 +92,7 @@ export function Utilities() {
     await loadConfigs();
   };
 
-  const loadBills = useCallback(async () => {
+  const loadBills = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setPageError("");
     const res = await searchUtilityBillsAPI({
@@ -96,22 +101,29 @@ export function Utilities() {
       month: searchFilters.month || undefined,
       year: searchFilters.year || undefined,
       status: searchFilters.status || undefined,
+      page: targetPage - 1,
+      size: PAGE_SIZE,
     });
-    if (res.success) setBills(res.data?.items || []);
-    else setPageError(res.message || "Không tải được danh sách hoá đơn");
+    if (res.success) {
+      setBills(res.data?.items || []);
+      setTotal(res.data?.totalElements || 0);
+      setPage(targetPage);
+    } else {
+      setPageError(res.message || "Không tải được danh sách hoá đơn");
+    }
     setLoading(false);
   }, [searchFilters]);
 
   useEffect(() => {
-    loadBills();
+    loadBills(1);
     loadConfigs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = () => loadBills();
+  const handleSearch = () => loadBills(1);
   const handleResetSearch = () => {
     setSearchFilters({ householdId: "", type: "", month: "", year: "", status: "" });
-    setTimeout(loadBills, 0);
+    setTimeout(() => loadBills(1), 0);
   };
 
   const openCreateForm = () => {
@@ -184,7 +196,7 @@ export function Utilities() {
     }
     setShowForm(false);
     setEditingBill(null);
-    await loadBills();
+    await loadBills(page);
   };
 
   const handleConfirmCash = async () => {
@@ -196,7 +208,7 @@ export function Utilities() {
     }
     setShowForm(false);
     setEditingBill(null);
-    await loadBills();
+    await loadBills(page);
   };
 
   const handleConfirmDelete = async () => {
@@ -209,7 +221,7 @@ export function Utilities() {
     }
     setShowForm(false);
     setEditingBill(null);
-    await loadBills();
+    await loadBills(page);
   };
 
   // Tạm tính số tiền điện/nước = (chỉ số mới - chỉ số cũ) * đơn giá hiện hành.
@@ -463,6 +475,11 @@ export function Utilities() {
             </tbody>
           </table>
         </div>
+        {!loading && total > 0 && (
+          <div className="border-t border-slate-200">
+            <Pagination page={page} total={total} pageSize={PAGE_SIZE} onPageChange={(p) => loadBills(p)} />
+          </div>
+        )}
       </div>
     </>
   );

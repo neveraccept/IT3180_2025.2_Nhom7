@@ -50,9 +50,10 @@ export function Dashboard({ role }) {
             setOpenPeriodsCount(items.filter((p) => p.status === "OPEN").length);
           }
           if (complaintsRes.success) {
-            const pending = (complaintsRes.data?.items || []).filter(
-              (c) => c.status === "NEW" || c.status === "IN_PROGRESS"
-            );
+            const pending = (complaintsRes.data?.items || [])
+              .filter((c) => c.status === "NEW" || c.status === "IN_PROGRESS")
+              // Mới nhất lên trước để khớp với "5 khiếu nại mới nhất".
+              .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
             setUnresolvedComplaints(pending);
           }
         }
@@ -65,7 +66,7 @@ export function Dashboard({ role }) {
           listMyUtilityBillsAPI(),
         ]);
         if (!cancelled) {
-          const fees = (paymentsRes.data?.items || []).filter((p) => p.status === "PENDING");
+          const fees = (paymentsRes.data?.items || []).filter((p) => p.status === "UNPAID");
           const bills = (billsRes.data?.items || []).filter((b) => b.status === "UNPAID");
           setUnpaidItems([
             ...fees.map((p) => ({
@@ -93,6 +94,10 @@ export function Dashboard({ role }) {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const unpaidTotal = unpaidItems.reduce((s, r) => s + r.amount, 0);
+  // 5 thông báo gần nhất (mới nhất lên trước).
+  const recentNotifications = [...notifications]
+    .sort((a, b) => new Date(b.sentAt || 0) - new Date(a.sentAt || 0))
+    .slice(0, 5);
 
   const closeModals = () => {
     setSelectedComplaint(null);
@@ -156,7 +161,7 @@ export function Dashboard({ role }) {
                 <p className="text-sm text-slate-500">Chưa có thông báo.</p>
               )}
               {!loading &&
-                notifications.slice(0, 5).map((n) => (
+                recentNotifications.map((n) => (
                   <button
                     key={n.id}
                     onClick={() => setSelectedNotification(n)}
@@ -272,7 +277,7 @@ export function Dashboard({ role }) {
               </div>
             )}
             {!loading &&
-              unresolvedComplaints.map((c) => (
+              unresolvedComplaints.slice(0, 5).map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedComplaint(c)}
@@ -296,6 +301,11 @@ export function Dashboard({ role }) {
                   </div>
                 </button>
               ))}
+            {!loading && unresolvedComplaints.length > 5 && (
+              <p className="pt-1 text-center text-xs font-semibold text-slate-400">
+                Đang hiển thị 5 khiếu nại mới nhất / {unresolvedComplaints.length} chưa xử lý — xem tất cả ở mục Khiếu nại.
+              </p>
+            )}
           </div>
         </Card>
 
@@ -307,7 +317,7 @@ export function Dashboard({ role }) {
               <p className="text-sm text-slate-500">Chưa có thông báo.</p>
             )}
             {!loading &&
-              notifications.slice(0, 5).map((n) => (
+              recentNotifications.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => setSelectedNotification(n)}

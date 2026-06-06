@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus } from "lucide-react";
 import { getAllUsersAPI, createInternalAccountAPI } from "../api/authApi";
-import { Badge, Button, Input, Select } from "../components/common";
+import { Badge, Button, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
 // Map UserDTO (backend) -> dòng hiển thị trên bảng.
@@ -40,6 +40,8 @@ export function Accounts() {
   const [saving, setSaving] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [formData, setFormData] = useState(emptyForm);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   // Tải danh sách tài khoản thật từ backend (GET /api/users)
   const fetchUsers = async () => {
@@ -69,6 +71,14 @@ export function Accounts() {
       String(account.apartment || "").toLowerCase().includes(keyword)
     );
   });
+
+  // Phân trang phía client: 20 tài khoản/trang.
+  const pagedRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Về trang 1 mỗi khi từ khoá tìm kiếm thay đổi để tránh trang rỗng.
+  useEffect(() => {
+    setPage(1);
+  }, [searchKeyword]);
 
   const openCreateForm = () => {
     setFormData(emptyForm);
@@ -290,7 +300,7 @@ export function Accounts() {
               ) : filteredRows.length === 0 ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">Không có tài khoản nào</td></tr>
               ) : (
-                filteredRows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.id ?? row.username} className="hover:bg-slate-50/80">
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.username}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.fullName}</td>
@@ -310,6 +320,11 @@ export function Accounts() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredRows.length > 0 && (
+          <div className="border-t border-slate-200">
+            <Pagination page={page} total={filteredRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          </div>
+        )}
       </div>
     </>
   );

@@ -72,6 +72,23 @@ public class FeePeriodService {
     }
 
     /**
+     * Backfill: sinh phiếu thu cho các đợt thu đang tồn tại nhưng CHƯA có phiếu nào
+     * (vd: đợt thu được seed/khởi tạo trước khi có cơ chế tự sinh phiếu).
+     * Idempotent — đợt nào đã có phiếu sẽ được bỏ qua. Trả về số đợt được backfill.
+     */
+    @Transactional
+    public int backfillMissingPayments() {
+        int periodsFixed = 0;
+        for (FeePeriod period : feePeriodRepository.findAll()) {
+            if (period.getFee() == null) continue;
+            if (paymentRepository.countByFeePeriod_Id(period.getId()) > 0) continue;
+            generatePayments(period, period.getFee());
+            periodsFixed++;
+        }
+        return periodsFixed;
+    }
+
+    /**
      * Sinh phiếu thu cho mọi hộ ACTIVE dựa trên đơn vị tính của khoản thu:
      *  - PER_M2: diện tích căn hộ * đơn giá
      *  - PER_PERSON: số nhân khẩu ACTIVE * đơn giá

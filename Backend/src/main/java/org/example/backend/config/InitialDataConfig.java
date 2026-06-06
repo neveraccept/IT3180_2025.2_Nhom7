@@ -59,6 +59,7 @@ public class InitialDataConfig implements CommandLineRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.example.backend.service.FeePeriodService feePeriodService;
 
     private final Faker faker = new Faker(Locale.of("vi"));
     private final Random random = new Random();
@@ -81,7 +82,8 @@ public class InitialDataConfig implements CommandLineRunner {
                              NotificationRecipientRepository notificationRecipientRepository,
                              UserRepository userRepository,
                              RoleRepository roleRepository,
-                             PasswordEncoder passwordEncoder) {
+                             PasswordEncoder passwordEncoder,
+                             org.example.backend.service.FeePeriodService feePeriodService) {
         this.apartmentRepository = apartmentRepository;
         this.parkingSlotRepository = parkingSlotRepository;
         this.householdRepository = householdRepository;
@@ -98,6 +100,7 @@ public class InitialDataConfig implements CommandLineRunner {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.feePeriodService = feePeriodService;
     }
 
     @Override
@@ -110,18 +113,25 @@ public class InitialDataConfig implements CommandLineRunner {
         // Chốt chặn idempotent: chỉ seed khi DB chưa có hạ tầng căn hộ.
         if (apartmentRepository.count() > 0) {
             System.out.println("[InitialDataConfig] Đã có dữ liệu căn hộ -> bỏ qua sinh dữ liệu mẫu.");
-            return;
+        } else {
+            System.out.println("[InitialDataConfig] Bắt đầu sinh dữ liệu mẫu...");
+
+            seedInfrastructure();
+            List<Household> households = seedHouseholdsAndResidents();
+            seedVehiclesAndParking(households);
+            seedFinance(households);
+            seedInteractions(households);
+
+            System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
         }
 
-        System.out.println("[InitialDataConfig] Bắt đầu sinh dữ liệu mẫu...");
-
-        seedInfrastructure();
-        List<Household> households = seedHouseholdsAndResidents();
-        seedVehiclesAndParking(households);
-        seedFinance(households);
-        seedInteractions(households);
-
-        System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
+        // Luôn đảm bảo mọi đợt thu đã có phiếu thu (Payment). Chạy cả với DB cũ:
+        // các đợt thu được seed/tạo trước khi có cơ chế tự sinh phiếu sẽ được backfill,
+        // nhờ vậy màn hình "Thu phí / Công nợ" mới có dữ liệu để hiển thị.
+        int fixedPeriods = feePeriodService.backfillMissingPayments();
+        if (fixedPeriods > 0) {
+            System.out.printf("[InitialDataConfig] Đã backfill phiếu thu cho %d đợt thu chưa có phiếu.%n", fixedPeriods);
+        }
     }
 
 

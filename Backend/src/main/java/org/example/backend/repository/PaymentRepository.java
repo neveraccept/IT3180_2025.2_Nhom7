@@ -26,6 +26,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Page<Payment> findByFeePeriod_Id(Long feePeriodId, Pageable pageable);
 
+    /** Số phiếu thu đã sinh cho một đợt thu — dùng để backfill những đợt chưa có phiếu. */
+    long countByFeePeriod_Id(Long feePeriodId);
+
     @Query(value = """
             SELECT p FROM Payment p
             LEFT JOIN FETCH p.feePeriod fp
