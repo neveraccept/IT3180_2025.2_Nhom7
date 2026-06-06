@@ -50,3 +50,7 @@ export const moveOutResidentAPI = (id) =>
 // PUT /api/residents/{id}/temporary-residence -> đăng ký tạm trú (F3.4)
 export const registerTemporaryResidenceAPI = (id) =>
   callApi(axiosClient.put(`/api/residents/${id}/temporary-residence`));
+
+// PUT /api/residents/{id}/permanent-residence -> chuyển tạm trú về thường trú
+export const registerPermanentResidenceAPI = (id) =>
+  callApi(axiosClient.put(`/api/residents/${id}/permanent-residence`));

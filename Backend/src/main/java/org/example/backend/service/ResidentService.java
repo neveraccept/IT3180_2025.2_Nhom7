@@ -108,6 +108,11 @@ public class ResidentService {
         return changeResidencyStatus(id, ResidencyStatus.TEMPORARY);
     }
 
+    //  Chuyển tạm trú về thường trú
+    public ResidentDetailDTO registerPermanentResidence(Long id) {
+        return changeResidencyStatus(id, ResidencyStatus.PERMANENT);
+    }
+
     private ResidentDetailDTO changeResidencyStatus(Long id, ResidencyStatus newResidency) {
 
         Resident r = findActiveResidentOrThrow(id);

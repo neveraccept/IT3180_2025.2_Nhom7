@@ -10,6 +10,7 @@ import {
   updateResidentAPI,
   moveOutResidentAPI,
   registerTemporaryResidenceAPI,
+  registerPermanentResidenceAPI,
 } from "../api/residentApi";
 
 const PAGE_SIZE = 20;
@@ -99,6 +100,9 @@ export function Residents() {
   };
 
   const openCreateForm = () => {
+    setDetail(null);
+    setMoveOutConfirm(null);
+    setActionMsg("");
     setFormData(emptyForm);
     setEditingId(null);
     setFormError("");
@@ -106,6 +110,9 @@ export function Residents() {
   };
 
   const openEditForm = (resident) => {
+    setDetail(null);
+    setMoveOutConfirm(null);
+    setActionMsg("");
     setFormData({
       householdId: resident.householdId ?? "",
       fullName: resident.fullName || "",
@@ -204,6 +211,25 @@ export function Residents() {
     } else {
       setDetailError(res.message || "Đăng ký tạm trú thất bại.");
     }
+  };
+
+  const handleRegisterPermanent = async (id) => {
+    setActionMsg("");
+    const res = await registerPermanentResidenceAPI(id);
+    if (res.success) {
+      setActionMsg(res.message || "Chuyển về thường trú thành công.");
+      if (res.data) setDetail(res.data);
+      loadPage(page);
+    } else {
+      setDetailError(res.message || "Chuyển về thường trú thất bại.");
+    }
+  };
+
+  const openMoveOutConfirm = (resident) => {
+    setDetail(null);
+    setShowForm(false);
+    setFormError("");
+    setMoveOutConfirm({ id: resident.id, name: resident.fullName });
   };
 
   const handleConfirmMoveOut = async () => {
@@ -371,7 +397,10 @@ export function Residents() {
                       {detail.residencyStatus !== "TEMPORARY" && (
                         <Button variant="soft" onClick={() => handleRegisterTemporary(detail.id)}>Đăng ký tạm trú</Button>
                       )}
-                      <Button variant="danger" onClick={() => setMoveOutConfirm({ id: detail.id, name: detail.fullName })}>Chuyển khỏi hộ</Button>
+                      {detail.residencyStatus === "TEMPORARY" && (
+                        <Button variant="soft" onClick={() => handleRegisterPermanent(detail.id)}>Chuyển về thường trú</Button>
+                      )}
+                      <Button variant="danger" onClick={() => openMoveOutConfirm(detail)}>Chuyển khỏi hộ</Button>
                     </>
                   )}
                   <Button variant="secondary" onClick={closeDetail}>Đóng</Button>
