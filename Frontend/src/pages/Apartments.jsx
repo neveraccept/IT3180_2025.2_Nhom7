@@ -120,7 +120,9 @@ export function Apartments() {
   };
 
   const household = detail?.currentHousehold || null;
-  const members = household?.residents || [];
+  const members = (household?.residents || []).filter(
+    (member) => member.status !== "MOVED_OUT" && member.residencyStatus !== "MOVED_OUT"
+  );
 
   const refreshApartmentDetail = async () => {
     if (!selectedApartment) return;
@@ -369,8 +371,48 @@ export function Apartments() {
               </div>
             )}
 
+
+            <h4 className="mb-3 text-lg font-black text-slate-900">Thành viên trong căn hộ</h4>
+            {detailLoading ? (
+              <div className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+                Đang tải thông tin hộ gia đình…
+              </div>
+            ) : detailError ? (
+              <div className="rounded-2xl bg-rose-50 px-4 py-6 text-center text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+                {detailError}
+              </div>
+            ) : !household || members.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+                Căn hộ này chưa có hộ dân đang cư trú.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Họ tên</th>
+                      <th className="px-4 py-3">Năm sinh</th>
+                      <th className="px-4 py-3">CCCD/CMND</th>
+                      <th className="px-4 py-3">Quan hệ</th>
+                      <th className="px-4 py-3">Cư trú</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {members.map((member) => (
+                      <tr key={member.id}>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{member.fullName}</td>
+                        <td className="px-4 py-3 text-slate-700">{yearOf(member.dateOfBirth)}</td>
+                        <td className="px-4 py-3 text-slate-700">{member.idCard || "—"}</td>
+                        <td className="px-4 py-3 text-slate-700">{member.relationToHead || "—"}</td>
+                        <td className="px-4 py-3"><StatusBadge status={member.residencyStatus} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {household && members.length > 0 && (
-              <div className="mb-5 rounded-2xl border border-slate-200 p-4">
+              <div className="mt-5 rounded-2xl border border-slate-200 p-4">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div className="min-w-64 flex-1">
                     <Select
@@ -421,46 +463,6 @@ export function Apartments() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            <h4 className="mb-3 text-lg font-black text-slate-900">Thành viên trong căn hộ</h4>
-            {detailLoading ? (
-              <div className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
-                Đang tải thông tin hộ gia đình…
-              </div>
-            ) : detailError ? (
-              <div className="rounded-2xl bg-rose-50 px-4 py-6 text-center text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
-                {detailError}
-              </div>
-            ) : !household || members.length === 0 ? (
-              <div className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
-                Căn hộ này chưa có hộ dân đang cư trú.
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">Họ tên</th>
-                      <th className="px-4 py-3">Năm sinh</th>
-                      <th className="px-4 py-3">CCCD/CMND</th>
-                      <th className="px-4 py-3">Quan hệ</th>
-                      <th className="px-4 py-3">Cư trú</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {members.map((member) => (
-                      <tr key={member.id}>
-                        <td className="px-4 py-3 font-semibold text-slate-800">{member.fullName}</td>
-                        <td className="px-4 py-3 text-slate-700">{yearOf(member.dateOfBirth)}</td>
-                        <td className="px-4 py-3 text-slate-700">{member.idCard || "—"}</td>
-                        <td className="px-4 py-3 text-slate-700">{member.relationToHead || "—"}</td>
-                        <td className="px-4 py-3"><StatusBadge status={member.residencyStatus} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             )}
 

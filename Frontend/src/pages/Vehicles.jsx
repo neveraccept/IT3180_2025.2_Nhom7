@@ -45,9 +45,12 @@ export function Vehicles({ role = "ADMIN" }) {
 function AdminVehicles() {
   const [summary, setSummary] = useState(null);
   const [slots, setSlots] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
+  const [lookupSlots, setLookupSlots] = useState(null);
   const [searchHouseholdId, setSearchHouseholdId] = useState("");
+  const [searchSlotCode, setSearchSlotCode] = useState("");
+  const [searchLicensePlate, setSearchLicensePlate] = useState("");
   const [loadedHousehold, setLoadedHousehold] = useState("");
+  const [slotLookupTitle, setSlotLookupTitle] = useState("");
   const [pageError, setPageError] = useState("");
   const [toast, setToast] = useState(null);
 
@@ -71,22 +74,29 @@ function AdminVehicles() {
 
   // Lọc + sắp xếp: ưu tiên chỗ đang có xe (USED/RENTED) lên trước chỗ trống (EMPTY).
   const displayedSlots = useMemo(() => {
+    const sourceSlots = lookupSlots || slots;
     const isOccupied = (s) => s.status !== "EMPTY";
-    const filtered = slots.filter((s) => {
-      if (!isOccupied(s)) return false;
+    const filtered = sourceSlots.filter((s) => {
       if (slotFilter === "OCCUPIED") return isOccupied(s);
+      if (slotFilter === "EMPTY") return !isOccupied(s);
       return true;
     });
     return [...filtered].sort((a, b) => {
+      if (slotFilter === "ALL") {
+        return String(a.code).localeCompare(String(b.code), "vi", { numeric: true });
+      }
       // Chỗ có xe trước (occupied = 0), chỗ trống sau (1)
       const rank = Number(!isOccupied(a)) - Number(!isOccupied(b));
       if (rank !== 0) return rank;
       return String(a.code).localeCompare(String(b.code), "vi", { numeric: true });
     });
-  }, [slots, slotFilter]);
+  }, [lookupSlots, slots, slotFilter]);
 
   const occupiedCount = slots.filter((s) => s.status !== "EMPTY").length;
   const emptyCount = slots.length - occupiedCount;
+  const filterSourceSlots = lookupSlots || slots;
+  const filterOccupiedCount = filterSourceSlots.filter((s) => s.status !== "EMPTY").length;
+  const filterEmptyCount = filterSourceSlots.length - filterOccupiedCount;
 
   // Cắt trang cho danh sách chỗ gửi đã lọc/sắp xếp.
   const pagedSlots = displayedSlots.slice((slotPage - 1) * SLOT_PAGE_SIZE, slotPage * SLOT_PAGE_SIZE);
@@ -94,7 +104,7 @@ function AdminVehicles() {
   // Đổi bộ lọc -> quay về trang 1 để không rơi vào trang rỗng.
   useEffect(() => {
     setSlotPage(1);
-  }, [slotFilter]);
+  }, [lookupSlots, slotFilter]);
 
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
@@ -115,6 +125,12 @@ function AdminVehicles() {
     loadSlots();
   }, [loadSummary, loadSlots]);
 
+  const findSlotByPlate = (plate) => {
+    const normalizedPlate = String(plate || "").trim().toLowerCase();
+    if (!normalizedPlate) return null;
+    return slots.find((slot) => String(slot.licensePlate || "").trim().toLowerCase() === normalizedPlate) || null;
+  };
+
   const loadVehicles = async (hid) => {
     const id = (hid ?? searchHouseholdId).toString().trim();
     if (!id) {
@@ -124,11 +140,50 @@ function AdminVehicles() {
     setPageError("");
     const res = await listVehiclesByHouseholdAPI(id);
     if (res.success) {
-      setVehicles(res.data?.items || []);
+      const matchedSlots = (res.data?.items || [])
+        .map((vehicle) => findSlotByPlate(vehicle.licensePlate))
+        .filter(Boolean);
+      setLookupSlots(matchedSlots);
       setLoadedHousehold(id);
+      setSlotLookupTitle(`Kết quả tra cứu theo hộ #${id}`);
+      setSlotFilter("ALL");
     } else {
       setPageError(res.message || "Không tải được danh sách xe của hộ");
     }
+  };
+
+  const loadVehiclesBySlot = () => {
+    const keyword = searchSlotCode.trim().toLowerCase();
+    if (!keyword) {
+      setPageError("Nhập mã chỗ để tra cứu xe");
+      return;
+    }
+    setPageError("");
+    const matchedSlots = slots.filter((slot) => String(slot.code || "").toLowerCase().includes(keyword));
+    setLookupSlots(matchedSlots);
+    setLoadedHousehold("");
+    setSlotLookupTitle(`Kết quả tra cứu theo mã chỗ "${searchSlotCode.trim()}"`);
+    setSlotFilter("ALL");
+  };
+
+  const loadVehiclesByLicensePlate = () => {
+    const keyword = searchLicensePlate.trim().toLowerCase();
+    if (!keyword) {
+      setPageError("Nhập biển số xe để tra cứu");
+      return;
+    }
+    setPageError("");
+    const matchedSlots = slots.filter((slot) => String(slot.licensePlate || "").toLowerCase().includes(keyword));
+    setLookupSlots(matchedSlots);
+    setLoadedHousehold("");
+    setSlotLookupTitle(`Kết quả tra cứu theo biển số "${searchLicensePlate.trim()}"`);
+    setSlotFilter("ALL");
+  };
+
+  const clearSlotLookup = () => {
+    setLookupSlots(null);
+    setSlotLookupTitle("");
+    setSlotFilter("ALL");
   };
 
   const openCreateForm = () => {
@@ -233,81 +288,80 @@ function AdminVehicles() {
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
       )}
 
-      {/* Tra cứu xe theo hộ */}
+      {/* Tra cứu xe */}
       <Card className="mb-5">
-        <h3 className="mb-3 font-black text-slate-900">Tra cứu xe theo hộ</h3>
-        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-          <Input
-            label="Mã hộ (householdId)"
-            placeholder="VD: 1"
-            value={searchHouseholdId}
-            onChange={(e) => setSearchHouseholdId(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadVehicles()}
-          />
-          <div className="flex items-end">
-            <Button onClick={() => loadVehicles()}><Search className="h-4 w-4" /> Tra cứu</Button>
+        <h3 className="mb-3 font-black text-slate-900">Tra cứu xe</h3>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <Input
+              label="Mã hộ (householdId)"
+              placeholder="VD: 1"
+              value={searchHouseholdId}
+              onChange={(e) => setSearchHouseholdId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadVehicles()}
+            />
+            <div className="flex items-end">
+              <Button onClick={() => loadVehicles()}><Search className="h-4 w-4" /> Tra cứu</Button>
+            </div>
           </div>
-        </div>
-      </Card>
-
-      <Card className="mb-8 !p-0">
-        <div className="border-b border-slate-200 px-5 py-5">
-          <h3 className="font-black text-slate-900">Danh sách xe {loadedHousehold ? `của hộ #${loadedHousehold}` : ""}</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-4">Biển số</th>
-                <th className="px-5 py-4">Loại</th>
-                <th className="px-5 py-4">Hộ</th>
-                <th className="px-5 py-4">Ngày đăng ký</th>
-                <th className="px-5 py-4">Trạng thái</th>
-                <th className="px-5 py-4 text-right">Chi tiết</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {vehicles.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">{loadedHousehold ? "Hộ này chưa có xe nào." : "Nhập mã hộ và bấm Tra cứu để xem danh sách xe."}</td></tr>
-              )}
-              {vehicles.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-50/80">
-                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{v.licensePlate}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(v.type)}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.householdCode || v.householdId}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã huỷ"}</Badge></td>
-                  <td className="px-5 py-4 text-right">
-                    <button onClick={() => openEditForm(v)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <Input
+              label="Mã chỗ"
+              placeholder="VD: B1-001"
+              value={searchSlotCode}
+              onChange={(e) => setSearchSlotCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadVehiclesBySlot()}
+            />
+            <div className="flex items-end">
+              <Button onClick={loadVehiclesBySlot}><Search className="h-4 w-4" /> Tra cứu</Button>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <Input
+              label="Biển số xe"
+              placeholder="VD: 30A-12345"
+              value={searchLicensePlate}
+              onChange={(e) => setSearchLicensePlate(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadVehiclesByLicensePlate()}
+            />
+            <div className="flex items-end">
+              <Button onClick={loadVehiclesByLicensePlate}><Search className="h-4 w-4" /> Tra cứu</Button>
+            </div>
+          </div>
         </div>
       </Card>
 
       {/* Chỗ gửi xe */}
       <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe của hộ)." />
 
+      {slotLookupTitle && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 ring-1 ring-sky-200">
+          <span>{slotLookupTitle}</span>
+          <Button variant="secondary" onClick={clearSlotLookup}>Xóa tra cứu</Button>
+        </div>
+      )}
+
       {/* Bộ lọc trạng thái chỗ gửi */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {[
-          { key: "ALL", label: `Tat ca (${occupiedCount})` },
-          { key: "OCCUPIED", label: `Đang có xe (${occupiedCount})` },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setSlotFilter(f.key)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
-              slotFilter === f.key
-                ? "bg-sky-600 text-white ring-sky-600"
-                : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "ALL", label: `Tat ca (${filterSourceSlots.length})` },
+            { key: "OCCUPIED", label: `Đang có xe (${filterOccupiedCount})` },
+            { key: "EMPTY", label: `Đang trống (${filterEmptyCount})` },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setSlotFilter(f.key)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                slotFilter === f.key
+                  ? "bg-sky-600 text-white ring-sky-600"
+                  : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Card className="!p-0">
@@ -325,7 +379,7 @@ function AdminVehicles() {
             <tbody className="divide-y divide-slate-100">
               {displayedSlots.length === 0 && (
                 <tr><td colSpan={5} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
-                  {slots.length === 0 ? "Chua co cho gui nao." : "Chua co cho gui nao dang gan xe."}
+                  {slots.length === 0 ? "Chua co cho gui nao." : "Chua co cho gui nao phu hop."}
                 </td></tr>
               )}
               {pagedSlots.map((s) => (
