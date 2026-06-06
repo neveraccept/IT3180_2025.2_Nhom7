@@ -28,6 +28,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	@Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.active = false AND u.household IS NULL")
 	List<User> findPendingApprovals();
 
+	// Phục vụ màn hình Admin liệt kê TẤT CẢ tài khoản trong hệ thống
+	@Query("SELECT u FROM User u JOIN FETCH u.role ORDER BY u.id")
+	List<User> findAllWithRole();
+
 	@Query("""
             SELECT u FROM User u
             WHERE u.active = true AND u.household IS NOT NULL

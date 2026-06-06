@@ -1,39 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus } from "lucide-react";
-import { useAppContext } from "../context/AppContext";
+import { getAllUsersAPI, createInternalAccountAPI } from "../api/authApi";
 import { Badge, Button, Input, Select } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
-export function Accounts({ registrations = [] }) {
-  const { users, setUsers } = useAppContext();
-  const approvedRegistrationAccounts = registrations
-    .filter((reg) => reg.status === "approved")
-    .map((reg) => ({
-      username: reg.username,
-      password: reg.password || "",
-      fullName: reg.fullName,
-      name: reg.fullName,
-      email: reg.email,
-      phone: reg.phone,
-      apartment: reg.apartment,
-      role: "RESIDENT",
-      active: "Hoạt động",
-    }));
+// Map UserDTO (backend) -> dòng hiển thị trên bảng.
+const toRow = (dto) => ({
+  id: dto.id,
+  username: dto.username,
+  fullName: dto.fullName || dto.username,
+  email: dto.email || "",
+  phone: dto.phone || "",
+  // Backend chưa trả mã căn hộ thực tế trong UserDTO -> dùng mã đã khai khi đăng ký.
+  apartment: dto.requestedApartmentCode || "",
+  role: dto.role || "RESIDENT",
+  active: dto.active ? "Hoạt động" : "Khoá",
+});
 
-  const accountRows = [
-    ...users.map((user) => ({
-      ...user,
-      fullName: user.fullName || user.name || user.username,
-      active: user.active || "Hoạt động",
-      apartment: user.apartment || "",
-      phone: user.phone || "",
-      email: user.email || "",
-    })),
-    ...approvedRegistrationAccounts.filter(
-      (approved) => !users.some((user) => user.username === approved.username)
-    ),
-  ];
+export function Accounts() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const emptyForm = {
     fullName: "",
@@ -44,22 +32,38 @@ export function Accounts({ registrations = [] }) {
     phone: "",
     apartment: "",
     role: "RESIDENT",
-    active: "Hoạt động",
   };
 
   const [showForm, setShowForm] = useState(false);
-  const [editingUsername, setEditingUsername] = useState(null);
+  const [mode, setMode] = useState("create"); // "create" | "view"
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [formData, setFormData] = useState(emptyForm);
 
-  const filteredRows = accountRows.filter((account) => {
+  // Tải danh sách tài khoản thật từ backend (GET /api/users)
+  const fetchUsers = async () => {
+    setLoading(true);
+    setLoadError("");
+    const res = await getAllUsersAPI();
+    if (res.success) {
+      setRows((Array.isArray(res.data) ? res.data : []).map(toRow));
+    } else {
+      setLoadError(res.message || "Không tải được danh sách tài khoản.");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const filteredRows = rows.filter((account) => {
     const keyword = searchKeyword.trim().toLowerCase();
     if (!keyword) return true;
-
     return (
       String(account.username || "").toLowerCase().includes(keyword) ||
-      String(account.fullName || account.name || "").toLowerCase().includes(keyword) ||
+      String(account.fullName || "").toLowerCase().includes(keyword) ||
       String(account.email || "").toLowerCase().includes(keyword) ||
       String(account.phone || "").toLowerCase().includes(keyword) ||
       String(account.apartment || "").toLowerCase().includes(keyword)
@@ -68,14 +72,14 @@ export function Accounts({ registrations = [] }) {
 
   const openCreateForm = () => {
     setFormData(emptyForm);
-    setEditingUsername(null);
+    setMode("create");
     setError("");
     setShowForm(true);
   };
 
-  const openEditForm = (account) => {
+  const openDetail = (account) => {
     setFormData({
-      fullName: account.fullName || account.name || "",
+      fullName: account.fullName || "",
       username: account.username || "",
       password: "",
       confirmPassword: "",
@@ -83,99 +87,70 @@ export function Accounts({ registrations = [] }) {
       phone: account.phone || "",
       apartment: account.apartment || "",
       role: account.role || "RESIDENT",
-      active: account.active || "Hoạt động",
     });
-    setEditingUsername(account.username);
+    setMode("view");
     setError("");
     setShowForm(true);
   };
 
   const handleCancel = () => {
     setFormData(emptyForm);
-    setEditingUsername(null);
     setError("");
     setShowForm(false);
   };
 
-  const validateAccountForm = () => {
+  const validateCreateForm = () => {
     if (
       !formData.fullName.trim() ||
       !formData.username.trim() ||
-      !formData.email.trim() ||
-      !formData.phone.trim()
+      !formData.email.trim()
     ) {
-      setError("Vui lòng nhập đầy đủ họ tên, username, email và số điện thoại");
+      setError("Vui lòng nhập đầy đủ họ tên, username và email");
       return false;
     }
-
-    if (!editingUsername && !formData.password.trim()) {
-      setError("Vui lòng nhập mật khẩu");
+    if (!formData.password.trim() || formData.password.length < 8) {
+      setError("Mật khẩu phải có tối thiểu 8 ký tự");
       return false;
     }
-
-    if ((formData.password || formData.confirmPassword) && formData.password !== formData.confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       setError("Mật khẩu nhập lại không khớp");
       return false;
     }
-
-    const usernameExisted = users.some(
-      (u) =>
-        u.username?.toLowerCase() === formData.username.trim().toLowerCase() &&
-        u.username !== editingUsername
-    );
-
-    if (usernameExisted) {
-      setError("Tên đăng nhập đã tồn tại");
-      return false;
-    }
-
     return true;
   };
 
-  const handleSave = () => {
-    if (!validateAccountForm()) return;
+  const handleCreate = async () => {
+    if (!validateCreateForm()) return;
 
-    const cleanUsername = formData.username.trim();
-    const savedAccount = {
-      username: cleanUsername,
+    setSaving(true);
+    setError("");
+    const res = await createInternalAccountAPI({
+      username: formData.username.trim(),
+      password: formData.password,
+      confirmPassword: formData.confirmPassword,
       fullName: formData.fullName.trim(),
-      name: formData.fullName.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      apartment: formData.apartment.trim(),
+      requestedApartmentCode: formData.apartment.trim() || null,
       role: formData.role,
-      active: formData.active,
-    };
+    });
+    setSaving(false);
 
-    if (formData.password.trim()) {
-      savedAccount.password = formData.password.trim();
+    if (!res.success) {
+      // Hiển thị nguyên thông điệp lỗi từ backend (vd: email cần xác thực OTP trước).
+      setError(res.message || "Tạo tài khoản thất bại.");
+      return;
     }
 
-    setUsers((prev) => {
-      const existed = prev.some((u) => u.username === editingUsername || u.username === cleanUsername);
-      if (!existed) {
-        return [...prev, savedAccount];
-      }
-
-      return prev.map((u) => {
-        if (u.username !== editingUsername && u.username !== cleanUsername) return u;
-
-        return {
-          ...u,
-          ...savedAccount,
-          password: formData.password.trim() ? formData.password.trim() : u.password,
-        };
-      });
-    });
-
     handleCancel();
+    fetchUsers();
   };
 
   return (
     <>
       <SectionHeader
         title="Quản lý tài khoản"
-        desc="Admin tạo, sửa, khoá/mở khoá và duyệt tài khoản cư dân đăng ký."
+        desc="Admin xem danh sách và tạo tài khoản nội bộ."
         action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Tạo tài khoản</Button>}
       />
 
@@ -187,7 +162,7 @@ export function Accounts({ registrations = [] }) {
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
           >
             <h3 className="mb-4 text-xl font-black text-slate-900">
-              {editingUsername ? "Chi tiết / chỉnh sửa tài khoản" : "Tạo tài khoản mới"}
+              {mode === "view" ? "Chi tiết tài khoản" : "Tạo tài khoản mới"}
             </h3>
 
             <div className="space-y-4">
@@ -196,9 +171,10 @@ export function Accounts({ registrations = [] }) {
                   label="Họ tên"
                   placeholder="Nguyễn Văn A"
                   value={formData.fullName}
+                  disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 />
-                <Select label="Vai trò" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
+                <Select label="Vai trò" value={formData.role} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
                   <option value="ADMIN">Admin</option>
                   <option value="RESIDENT">Cư dân</option>
                 </Select>
@@ -210,12 +186,14 @@ export function Accounts({ registrations = [] }) {
                   type="email"
                   placeholder="name@email.com"
                   value={formData.email}
+                  disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
                 <Input
                   label="Số điện thoại"
                   placeholder="09xxxxxxxx"
                   value={formData.phone}
+                  disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
@@ -225,43 +203,50 @@ export function Accounts({ registrations = [] }) {
                   label="Tên đăng nhập"
                   placeholder="Nhập tên đăng nhập"
                   value={formData.username}
+                  disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 />
                 <Input
                   label="Căn hộ"
                   placeholder="VD: 1201"
                   value={formData.apartment}
+                  disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label={editingUsername ? "Mật khẩu mới" : "Mật khẩu"}
-                  type="password"
-                  placeholder={editingUsername ? "Bỏ trống nếu không đổi" : "Nhập mật khẩu"}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                />
-                <Input
-                  label="Nhập lại mật khẩu"
-                  type="password"
-                  placeholder={editingUsername ? "Nhập lại mật khẩu mới" : "Nhập lại mật khẩu"}
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                />
-              </div>
+              {mode === "create" && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="Mật khẩu"
+                    type="password"
+                    placeholder="Tối thiểu 8 ký tự"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  />
+                  <Input
+                    label="Nhập lại mật khẩu"
+                    type="password"
+                    placeholder="Nhập lại mật khẩu"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  />
+                </div>
+              )}
 
-              <Select label="Trạng thái" value={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.value })}>
-                <option>Hoạt động</option>
-                <option>Khoá</option>
-              </Select>
+              {mode === "create" && (
+                <p className="text-xs text-slate-500">
+                  Lưu ý: email phải được xác thực OTP trước khi tạo tài khoản nội bộ (theo quy tắc của backend).
+                </p>
+              )}
 
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
 
               <div className="flex justify-end gap-3 pt-2">
-                <Button variant="secondary" onClick={handleCancel}>Hủy</Button>
-                <Button onClick={handleSave}>{editingUsername ? "Lưu thay đổi" : "Tạo tài khoản"}</Button>
+                <Button variant="secondary" onClick={handleCancel}>Đóng</Button>
+                {mode === "create" && (
+                  <Button onClick={handleCreate} disabled={saving}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</Button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -277,6 +262,12 @@ export function Accounts({ registrations = [] }) {
           className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
         />
       </div>
+
+      {loadError && (
+        <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+          {loadError}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
@@ -294,22 +285,28 @@ export function Accounts({ registrations = [] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRows.map((row) => (
-                <tr key={row.username} className="hover:bg-slate-50/80">
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.username}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.fullName || row.name}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.email || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.phone || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.apartment || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.role === "ADMIN" ? "blue" : "green"}>{row.role}</Badge></td>
-                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.active === "Khoá" ? "red" : "green"}>{row.active || "Hoạt động"}</Badge></td>
-                  <td className="px-5 py-4 text-right">
-                    <button onClick={() => openEditForm(row)} className="font-semibold text-sky-700 hover:text-sky-900">
-                      Chi tiết
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {loading ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">Đang tải danh sách...</td></tr>
+              ) : filteredRows.length === 0 ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">Không có tài khoản nào</td></tr>
+              ) : (
+                filteredRows.map((row) => (
+                  <tr key={row.id ?? row.username} className="hover:bg-slate-50/80">
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.username}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.fullName}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.email || "__"}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.phone || "__"}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.apartment || "__"}</td>
+                    <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.role === "ADMIN" ? "blue" : "green"}>{row.role}</Badge></td>
+                    <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.active === "Khoá" ? "red" : "green"}>{row.active}</Badge></td>
+                    <td className="px-5 py-4 text-right">
+                      <button onClick={() => openDetail(row)} className="font-semibold text-sky-700 hover:text-sky-900">
+                        Chi tiết
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -317,4 +314,3 @@ export function Accounts({ registrations = [] }) {
     </>
   );
 }
-

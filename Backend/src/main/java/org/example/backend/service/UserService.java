@@ -205,4 +205,12 @@ public class UserService {
                 .map(userMapper::toDto)
                 .collect(Collectors.toList());
     }
+
+    // Lấy toàn bộ tài khoản (Admin) phục vụ màn hình Quản lý tài khoản
+    @Transactional(readOnly = true)
+    public List<UserDTO> getAllUsers() {
+        return userRepo.findAllWithRole().stream()
+                .map(userMapper::toDto)
+                .collect(Collectors.toList());
+    }
 }

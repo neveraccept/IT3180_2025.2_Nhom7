@@ -25,7 +25,7 @@ import { listFeePeriodsAPI } from "../api/feeApi";
 //  Nguồn dữ liệu: ReportController /api/reports (Spring Boot).
 //  Giữ nguyên UI/Tailwind; thay toàn bộ logic mock bằng API thật.
 // ============================================================
-export function Statistics({ paymentRecords = [] }) {
+export function Statistics() {
   // Dữ liệu thống kê
   const [households, setHouseholds] = useState([]);
   const [residentStats, setResidentStats] = useState(null);

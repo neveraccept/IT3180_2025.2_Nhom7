@@ -3,10 +3,9 @@ import { createContext, useContext, useState } from "react";
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  const [users, setUsers] = useState([
-    { username: "admin", fullName: "Admin BlueMoon", role: "ADMIN", email: "admin@bluemoon.vn", active: "Hoạt động" },
-    { username: "nguyenma", fullName: "Nguyễn Minh Anh", role: "RESIDENT", email: "minhanh@email.com", active: "Hoạt động" },
-  ]);
+  // Danh sách tài khoản giờ được lấy trực tiếp từ API (GET /api/users) ở các trang.
+  // Context này chỉ còn giữ chỗ cho dữ liệu dùng chung phía client nếu cần.
+  const [users, setUsers] = useState([]);
 
   const addUser = (newUser) => {
     if (!users.find(u => u.username === newUser.username)) {

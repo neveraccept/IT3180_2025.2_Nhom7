@@ -22,6 +22,9 @@ public class ProfileService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // readOnly = true để giữ Hibernate session mở trong lúc fromEntity() truy cập
+    // household.apartment (LAZY) lấy số căn hộ.
+    @Transactional(readOnly = true)
     public UserProfileDTO getUserProfile(Long userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + userId));

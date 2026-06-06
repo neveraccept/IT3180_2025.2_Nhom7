@@ -105,6 +105,15 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(updatedUser, "Cập nhật thông tin đăng ký thành công!"));
     }
 
+    // API lấy danh sách TẤT CẢ tài khoản trong hệ thống (chỉ ADMIN truy cập được — xem SecurityConfig)
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers() {
+        List<UserDTO> users = userService.getAllUsers();
+        return ResponseEntity.ok(
+                ApiResponse.ok(users, "Lấy danh sách tài khoản thành công!")
+        );
+    }
+
     // API lấy các tài khoản cần duyệt
     @GetMapping("/pending")
     public ResponseEntity<ApiResponse<List<UserDTO>>> getPendingAccounts() {
