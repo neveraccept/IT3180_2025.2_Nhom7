@@ -43,6 +43,16 @@ public class NotificationController {
                 notificationService.getMyNotifications(pageable)));
     }
 
+    // F9.1 - Admin xem lại danh sách thông báo mình đã gửi (kèm số người nhận)
+    @GetMapping("/sent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<NotificationDTO>>> sentNotifications(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                notificationService.getSentNotifications(pageable)));
+    }
+
     // F9.4 - Đánh dấu thông báo đã đọc
     @PutMapping("/{id}/read")
     @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")

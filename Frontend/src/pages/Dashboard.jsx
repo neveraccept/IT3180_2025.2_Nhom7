@@ -7,7 +7,7 @@ import { SectionHeader } from "../components/layout/SectionHeader";
 import { getResidentStatisticsAPI } from "../api/reportApi";
 import { listFeePeriodsAPI } from "../api/feeApi";
 import { listAllComplaintsAPI, CATEGORY_LABEL } from "../api/complaintApi";
-import { listMyNotificationsAPI } from "../api/notificationApi";
+import { listMyNotificationsAPI, listSentNotificationsAPI } from "../api/notificationApi";
 import { listMyHouseholdPaymentsAPI } from "../api/paymentApi";
 import { listMyUtilityBillsAPI } from "../api/utilityApi";
 
@@ -32,24 +32,34 @@ export function Dashboard({ role }) {
     (async () => {
       setLoading(true);
 
-      const notifRes = await listMyNotificationsAPI();
-      if (!cancelled && notifRes.success) setNotifications(notifRes.data?.items || []);
-
       if (role === "ADMIN") {
-        const [statsRes, periodsRes, complaintsRes] = await Promise.all([
+        // Admin: thông báo đã gửi + thống kê + đợt thu + khiếu nại chưa xử lý
+        const [notifRes, statsRes, periodsRes, complaintsRes] = await Promise.all([
+          listSentNotificationsAPI(),
           getResidentStatisticsAPI(),
           listFeePeriodsAPI(),
-          listAllComplaintsAPI({ status: "IN_PROGRESS", size: 50 }),
+          // Lấy toàn bộ rồi lọc các khiếu nại chưa xử lý (NEW + IN_PROGRESS) phía client,
+          // vì API chỉ lọc được 1 trạng thái mỗi lần gọi.
+          listAllComplaintsAPI({ size: 200 }),
         ]);
         if (!cancelled) {
+          if (notifRes.success) setNotifications(notifRes.data?.items || []);
           if (statsRes.success) setStats(statsRes.data);
           if (periodsRes.success) {
             const items = periodsRes.data?.items || [];
             setOpenPeriodsCount(items.filter((p) => p.status === "OPEN").length);
           }
-          if (complaintsRes.success) setUnresolvedComplaints(complaintsRes.data?.items || []);
+          if (complaintsRes.success) {
+            const pending = (complaintsRes.data?.items || []).filter(
+              (c) => c.status === "NEW" || c.status === "IN_PROGRESS"
+            );
+            setUnresolvedComplaints(pending);
+          }
         }
       } else {
+        const notifRes = await listMyNotificationsAPI();
+        if (!cancelled && notifRes.success) setNotifications(notifRes.data?.items || []);
+
         const [paymentsRes, billsRes] = await Promise.all([
           listMyHouseholdPaymentsAPI(),
           listMyUtilityBillsAPI(),
@@ -217,11 +227,11 @@ export function Dashboard({ role }) {
       sub: "Đợt thu phí đang hoạt động",
     },
     {
-      label: "Khiếu nại đang xử lý",
+      label: "Khiếu nại chưa xử lý",
       value: loading ? "..." : String(unresolvedComplaints.length),
       icon: MessageSquareWarning,
       tone: "text-rose-700",
-      sub: "Cần xử lý",
+      sub: "Chờ xử lý & đang xử lý",
     },
   ];
 

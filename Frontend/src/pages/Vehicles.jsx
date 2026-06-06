@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, AlertCircle } from "lucide-react";
 import { money } from "../utils/helpers";
@@ -61,6 +61,28 @@ function AdminVehicles() {
   const [showParkForm, setShowParkForm] = useState(false);
   const [parkForm, setParkForm] = useState({ slotId: "", vehicleId: "", monthlyFee: "", startDate: "", endDate: "" });
   const [parkError, setParkError] = useState("");
+
+  // Bộ lọc chỗ gửi: ALL | OCCUPIED (đang có xe) | EMPTY (đang trống)
+  const [slotFilter, setSlotFilter] = useState("ALL");
+
+  // Lọc + sắp xếp: ưu tiên chỗ đang có xe (USED/RENTED) lên trước chỗ trống (EMPTY).
+  const displayedSlots = useMemo(() => {
+    const isOccupied = (s) => s.status !== "EMPTY";
+    const filtered = slots.filter((s) => {
+      if (slotFilter === "OCCUPIED") return isOccupied(s);
+      if (slotFilter === "EMPTY") return !isOccupied(s);
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
+      // Chỗ có xe trước (occupied = 0), chỗ trống sau (1)
+      const rank = Number(!isOccupied(a)) - Number(!isOccupied(b));
+      if (rank !== 0) return rank;
+      return String(a.code).localeCompare(String(b.code), "vi", { numeric: true });
+    });
+  }, [slots, slotFilter]);
+
+  const occupiedCount = slots.filter((s) => s.status !== "EMPTY").length;
+  const emptyCount = slots.length - occupiedCount;
 
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
@@ -261,6 +283,28 @@ function AdminVehicles() {
 
       {/* Chỗ gửi xe */}
       <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe của hộ)." />
+
+      {/* Bộ lọc trạng thái chỗ gửi */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {[
+          { key: "ALL", label: `Tất cả (${slots.length})` },
+          { key: "OCCUPIED", label: `Đang có xe (${occupiedCount})` },
+          { key: "EMPTY", label: `Đang trống (${emptyCount})` },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setSlotFilter(f.key)}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+              slotFilter === f.key
+                ? "bg-sky-600 text-white ring-sky-600"
+                : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <Card className="!p-0">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -275,10 +319,12 @@ function AdminVehicles() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {slots.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Chưa có chỗ gửi nào.</td></tr>
+              {displayedSlots.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
+                  {slots.length === 0 ? "Chưa có chỗ gửi nào." : "Không có chỗ gửi phù hợp với bộ lọc."}
+                </td></tr>
               )}
-              {slots.map((s) => (
+              {displayedSlots.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{s.code}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(s.type)}</td>

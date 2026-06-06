@@ -6,6 +6,7 @@ import { SectionHeader } from "../components/layout/SectionHeader";
 import {
   createNotificationAPI,
   listMyNotificationsAPI,
+  listSentNotificationsAPI,
   markNotificationReadAPI,
   SCOPE_LABEL,
 } from "../api/notificationApi";
@@ -28,11 +29,6 @@ const formatDate = (iso) => {
 
 export function Notifications({
   role,
-  // mock data props giữ để không break Layout, không dùng
-  // eslint-disable-next-line no-unused-vars
-  notificationList: _notifList,
-  // eslint-disable-next-line no-unused-vars
-  setNotificationList: _setNotifList,
   initialNotificationId,
   onInitialNotificationHandled,
 }) {
@@ -67,7 +63,9 @@ export function Notifications({
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     setPageError("");
-    const res = await listMyNotificationsAPI();
+    // Admin xem các thông báo mình đã gửi; cư dân xem thông báo nhận được.
+    const res =
+      role === "ADMIN" ? await listSentNotificationsAPI() : await listMyNotificationsAPI();
     if (res.success && res.data) {
       setNotifications(res.data.items || []);
     } else {
@@ -75,7 +73,7 @@ export function Notifications({
       setNotifications([]);
     }
     setLoading(false);
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     fetchNotifications();

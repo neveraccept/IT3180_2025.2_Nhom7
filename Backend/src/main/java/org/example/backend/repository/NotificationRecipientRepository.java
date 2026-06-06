@@ -18,4 +18,7 @@ public interface NotificationRecipientRepository
     /** F9.4 – tìm đúng bản ghi nhận của user cho 1 notification (để đánh dấu đã đọc). */
     Optional<NotificationRecipient> findByNotificationIdAndRecipientId(
             Long notificationId, Long recipientId);
+
+    /** Đếm số người nhận của một thông báo (dùng cho góc nhìn admin đã gửi). */
+    long countByNotificationId(Long notificationId);
 }

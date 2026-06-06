@@ -34,6 +34,10 @@ export const createNotificationAPI = (payload) =>
 export const listMyNotificationsAPI = ({ page = 0, size = 50, sort = "id,desc" } = {}) =>
   callApi(axiosClient.get("/api/notifications/my", { params: { page, size, sort } }));
 
+// ADMIN: danh sách thông báo do chính admin đã gửi (kèm recipientCount).
+export const listSentNotificationsAPI = ({ page = 0, size = 50, sort = "id,desc" } = {}) =>
+  callApi(axiosClient.get("/api/notifications/sent", { params: { page, size, sort } }));
+
 // ADMIN | RESIDENT: đánh dấu một thông báo đã đọc.
 export const markNotificationReadAPI = (id) =>
   callApi(axiosClient.put(`/api/notifications/${id}/read`));

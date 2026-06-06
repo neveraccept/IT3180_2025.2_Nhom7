@@ -16,13 +16,16 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString("vi-VN");
 };
 
+// Màu nền cho dropdown trạng thái (admin) — mỗi trạng thái một màu riêng.
+const STATUS_SELECT_CLASS = {
+  NEW: "bg-amber-50 text-amber-700 ring-amber-200",
+  IN_PROGRESS: "bg-sky-50 text-sky-700 ring-sky-200",
+  RESOLVED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  REJECTED: "bg-rose-50 text-rose-700 ring-rose-200",
+};
+
 export function Complaints({
   role,
-  // các props mock data bên dưới được giữ để không break Layout, nhưng không dùng
-  // eslint-disable-next-line no-unused-vars
-  complaintsList,
-  // eslint-disable-next-line no-unused-vars
-  setComplaintsList,
   initialComplaintId,
   onInitialComplaintHandled,
 }) {
@@ -99,10 +102,11 @@ export function Complaints({
   const handleInlineStatusChange = async (complaint, newStatus) => {
     if (newStatus === complaint.status || updatingStatusId === complaint.id) return;
     setUpdatingStatusId(complaint.id);
-    const res = await respondComplaintAPI(complaint.id, {
-      response: complaint.response || "",
-      status: newStatus,
-    });
+    // Chỉ gửi status; giữ nguyên nội dung phản hồi cũ (không gửi chuỗi rỗng để
+    // tránh ghi đè và tránh lỗi validate ở backend khi đổi nhanh trạng thái).
+    const payload = { status: newStatus };
+    if (complaint.response) payload.response = complaint.response;
+    const res = await respondComplaintAPI(complaint.id, payload);
     setUpdatingStatusId(null);
     if (res.success) {
       setComplaints((prev) =>
@@ -248,7 +252,7 @@ export function Complaints({
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="">Tất cả trạng thái</option>
-              <option value="NEW">Mới gửi</option>
+              <option value="NEW">Chờ xử lý</option>
               <option value="IN_PROGRESS">Đang xử lý</option>
               <option value="RESOLVED">Đã giải quyết</option>
               <option value="REJECTED">Từ chối</option>
@@ -325,9 +329,14 @@ export function Complaints({
                         disabled={updatingStatusId === complaint.id}
                         onChange={(e) => handleInlineStatusChange(complaint, e.target.value)}
                         onClick={(e) => e.stopPropagation()}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                          STATUS_SELECT_CLASS[complaint.status] || "bg-slate-100 text-slate-700 ring-slate-200"
+                        }`}
                       >
-                        <option value="NEW">Mới gửi</option>
+                        {/* NEW chỉ để hiển thị trạng thái hiện tại, không cho chọn lại (BE chặn) */}
+                        <option value="NEW" disabled>
+                          Chờ xử lý
+                        </option>
                         <option value="IN_PROGRESS">Đang xử lý</option>
                         <option value="RESOLVED">Đã giải quyết</option>
                         <option value="REJECTED">Từ chối</option>
