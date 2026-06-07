@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
 import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.UserDTO;
 import org.example.backend.dto.request.AdminRegisterRequest;
@@ -50,7 +51,8 @@ public class UserService {
     }
 
     //Admin tạo tài khoản nội bộ
-    @LogAdminAction(entity = "User", action = "CREATE", description = "Tạo tài khoản nội bộ")
+    @LogAdminAction(entity = "User", action = "CREATE", description = "Tạo tài khoản nội bộ",
+            detail = "'Tài khoản: ' + #result.username")
     @Transactional
     public User createInternalAccount(AdminRegisterRequest req) {
         if (userRepo.existsByUsername(req.username())) {
@@ -100,7 +102,8 @@ public class UserService {
     }
 
     // Duyệt tài khoản cư dân đã đăng ký
-    @LogAdminAction(entity = "User", action = "UPDATE", description = "Duyệt tài khoản cư dân")
+    @LogAdminAction(entity = "User", action = "UPDATE", description = "Duyệt tài khoản cư dân",
+            detail = "'Tài khoản: ' + #result.username")
     @Transactional
     public User approvePendingAccount(Long id) {
         // 1. Tìm tài khoản cư dân theo ID
@@ -144,6 +147,7 @@ public class UserService {
 
         // 4. Xóa tài khoản khỏi Database
         userRepo.delete(user);
+        AuditContext.detail("Từ chối & xóa tài khoản chờ duyệt: " + user.getUsername());
     }
 
     /**
@@ -235,5 +239,6 @@ public class UserService {
         user.setDeleted(true);
         user.setActive(false);
         userRepo.saveAndFlush(user);
+        AuditContext.detail("Xóa mềm tài khoản: " + user.getUsername());
     }
 }

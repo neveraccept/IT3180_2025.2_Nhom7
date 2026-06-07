@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
 import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.HouseholdSummaryDTO;
 import org.example.backend.dto.request.AssignHouseholdRequest;
@@ -54,7 +55,8 @@ public class HouseholdLifecycleService {
     }
     //  cán hộ dân vào căn hộ trống
 
-    @LogAdminAction(entity = "Household", action = "CREATE", description = "Gán hộ dân vào căn hộ")
+    @LogAdminAction(entity = "Household", action = "CREATE", description = "Gán hộ dân vào căn hộ",
+            detail = "'Hộ ' + #result.code() + ' vào căn hộ ' + #result.apartmentCode()")
     @Transactional
     public HouseholdSummaryDTO assignHousehold(Long apartmentId, AssignHouseholdRequest req) {
 
@@ -192,6 +194,8 @@ public class HouseholdLifecycleService {
         }
         h = householdRepository.save(h);
 
+        AuditContext.detail("Cập nhật thông tin hộ " + h.getCode()
+                + " (căn hộ " + (h.getApartment() != null ? h.getApartment().getCode() : "?") + ")");
         return mapper.toHouseholdSummary(h);
     }
 
@@ -199,6 +203,7 @@ public class HouseholdLifecycleService {
     private HouseholdSummaryDTO doMoveOut(Apartment ap, Household h) {
         h.setStatus(HouseholdStatus.MOVED_OUT);
         householdRepository.save(h);
+        AuditContext.detail("Chuyển hộ " + h.getCode() + " ra khỏi căn hộ " + ap.getCode());
 
         // Đồng thời đánh dấu toàn bộ nhân khẩu ACTIVE trong hộ là MOVED_OUT
         residentRepository.markAllResidentsMovedOut(h.getId(),

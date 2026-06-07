@@ -44,10 +44,6 @@ export const getFeePeriodStatisticsAPI = (feePeriodIds, range = {}) =>
     })
   );
 
-// F10.2 - Thống kê khoản đóng góp tự nguyện theo KHOẢN THU (feeId).
-export const getDonationStatisticsAPI = (feeId) =>
-  callApi(axiosClient.get(`/api/reports/donations/${feeId}/statistics`));
-
 export const getHouseholdStatisticsAPI = (range = {}) =>
   callApi(axiosClient.get("/api/reports/households/statistics", { params: dateParams(range) }));
 
@@ -65,9 +61,6 @@ export const exportFeePeriodExcelAPI = (feePeriodIds) =>
       params: { feePeriodIds: joinIds(feePeriodIds) },
     })
   );
-
-export const exportDonationExcelAPI = (feeId) =>
-  callApi(axiosClient.get(`/api/reports/donations/${feeId}/excel`, { responseType: "blob" }));
 
 export const exportHouseholdExcelAPI = () =>
   callApi(axiosClient.get("/api/reports/households/excel", { responseType: "blob" }));
@@ -96,9 +89,6 @@ export const exportFeePeriodPdfAPI = (feePeriodIds) =>
       params: { feePeriodIds: joinIds(feePeriodIds) },
     })
   );
-
-export const exportDonationPdfAPI = (feeId) =>
-  callApi(axiosClient.get(`/api/reports/donations/${feeId}/pdf`, { responseType: "blob" }));
 
 export const exportHouseholdPdfAPI = () =>
   callApi(axiosClient.get("/api/reports/households/pdf", { responseType: "blob" }));

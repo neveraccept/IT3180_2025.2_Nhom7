@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
 import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.UtilityBillDTO;
@@ -55,7 +56,8 @@ public class UtilityBillService {
     }
 
     // F7.1 - Nhập hoá đơn.
-    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hoá đơn điện/nước/internet")
+    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hoá đơn điện/nước/internet",
+            detail = "'Hộ ' + #result.householdCode() + ' - ' + #result.type() + ' tháng ' + #result.month() + '/' + #result.year()")
     @Transactional
     public UtilityBillDTO create(CreateUtilityBillRequest req) {
         Household household = householdRepository.findById(req.householdId())
@@ -113,7 +115,8 @@ public class UtilityBillService {
     }
 
     // F7.2 - Sửa hoá đơn (chỉ khi UNPAID).
-    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Cập nhật hoá đơn điện/nước/internet")
+    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Cập nhật hoá đơn điện/nước/internet",
+            detail = "'Hộ ' + #result.householdCode() + ' - ' + #result.type() + ' tháng ' + #result.month() + '/' + #result.year()")
     @Transactional
     public UtilityBillDTO update(Long id, UpdateUtilityBillRequest req) {
         UtilityBill b = requireBill(id);
@@ -160,12 +163,15 @@ public class UtilityBillService {
     public void delete(Long id) {
         UtilityBill b = requireBill(id);
         requireUnpaid(b, "xoá");
+        String householdCode = b.getHousehold() != null ? b.getHousehold().getCode() : "?";
         billRepository.delete(b);
-
+        AuditContext.detail("Xoá hoá đơn " + b.getType() + " - hộ " + householdCode
+                + " tháng " + b.getMonth() + "/" + b.getYear());
     }
 
     // F7.3 - Ghi nhận hộ đã nộp tiền mặt.
-    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Xác nhận hộ nộp tiền mặt hoá đơn")
+    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Xác nhận hộ nộp tiền mặt hoá đơn",
+            detail = "'Hộ ' + #result.householdCode() + ' - ' + #result.type() + ' tháng ' + #result.month() + '/' + #result.year()")
     @Transactional
     public UtilityBillDTO confirmCash(Long id) {
         UtilityBill b = requireBill(id);

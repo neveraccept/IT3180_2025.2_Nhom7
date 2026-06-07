@@ -36,7 +36,8 @@ public class ResidentService {
     private final ApartmentMapper apartmentMapper;
 
     //Thêm nhân khẩu vào hộ khẩu
-    @LogAdminAction(entity = "Resident", action = "CREATE", description = "Thêm nhân khẩu vào hộ khẩu")
+    @LogAdminAction(entity = "Resident", action = "CREATE", description = "Thêm nhân khẩu vào hộ khẩu",
+            detail = "'Nhân khẩu: ' + #result.fullName() + ' - hộ ' + #result.householdCode()")
     public ResidentDetailDTO createResident(CreateResidentRequest req) {
 
         Household household = householdRepository.findById(req.householdId())
@@ -74,7 +75,8 @@ public class ResidentService {
     }
 
     // Sửa nhân khẩu
-    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Cập nhật thông tin nhân khẩu")
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Cập nhật thông tin nhân khẩu",
+            detail = "'Nhân khẩu: ' + #result.fullName()")
     public ResidentDetailDTO updateResident(Long id, UpdateResidentRequest req) {
 
         Resident r = findActiveResidentOrThrow(id);
@@ -97,7 +99,8 @@ public class ResidentService {
     }
 
     //  Chuyển nhân khẩu khỏi hộ
-    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu ra khỏi hộ (MOVED_OUT)")
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu ra khỏi hộ (MOVED_OUT)",
+            detail = "'Nhân khẩu: ' + #result.fullName() + ' - hộ ' + #result.householdCode()")
     public ResidentDetailDTO moveOutResident(Long id) {
 
         Resident r = findActiveResidentOrThrow(id);
@@ -117,13 +120,15 @@ public class ResidentService {
     }
 
     //  Đăng ký tạm trú
-    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Đăng ký tạm trú cho nhân khẩu")
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Đăng ký tạm trú cho nhân khẩu",
+            detail = "'Nhân khẩu: ' + #result.fullName()")
     public ResidentDetailDTO registerTemporaryResidence(Long id) {
         return changeResidencyStatus(id, ResidencyStatus.TEMPORARY);
     }
 
     //  Chuyển tạm trú về thường trú
-    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu về thường trú")
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu về thường trú",
+            detail = "'Nhân khẩu: ' + #result.fullName()")
     public ResidentDetailDTO registerPermanentResidence(Long id) {
         return changeResidencyStatus(id, ResidencyStatus.PERMANENT);
     }

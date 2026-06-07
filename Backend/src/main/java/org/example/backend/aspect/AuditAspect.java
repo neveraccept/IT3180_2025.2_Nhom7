@@ -3,22 +3,34 @@ package org.example.backend.aspect;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.example.backend.service.AuditLogService;
+import org.springframework.core.DefaultParameterNameDiscoverer;
+import org.springframework.core.ParameterNameDiscoverer;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-import java.util.stream.Collectors;
-import java.util.Arrays;
+import java.lang.reflect.Method;
 
 /**
  * Aspect tự động ghi Audit Log cho mọi phương thức Service được gắn @LogAdminAction.
  * Chỉ ghi khi phương thức chạy THÀNH CÔNG (@AfterReturning), tránh log nhầm thao tác lỗi.
+ *
+ * Phần "chi tiết" được lấy theo thứ tự ưu tiên:
+ *   1. {@link AuditContext} – service tự ghi (chính xác nhất: có cả tên thực thể).
+ *   2. Biểu thức SpEL trong {@code detail()} – tham chiếu tham số (#id, #dto...) và #result.
+ *   3. Nếu không có cả hai – chỉ ghi mô tả tĩnh trong {@code description()}.
  */
 @Aspect
 @Component
 public class AuditAspect {
     private final AuditLogService auditLogService;
+    private final ExpressionParser expressionParser = new SpelExpressionParser();
+    private final ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
     public AuditAspect(AuditLogService auditLogService) {
         this.auditLogService = auditLogService;
@@ -28,23 +40,66 @@ public class AuditAspect {
     public void logAfter(JoinPoint joinPoint, LogAdminAction logAdminAction, Object result) {
         // Mọi sự cố khi ghi log đều phải "nuốt" lại để không phá luồng nghiệp vụ chính.
         try {
-            String adminUsername = currentUsername();
-
-            // Gộp mô tả từ annotation + tham số đầu vào để details có ngữ cảnh (vd: id bị xóa).
             String description = logAdminAction.description();
-            Object[] args = joinPoint.getArgs();
-            String details = (description == null || description.isBlank())
-                    ? "Tham số: " + safeArgs(args)
-                    : description + " | Tham số: " + safeArgs(args);
+            String detail = resolveDetail(joinPoint, logAdminAction, result);
+
+            String details;
+            if (detail == null || detail.isBlank()) {
+                details = description;
+            } else if (description == null || description.isBlank()) {
+                details = detail;
+            } else {
+                details = description + " — " + detail;
+            }
 
             auditLogService.record(
-                    adminUsername,
+                    currentUsername(),
                     logAdminAction.action(),
                     logAdminAction.entity(),
                     details
             );
         } catch (Exception ignored) {
             // Không làm gì: ghi log thất bại không được ảnh hưởng tới kết quả thao tác.
+        } finally {
+            // Luôn dọn context để không sót chi tiết sang thao tác kế tiếp trên cùng luồng.
+            AuditContext.clear();
+        }
+    }
+
+    /**
+     * Lấy phần chi tiết: ưu tiên giá trị service tự ghi qua AuditContext; nếu không có,
+     * thử suy ra từ biểu thức SpEL trong annotation (tham chiếu tham số theo tên và #result).
+     */
+    private String resolveDetail(JoinPoint joinPoint, LogAdminAction logAdminAction, Object result) {
+        String contextDetail = AuditContext.consume();
+        if (contextDetail != null && !contextDetail.isBlank()) {
+            return contextDetail;
+        }
+
+        String expression = logAdminAction.detail();
+        if (expression == null || expression.isBlank()) {
+            return null;
+        }
+
+        try {
+            MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+            Method method = signature.getMethod();
+
+            StandardEvaluationContext context = new StandardEvaluationContext();
+            Object[] args = joinPoint.getArgs();
+            String[] names = parameterNameDiscoverer.getParameterNames(method);
+            if (names != null) {
+                for (int i = 0; i < names.length && i < args.length; i++) {
+                    context.setVariable(names[i], args[i]);
+                }
+            }
+            context.setVariable("result", result);
+
+            Object value = expressionParser.parseExpression(expression).getValue(context);
+            return value == null ? null : String.valueOf(value);
+        } catch (Exception ex) {
+            // Biểu thức lỗi không được làm hỏng việc ghi log -> bỏ qua phần chi tiết.
+            return null;
         }
     }
 
@@ -54,31 +109,5 @@ public class AuditAspect {
             return "SYSTEM";
         }
         return auth.getName();
-    }
-
-    // Rút gọn tham số an toàn: chỉ in giá trị các kiểu đơn giản (id, chuỗi, số, boolean, enum).
-    // Với object phức tạp (vd: request chứa mật khẩu) chỉ in tên kiểu để tránh lộ dữ liệu nhạy cảm.
-    private String safeArgs(Object[] args) {
-        if (args == null || args.length == 0) {
-            return "[]";
-        }
-        try {
-            return Arrays.stream(args)
-                    .map(this::describeArg)
-                    .collect(Collectors.joining(", ", "[", "]"));
-        } catch (Exception ex) {
-            return "[không đọc được tham số]";
-        }
-    }
-
-    private String describeArg(Object arg) {
-        if (arg == null) {
-            return "null";
-        }
-        if (arg instanceof Number || arg instanceof Boolean || arg instanceof CharSequence || arg instanceof Enum<?>) {
-            return String.valueOf(arg);
-        }
-        // Không in nội dung object (có thể chứa mật khẩu / dữ liệu lớn) — chỉ ghi tên kiểu.
-        return arg.getClass().getSimpleName();
     }
 }

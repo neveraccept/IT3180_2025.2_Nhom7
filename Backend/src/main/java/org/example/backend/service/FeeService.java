@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
 import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.FeeDTO;
 import org.example.backend.entity.Fee;
@@ -35,7 +36,8 @@ public class FeeService {
     @Autowired
     private FeePeriodRepository feePeriodRepository;
 
-    @LogAdminAction(entity = "Fee", action = "CREATE", description = "Tạo khoản thu")
+    @LogAdminAction(entity = "Fee", action = "CREATE", description = "Tạo khoản thu",
+            detail = "'Khoản thu: ' + #result.name + ' (' + #result.type + ')'")
     @Transactional
     public FeeDTO createFee(FeeDTO dto) {
         if(feeRepository.existsByName(dto.getName())) {
@@ -48,7 +50,8 @@ public class FeeService {
         return convertToDto(feeRepository.save(fee));
     }
 
-    @LogAdminAction(entity = "Fee", action = "UPDATE", description = "Cập nhật khoản thu")
+    @LogAdminAction(entity = "Fee", action = "UPDATE", description = "Cập nhật khoản thu",
+            detail = "'Khoản thu: ' + #result.name")
     @Transactional
     public FeeDTO updateFee(Long id, FeeDTO dto) {
         Fee fee = feeRepository.findById(id)
@@ -106,8 +109,10 @@ public class FeeService {
         if(hasPeriods) {
             fee.setActive(false);
             feeRepository.save(fee);
+            AuditContext.detail("Ngừng sử dụng khoản thu: " + fee.getName());
         } else {
             feeRepository.delete(fee);
+            AuditContext.detail("Xóa khoản thu: " + fee.getName());
         }
     }
 

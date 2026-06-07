@@ -1,7 +1,6 @@
 package org.example.backend.service;
 
 import org.example.backend.dto.*;
-import org.example.backend.entity.Fee;
 import org.example.backend.entity.FeePeriod;
 import org.example.backend.entity.Payment;
 import org.example.backend.entity.PaymentTransaction;
@@ -52,7 +51,6 @@ public class ReportService {
     private final ReportResidentRepository residentRepository;
     private final ReportHouseholdRepository householdRepository;
     private final ReportTransactionRepository transactionRepository;
-    private final FeeRepository feeRepository;
     private final ExcelReportExporter excelExporter;
     private final PdfReportExporter pdfExporter;
 
@@ -61,7 +59,6 @@ public class ReportService {
                          ReportResidentRepository residentRepository,
                          ReportHouseholdRepository householdRepository,
                          ReportTransactionRepository transactionRepository,
-                         FeeRepository feeRepository,
                          ExcelReportExporter excelExporter,
                          PdfReportExporter pdfExporter) {
         this.paymentRepository = paymentRepository;
@@ -69,7 +66,6 @@ public class ReportService {
         this.residentRepository = residentRepository;
         this.householdRepository = householdRepository;
         this.transactionRepository = transactionRepository;
-        this.feeRepository = feeRepository;
         this.excelExporter = excelExporter;
         this.pdfExporter = pdfExporter;
     }
@@ -131,36 +127,6 @@ public class ReportService {
                 statuses.size() == 1 ? statuses.iterator().next() : String.join(", ", statuses),
                 total, paid, unpaid,
                 due, collected, outstanding, rate);
-    }
-
-    // ============================================================
-    //  F10.2 – Thống kê khoản đóng góp tự nguyện theo KHOẢN THU (Fee type=DONATION)
-    // ============================================================
-
-    @Transactional(readOnly = true)
-    public DonationStatisticsDTO getDonationStatistics(Long feeId) {
-        Fee fee = requireDonationFee(feeId);
-        List<DonationContributionProjection> raw = paymentRepository.findContributionsByFee(feeId);
-
-        List<DonationContributionDTO> items = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
-        for (DonationContributionProjection p : raw) {
-            BigDecimal amount = nz(p.getAmount());
-            total = total.add(amount);
-            items.add(new DonationContributionDTO(
-                    p.getHouseholdCode(),
-                    p.getHeadName(),
-                    p.getApartmentCode(),
-                    amount,
-                    p.getPaidDate()));
-        }
-
-        return new DonationStatisticsDTO(
-                fee.getId(),
-                fee.getName(),
-                items.size(),
-                total,
-                items);
     }
 
     // ============================================================
@@ -234,31 +200,49 @@ public class ReportService {
     @Transactional
     public byte[] exportFeePeriodExcel(List<Long> feePeriodIds) {
         FeePeriodStatisticsDTO s = getFeePeriodStatistics(feePeriodIds, null, null);
-        ReportData data = buildFeePeriodReport(s);
-        byte[] file = excelExporter.export("Tinh trang dot thu", data.title, data.meta, data.headers, data.rows);
-        return file;
+
+        List<String> meta = List.of(
+                "Đợt thu: " + safe(s.feePeriodName()),
+                "Khoản thu: " + safe(s.feeName()),
+                "Trạng thái đợt: " + safe(s.periodStatus()),
+                "Ngày xuất: " + LocalDateTime.now().format(DATETIME_FMT));
+
+        // Phần I – số liệu tổng hợp.
+        ExcelReportExporter.Section summary = new ExcelReportExporter.Section(
+                "I. TỔNG HỢP",
+                List.of("Chỉ tiêu", "Giá trị"),
+                feePeriodSummaryRows(s));
+
+        // Phần II – danh sách các hộ đã đóng góp/nộp trong (các) đợt thu được chọn.
+        List<DonationContributionProjection> contributions =
+                paymentRepository.findContributionsByFeePeriodIds(feePeriodIds);
+        List<List<String>> contributionRows = new ArrayList<>();
+        int i = 1;
+        for (DonationContributionProjection c : contributions) {
+            contributionRows.add(List.of(
+                    String.valueOf(i++),
+                    safe(c.getHouseholdCode()),
+                    safe(c.getHeadName()),
+                    safe(c.getApartmentCode()),
+                    money(c.getAmount()),
+                    c.getPaidDate() == null ? "" : c.getPaidDate().format(DATE_FMT)));
+        }
+        ExcelReportExporter.Section list = new ExcelReportExporter.Section(
+                "II. DANH SÁCH ĐÓNG GÓP (" + contributionRows.size() + " lượt nộp)",
+                List.of("STT", "Mã hộ", "Chủ hộ", "Căn hộ", "Số tiền đã nộp (đ)", "Ngày nộp"),
+                contributionRows);
+
+        return excelExporter.exportSections(
+                "Tinh trang dot thu",
+                "BÁO CÁO TÌNH TRẠNG ĐỢT THU",
+                meta,
+                List.of(summary, list));
     }
 
     @Transactional
     public byte[] exportFeePeriodPdf(List<Long> feePeriodIds) {
         FeePeriodStatisticsDTO s = getFeePeriodStatistics(feePeriodIds, null, null);
         ReportData data = buildFeePeriodReport(s);
-        byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
-        return file;
-    }
-
-    @Transactional
-    public byte[] exportDonationExcel(Long feeId) {
-        DonationStatisticsDTO s = getDonationStatistics(feeId);
-        ReportData data = buildDonationReport(s);
-        byte[] file = excelExporter.export("Bao cao dong gop", data.title, data.meta, data.headers, data.rows);
-        return file;
-    }
-
-    @Transactional
-    public byte[] exportDonationPdf(Long feeId) {
-        DonationStatisticsDTO s = getDonationStatistics(feeId);
-        ReportData data = buildDonationReport(s);
         byte[] file = pdfExporter.export(data.title, data.meta, data.headers, data.rows);
         return file;
     }
@@ -322,7 +306,13 @@ public class ReportService {
                 "Trạng thái đợt: " + safe(s.periodStatus()),
                 "Ngày xuất: " + LocalDateTime.now().format(DATETIME_FMT));
         d.headers = List.of("Chỉ tiêu", "Giá trị");
-        d.rows = List.of(
+        d.rows = feePeriodSummaryRows(s);
+        return d;
+    }
+
+    /** Các dòng số liệu tổng hợp của một/nhiều đợt thu (dùng chung cho PDF và phần I của Excel). */
+    private List<List<String>> feePeriodSummaryRows(FeePeriodStatisticsDTO s) {
+        return List.of(
                 List.of("Tổng số hộ phải nộp", String.valueOf(s.totalHouseholds())),
                 List.of("Số hộ đã nộp", String.valueOf(s.paidCount())),
                 List.of("Số hộ chưa nộp", String.valueOf(s.unpaidCount())),
@@ -330,31 +320,6 @@ public class ReportService {
                 List.of("Tổng tiền đã thu (đ)", money(s.totalCollected())),
                 List.of("Còn phải thu (đ)", money(s.totalOutstanding())),
                 List.of("Tỉ lệ đã nộp (%)", percent(s.collectionRate())));
-        return d;
-    }
-
-    private ReportData buildDonationReport(DonationStatisticsDTO s) {
-        ReportData d = new ReportData();
-        d.title = "BÁO CÁO KHOẢN ĐÓNG GÓP";
-        d.meta = List.of(
-                "Khoản đóng góp: " + safe(s.feeName()),
-                "Số hộ đóng góp: " + s.contributorCount(),
-                "Tổng số tiền đóng góp (đ): " + money(s.totalAmount()),
-                "Ngày xuất: " + LocalDateTime.now().format(DATETIME_FMT));
-        d.headers = List.of("STT", "Mã hộ", "Chủ hộ", "Căn hộ", "Số tiền (đ)", "Ngày đóng");
-        List<List<String>> rows = new ArrayList<>();
-        int i = 1;
-        for (DonationContributionDTO c : s.contributions()) {
-            rows.add(List.of(
-                    String.valueOf(i++),
-                    safe(c.householdCode()),
-                    safe(c.headName()),
-                    safe(c.apartmentCode()),
-                    money(c.amount()),
-                    c.paidDate() == null ? "" : c.paidDate().format(DATE_FMT)));
-        }
-        d.rows = rows;
-        return d;
     }
 
     private ReportData buildHouseholdReport(List<HouseholdPaymentSummaryDTO> list) {
@@ -460,13 +425,6 @@ public class ReportService {
     //  Helpers
     // ============================================================
 
-    private FeePeriod requireFeePeriod(Long id) {
-        return feePeriodRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(
-                        "FEE_PERIOD_NOT_FOUND",
-                        "Không tìm thấy đợt thu id=" + id));
-    }
-
     /** Nạp & xác thực danh sách đợt thu được chọn (giữ thứ tự id truyền vào). */
     private List<FeePeriod> requireFeePeriods(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
@@ -478,18 +436,6 @@ public class ReportService {
                     "Không tìm thấy đợt thu với id=" + ids);
         }
         return periods;
-    }
-
-    /** Nạp & xác thực một khoản thu tự nguyện (Fee type=DONATION). */
-    private Fee requireDonationFee(Long feeId) {
-        Fee fee = feeRepository.findById(feeId)
-                .orElseThrow(() -> new NotFoundException(
-                        "FEE_NOT_FOUND", "Không tìm thấy khoản thu id=" + feeId));
-        if (!"DONATION".equals(fee.getType())) {
-            throw new NotFoundException("FEE_NOT_DONATION",
-                    "Khoản thu id=" + feeId + " không phải khoản đóng góp tự nguyện");
-        }
-        return fee;
     }
 
     private static String genderLabel(Gender g) {

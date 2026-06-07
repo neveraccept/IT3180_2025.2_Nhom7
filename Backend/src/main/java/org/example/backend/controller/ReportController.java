@@ -1,7 +1,6 @@
 package org.example.backend.controller;
 
 import org.example.backend.dto.response.ApiResponse;
-import org.example.backend.dto.DonationStatisticsDTO;
 import org.example.backend.dto.FeePeriodStatisticsDTO;
 import org.example.backend.dto.HouseholdPaymentSummaryDTO;
 import org.example.backend.dto.ResidentStatisticsDTO;
@@ -53,13 +52,6 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getFeePeriodStatistics(feePeriodIds, from, to)));
     }
 
-    // F10.2 - Thống kê khoản đóng góp tự nguyện theo KHOẢN THU (Fee type=DONATION)
-    @GetMapping("/donations/{feeId}/statistics")
-    public ResponseEntity<ApiResponse<DonationStatisticsDTO>> donationStatistics(
-            @PathVariable Long feeId) {
-        return ResponseEntity.ok(ApiResponse.ok(reportService.getDonationStatistics(feeId)));
-    }
-
     // F10.3 - Thống kê theo hộ gia đình (lọc tuỳ chọn theo khoảng ngày thanh toán)
     @GetMapping("/households/statistics")
     public ResponseEntity<ApiResponse<List<HouseholdPaymentSummaryDTO>>> householdStatistics(
@@ -81,11 +73,6 @@ public class ReportController {
     @GetMapping("/fee-periods/excel")
     public ResponseEntity<byte[]> feePeriodExcel(@RequestParam List<Long> feePeriodIds) {
         return excel(reportService.exportFeePeriodExcel(feePeriodIds), "tinh-trang-dot-thu");
-    }
-
-    @GetMapping("/donations/{feeId}/excel")
-    public ResponseEntity<byte[]> donationExcel(@PathVariable Long feeId) {
-        return excel(reportService.exportDonationExcel(feeId), "khoan-dong-gop-" + feeId);
     }
 
     @GetMapping("/households/excel")
@@ -112,11 +99,6 @@ public class ReportController {
     @GetMapping("/fee-periods/pdf")
     public ResponseEntity<byte[]> feePeriodPdf(@RequestParam List<Long> feePeriodIds) {
         return pdf(reportService.exportFeePeriodPdf(feePeriodIds), "tinh-trang-dot-thu");
-    }
-
-    @GetMapping("/donations/{feeId}/pdf")
-    public ResponseEntity<byte[]> donationPdf(@PathVariable Long feeId) {
-        return pdf(reportService.exportDonationPdf(feeId), "khoan-dong-gop-" + feeId);
     }
 
     @GetMapping("/households/pdf")

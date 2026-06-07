@@ -76,7 +76,8 @@ public class PaymentService {
 
     // ============================ XÁC NHẬN TIỀN MẶT =========================
 
-    @LogAdminAction(entity = "Payment", action = "UPDATE", description = "Xác nhận thu tiền mặt phiếu nộp")
+    @LogAdminAction(entity = "Payment", action = "UPDATE", description = "Xác nhận thu tiền mặt phiếu nộp",
+            detail = "'Hộ ' + #result.householdCode() + ' - đợt ' + #result.feePeriodName()")
     @Transactional
     public PaymentDetailDTO confirmCashPayment(Long paymentId, Long adminUserId) {
         Payment p = paymentRepository.findById(paymentId)

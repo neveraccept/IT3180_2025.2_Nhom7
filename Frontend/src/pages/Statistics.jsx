@@ -7,20 +7,17 @@ import {
   getHouseholdStatisticsAPI,
   getResidentStatisticsAPI,
   getFeePeriodStatisticsAPI,
-  getDonationStatisticsAPI,
   exportHouseholdExcelAPI,
   exportHouseholdPdfAPI,
   exportResidentExcelAPI,
   exportResidentPdfAPI,
   exportFeePeriodExcelAPI,
   exportFeePeriodPdfAPI,
-  exportDonationExcelAPI,
-  exportDonationPdfAPI,
   exportTransactionExcelAPI,
   exportTransactionPdfAPI,
   downloadBlob,
 } from "../api/reportApi";
-import { listFeePeriodsAPI, searchFeesAPI } from "../api/feeApi";
+import { listFeePeriodsAPI } from "../api/feeApi";
 import { searchVnpayTransactionsAPI } from "../api/vnpayApi";
 
 const REPORT_PAGE_SIZE = 20;
@@ -29,20 +26,17 @@ const reportLabels = {
   households: "Thống kê theo hộ",
   residents: "Thống kê dân cư",
   "fee-period": "Thống kê đợt thu",
-  donation: "Khoản đóng góp",
   transactions: "Giao dịch online",
 };
 
 export function Statistics() {
   const [feePeriods, setFeePeriods] = useState([]);
-  const [donationFees, setDonationFees] = useState([]);
 
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState(null);
 
   const [reportType, setReportType] = useState("households");
   const [selectedPeriodIds, setSelectedPeriodIds] = useState([]); // multi-select đợt thu
-  const [selectedFeeId, setSelectedFeeId] = useState(""); // khoản đóng góp tự nguyện
   const [format, setFormat] = useState("excel");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -109,21 +103,6 @@ export function Statistics() {
       };
     }
 
-    if (type === "donation") {
-      const rows = (data?.contributions || []).map((c) => [
-        c.apartmentCode || c.householdCode || "?",
-        c.headName || "?",
-        money(c.amount || 0),
-        c.paidDate || "?",
-      ]);
-      return {
-        title: `${reportLabels[type]}${data?.feeName ? ` - ${data.feeName}` : ""}`,
-        columns: ["Căn hộ", "Chủ hộ", "Số tiền", "Ngày nộp"],
-        rows,
-        summary: `Số hộ đóng góp: ${data?.contributorCount ?? rows.length} | Tổng tiền: ${money(data?.totalAmount || 0)}`,
-      };
-    }
-
     return {
       title: reportLabels[type],
       columns: ["Mã giao dịch", "Hộ", "Nội dung", "Số tiền", "Trạng thái", "Tạo lúc", "Thanh toán lúc"],
@@ -144,10 +123,6 @@ export function Statistics() {
       showToast("Vui lòng chọn ít nhất một đợt thu.", "error");
       return;
     }
-    if (reportType === "donation" && !selectedFeeId) {
-      showToast("Vui lòng chọn khoản đóng góp.", "error");
-      return;
-    }
 
     setReportLoading(true);
     setReportPage(1);
@@ -160,8 +135,6 @@ export function Statistics() {
       res = await getResidentStatisticsAPI(range);
     } else if (reportType === "fee-period") {
       res = await getFeePeriodStatisticsAPI(selectedPeriodIds, range);
-    } else if (reportType === "donation") {
-      res = await getDonationStatisticsAPI(selectedFeeId);
     } else {
       res = await searchVnpayTransactionsAPI({
         status: statusFilter || undefined,
@@ -187,21 +160,11 @@ export function Statistics() {
         if (res.success) setFeePeriods(res.data?.items || []);
       });
     }
-    if (reportType === "donation" && donationFees.length === 0) {
-      // Chỉ lấy các khoản thu tự nguyện (type=DONATION) cho ô chọn khoản đóng góp.
-      searchFeesAPI({ type: "DONATION" }).then((res) => {
-        if (res.success) setDonationFees(res.data?.items || []);
-      });
-    }
-  }, [reportType, feePeriods.length, donationFees.length]);
+  }, [reportType, feePeriods.length]);
 
   const handleExport = async () => {
     if (reportType === "fee-period" && selectedPeriodIds.length === 0) {
       showToast("Vui lòng chọn ít nhất một đợt thu.", "error");
-      return;
-    }
-    if (reportType === "donation" && !selectedFeeId) {
-      showToast("Vui lòng chọn khoản đóng góp.", "error");
       return;
     }
 
@@ -225,11 +188,6 @@ export function Statistics() {
           ? await exportFeePeriodPdfAPI(selectedPeriodIds)
           : await exportFeePeriodExcelAPI(selectedPeriodIds);
         filename = `tinh-trang-dot-thu.${ext}`;
-      } else if (reportType === "donation") {
-        res = isPdf
-          ? await exportDonationPdfAPI(selectedFeeId)
-          : await exportDonationExcelAPI(selectedFeeId);
-        filename = `khoan-dong-gop-${selectedFeeId}.${ext}`;
       } else {
         const params = {
           status: statusFilter || undefined,
@@ -284,7 +242,6 @@ export function Statistics() {
             onChange={(e) => {
               setReportType(e.target.value);
               setSelectedPeriodIds([]);
-              setSelectedFeeId("");
               setReportPage(1);
               setReportResult(null);
             }}
@@ -292,7 +249,6 @@ export function Statistics() {
             <option value="households">Thống kê theo hộ</option>
             <option value="residents">Thống kê dân cư</option>
             <option value="fee-period">Thống kê đợt thu</option>
-            <option value="donation">Khoản đóng góp</option>
             <option value="transactions">Giao dịch online</option>
           </Select>
 
@@ -357,23 +313,6 @@ export function Statistics() {
                 Đã chọn {selectedPeriodIds.length} đợt thu.
               </p>
             )}
-          </div>
-        )}
-
-        {reportType === "donation" && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Select
-              label="Khoản đóng góp (tự nguyện)"
-              value={selectedFeeId}
-              onChange={(e) => setSelectedFeeId(e.target.value)}
-            >
-              <option value="">-- Chọn khoản đóng góp --</option>
-              {donationFees.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </Select>
           </div>
         )}
 

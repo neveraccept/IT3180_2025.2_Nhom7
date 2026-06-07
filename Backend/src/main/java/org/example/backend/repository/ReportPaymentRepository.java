@@ -83,8 +83,8 @@ public interface ReportPaymentRepository extends JpaRepository<Payment, Long> {
                                                @Param("from") LocalDate from,
                                                @Param("to") LocalDate to);
 
-    // ---- F10.2: khoản đóng góp theo KHOẢN THU tự nguyện (Fee type=DONATION) ----
-    // Gom toàn bộ phiếu thuộc mọi đợt của khoản đóng góp này mà hộ thực sự đã đóng (amount_paid > 0).
+    // ---- F10.1 (kèm danh sách đóng góp): chi tiết các hộ đã nộp trong (các) đợt thu được chọn ----
+    // Liệt kê từng phiếu mà hộ thực sự đã đóng (amount_paid > 0) để xuất kèm trong báo cáo Excel đợt thu.
 
     @Query("""
             SELECT h.code             AS householdCode,
@@ -96,11 +96,11 @@ public interface ReportPaymentRepository extends JpaRepository<Payment, Long> {
             JOIN p.household h
             JOIN h.apartment a
             LEFT JOIN h.headOfHousehold r
-            WHERE p.feePeriod.fee.id = :feeId
+            WHERE p.feePeriod.id IN :feePeriodIds
               AND p.amountPaid > 0
             ORDER BY p.paidDate DESC, h.code ASC
             """)
-    List<DonationContributionProjection> findContributionsByFee(@Param("feeId") Long feeId);
+    List<DonationContributionProjection> findContributionsByFeePeriodIds(@Param("feePeriodIds") List<Long> feePeriodIds);
 
     // ---- F10.3: gộp theo hộ gia đình (toàn bộ phiếu nộp) ----
 

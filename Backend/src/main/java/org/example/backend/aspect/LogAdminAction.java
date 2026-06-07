@@ -24,4 +24,14 @@ public @interface LogAdminAction {
 
     /** Mô tả ngắn gọn (tùy chọn) hiển thị trong nhật ký. */
     String description() default "";
+
+    /**
+     * Biểu thức SpEL (tùy chọn) sinh phần "chi tiết" cho nhật ký, nối thêm sau mô tả.
+     * Có thể tham chiếu tham số đầu vào theo tên (vd: #id, #dto) và giá trị trả về (#result).
+     *
+     * Ví dụ: detail = "'Khoản thu: ' + #result.name"
+     *
+     * Lưu ý: nếu service tự ghi qua {@code AuditContext.detail(...)} thì giá trị đó được ưu tiên.
+     */
+    String detail() default "";
 }

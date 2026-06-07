@@ -101,7 +101,8 @@ public class ParkingService {
     }
 
     // F6.1 (gán xe hộ) + F6.5 (cho thuê chỗ thừa).
-    @LogAdminAction(entity = "ParkingRegistration", action = "CREATE", description = "Gán/cho thuê chỗ gửi xe")
+    @LogAdminAction(entity = "ParkingRegistration", action = "CREATE", description = "Gán/cho thuê chỗ gửi xe",
+            detail = "'Chỗ ' + #result.slotCode()")
     @Transactional
     public ParkingRegistrationDTO createRegistration(CreateParkingRegistrationRequest req) {
         ParkingSlot slot = slotRepository.findById(req.slotId())
@@ -171,7 +172,8 @@ public class ParkingService {
     }
 
     // F6.2 / F6.5 - Kết thúc một lượt đăng ký/cho thuê, trả chỗ về EMPTY.
-    @LogAdminAction(entity = "ParkingRegistration", action = "UPDATE", description = "Kết thúc lượt gửi xe, trả chỗ về trống")
+    @LogAdminAction(entity = "ParkingRegistration", action = "UPDATE", description = "Kết thúc lượt gửi xe, trả chỗ về trống",
+            detail = "'Chỗ ' + #result.slotCode()")
     @Transactional
     public ParkingRegistrationDTO endRegistration(Long id) {
         ParkingRegistration reg = registrationRepository.findById(id)
