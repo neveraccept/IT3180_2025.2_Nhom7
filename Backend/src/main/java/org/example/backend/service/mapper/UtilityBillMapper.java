@@ -16,6 +16,8 @@ public class UtilityBillMapper {
                 b.getType(),
                 b.getMonth(),
                 b.getYear(),
+                b.getOldIndex(),
+                b.getNewIndex(),
                 b.getAmount(),
                 b.getStatus(),
                 b.getPaidDate(),

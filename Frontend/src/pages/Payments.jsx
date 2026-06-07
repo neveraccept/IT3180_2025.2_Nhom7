@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { money } from "../utils/helpers";
-import { Badge, Button, Card, Input, Select } from "../components/common";
+import { Badge, Button, Card, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { listAdminPaymentsAPI, confirmCashPaymentAPI } from "../api/paymentApi";
 
@@ -11,7 +11,7 @@ import { listAdminPaymentsAPI, confirmCashPaymentAPI } from "../api/paymentApi";
 //  Nguồn dữ liệu: backend PaymentController (/api/admin/payments).
 //  Admin xem phiếu nộp của từng hộ, xác nhận đã nộp tiền mặt.
 //  PaymentDetailDTO: { id, feePeriodName, feeName, householdCode, amountDue, amountPaid,
-//    status(PENDING|PAID), paymentMethod, paidDate, collectedByName, transactionCode }
+//    status(UNPAID|PAID), paymentMethod, paidDate, collectedByName, transactionCode }
 //  Lưu ý: phiếu nộp được backend sinh từ đợt thu (FeePeriod); FE không lập đợt hàng loạt ở đây.
 // ============================================================
 const statusBadge = (status) => (
@@ -28,31 +28,79 @@ export function Payments() {
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Phân trang phía server: 20 phiếu/trang.
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 20;
+
+  // Thống kê tính trên TOÀN BỘ phiếu khớp bộ lọc (không phụ thuộc trang đang xem).
+  const [summary, setSummary] = useState({ totalDue: 0, totalPaid: 0, paid: 0, pending: 0 });
+
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const loadPayments = useCallback(async () => {
+  // Tải 1 trang phiếu nộp để hiển thị bảng.
+  const loadPayments = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setPageError("");
     const res = await listAdminPaymentsAPI({
       householdId: filters.householdId || undefined,
       status: filters.status !== "ALL" ? filters.status : undefined,
+      page: targetPage - 1,
+      size: PAGE_SIZE,
     });
-    if (res.success) setPayments(res.data?.items || []);
-    else setPageError(res.message || "Không tải được danh sách phiếu nộp");
+    if (res.success) {
+      setPayments(res.data?.items || []);
+      setTotal(res.data?.totalElements || 0);
+      setPage(targetPage);
+    } else {
+      setPageError(res.message || "Không tải được danh sách phiếu nộp");
+    }
     setLoading(false);
   }, [filters]);
 
+  // Tải toàn bộ phiếu khớp bộ lọc để tính các thẻ thống kê (tổng phải thu/đã thu...).
+  const loadSummary = useCallback(async () => {
+    const res = await listAdminPaymentsAPI({
+      householdId: filters.householdId || undefined,
+      status: filters.status !== "ALL" ? filters.status : undefined,
+      page: 0,
+      size: 100000,
+    });
+    if (res.success) {
+      const acc = (res.data?.items || []).reduce(
+        (a, p) => {
+          a.totalDue += Number(p.amountDue || 0);
+          a.totalPaid += Number(p.amountPaid || 0);
+          if (p.status === "PAID") a.paid += 1;
+          else a.pending += 1;
+          return a;
+        },
+        { totalDue: 0, totalPaid: 0, paid: 0, pending: 0 }
+      );
+      setSummary(acc);
+    }
+  }, [filters]);
+
   useEffect(() => {
-    loadPayments();
+    loadPayments(1);
+    loadSummary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleSearch = () => {
+    loadPayments(1);
+    loadSummary();
+  };
+
   const handleResetFilters = () => {
     setFilters({ householdId: "", status: "ALL" });
-    setTimeout(loadPayments, 0);
+    setTimeout(() => {
+      loadPayments(1);
+      loadSummary();
+    }, 0);
   };
 
   const handleConfirmCash = async () => {
@@ -66,19 +114,9 @@ export function Payments() {
     }
     setSelected(null);
     showToast("Đã xác nhận nộp tiền mặt");
-    await loadPayments();
+    await loadPayments(page);
+    loadSummary();
   };
-
-  const summary = payments.reduce(
-    (acc, p) => {
-      acc.totalDue += Number(p.amountDue || 0);
-      acc.totalPaid += Number(p.amountPaid || 0);
-      if (p.status === "PAID") acc.paid += 1;
-      else acc.pending += 1;
-      return acc;
-    },
-    { totalDue: 0, totalPaid: 0, paid: 0, pending: 0 }
-  );
 
   return (
     <>
@@ -109,15 +147,15 @@ export function Payments() {
             placeholder="VD: 1"
             value={filters.householdId}
             onChange={(e) => setFilters({ ...filters, householdId: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && loadPayments()}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
           <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="ALL">Tất cả</option>
             <option value="PAID">Đã nộp</option>
-            <option value="PENDING">Chưa nộp</option>
+            <option value="UNPAID">Chưa nộp</option>
           </Select>
           <div className="flex items-end gap-3">
-            <Button onClick={loadPayments}><Search className="h-4 w-4" /> Tìm kiếm</Button>
+            <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
             <Button variant="secondary" onClick={handleResetFilters}>Xóa bộ lọc</Button>
           </div>
         </div>
@@ -162,6 +200,11 @@ export function Payments() {
             </tbody>
           </table>
         </div>
+        {!loading && total > 0 && (
+          <div className="border-t border-slate-200">
+            <Pagination page={page} total={total} pageSize={PAGE_SIZE} onPageChange={(p) => loadPayments(p)} />
+          </div>
+        )}
       </div>
 
       {selected && (

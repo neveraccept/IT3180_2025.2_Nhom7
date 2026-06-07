@@ -7,7 +7,7 @@ import { SectionHeader } from "../components/layout/SectionHeader";
 import { getResidentStatisticsAPI } from "../api/reportApi";
 import { listFeePeriodsAPI } from "../api/feeApi";
 import { listAllComplaintsAPI, CATEGORY_LABEL } from "../api/complaintApi";
-import { listMyNotificationsAPI } from "../api/notificationApi";
+import { listMyNotificationsAPI, listSentNotificationsAPI } from "../api/notificationApi";
 import { listMyHouseholdPaymentsAPI } from "../api/paymentApi";
 import { listMyUtilityBillsAPI } from "../api/utilityApi";
 
@@ -32,30 +32,41 @@ export function Dashboard({ role }) {
     (async () => {
       setLoading(true);
 
-      const notifRes = await listMyNotificationsAPI();
-      if (!cancelled && notifRes.success) setNotifications(notifRes.data?.items || []);
-
       if (role === "ADMIN") {
-        const [statsRes, periodsRes, complaintsRes] = await Promise.all([
+        // Admin: thông báo đã gửi + thống kê + đợt thu + khiếu nại chưa xử lý
+        const [notifRes, statsRes, periodsRes, complaintsRes] = await Promise.all([
+          listSentNotificationsAPI(),
           getResidentStatisticsAPI(),
           listFeePeriodsAPI(),
-          listAllComplaintsAPI({ status: "IN_PROGRESS", size: 50 }),
+          // Lấy toàn bộ rồi lọc các khiếu nại chưa xử lý (NEW + IN_PROGRESS) phía client,
+          // vì API chỉ lọc được 1 trạng thái mỗi lần gọi.
+          listAllComplaintsAPI({ size: 200 }),
         ]);
         if (!cancelled) {
+          if (notifRes.success) setNotifications(notifRes.data?.items || []);
           if (statsRes.success) setStats(statsRes.data);
           if (periodsRes.success) {
             const items = periodsRes.data?.items || [];
             setOpenPeriodsCount(items.filter((p) => p.status === "OPEN").length);
           }
-          if (complaintsRes.success) setUnresolvedComplaints(complaintsRes.data?.items || []);
+          if (complaintsRes.success) {
+            const pending = (complaintsRes.data?.items || [])
+              .filter((c) => c.status === "NEW" || c.status === "IN_PROGRESS")
+              // Mới nhất lên trước để khớp với "5 khiếu nại mới nhất".
+              .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+            setUnresolvedComplaints(pending);
+          }
         }
       } else {
+        const notifRes = await listMyNotificationsAPI();
+        if (!cancelled && notifRes.success) setNotifications(notifRes.data?.items || []);
+
         const [paymentsRes, billsRes] = await Promise.all([
           listMyHouseholdPaymentsAPI(),
           listMyUtilityBillsAPI(),
         ]);
         if (!cancelled) {
-          const fees = (paymentsRes.data?.items || []).filter((p) => p.status === "PENDING");
+          const fees = (paymentsRes.data?.items || []).filter((p) => p.status === "UNPAID");
           const bills = (billsRes.data?.items || []).filter((b) => b.status === "UNPAID");
           setUnpaidItems([
             ...fees.map((p) => ({
@@ -83,6 +94,10 @@ export function Dashboard({ role }) {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const unpaidTotal = unpaidItems.reduce((s, r) => s + r.amount, 0);
+  // 5 thông báo gần nhất (mới nhất lên trước).
+  const recentNotifications = [...notifications]
+    .sort((a, b) => new Date(b.sentAt || 0) - new Date(a.sentAt || 0))
+    .slice(0, 5);
 
   const closeModals = () => {
     setSelectedComplaint(null);
@@ -146,7 +161,7 @@ export function Dashboard({ role }) {
                 <p className="text-sm text-slate-500">Chưa có thông báo.</p>
               )}
               {!loading &&
-                notifications.slice(0, 5).map((n) => (
+                recentNotifications.map((n) => (
                   <button
                     key={n.id}
                     onClick={() => setSelectedNotification(n)}
@@ -217,11 +232,11 @@ export function Dashboard({ role }) {
       sub: "Đợt thu phí đang hoạt động",
     },
     {
-      label: "Khiếu nại đang xử lý",
+      label: "Khiếu nại chưa xử lý",
       value: loading ? "..." : String(unresolvedComplaints.length),
       icon: MessageSquareWarning,
       tone: "text-rose-700",
-      sub: "Cần xử lý",
+      sub: "Chờ xử lý & đang xử lý",
     },
   ];
 
@@ -262,7 +277,7 @@ export function Dashboard({ role }) {
               </div>
             )}
             {!loading &&
-              unresolvedComplaints.map((c) => (
+              unresolvedComplaints.slice(0, 5).map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedComplaint(c)}
@@ -286,6 +301,11 @@ export function Dashboard({ role }) {
                   </div>
                 </button>
               ))}
+            {!loading && unresolvedComplaints.length > 5 && (
+              <p className="pt-1 text-center text-xs font-semibold text-slate-400">
+                Đang hiển thị 5 khiếu nại mới nhất / {unresolvedComplaints.length} chưa xử lý — xem tất cả ở mục Khiếu nại.
+              </p>
+            )}
           </div>
         </Card>
 
@@ -297,7 +317,7 @@ export function Dashboard({ role }) {
               <p className="text-sm text-slate-500">Chưa có thông báo.</p>
             )}
             {!loading &&
-              notifications.slice(0, 5).map((n) => (
+              recentNotifications.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => setSelectedNotification(n)}

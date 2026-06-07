@@ -11,7 +11,8 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 	// Phục vụ luồng đăng nhập và kiểm tra trùng lặp khi đăng ký
-	@Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.username = :username")
+	// (loại trừ tài khoản đã xóa mềm để không cho đăng nhập lại)
+	@Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.username = :username AND u.deleted = false")
 	Optional<User> findByUsername(@Param("username") String username);
 	boolean existsByUsername(String username);
 
@@ -24,9 +25,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	Optional<User> findByEmail(@Param("email") String email);
 	boolean existsByEmail(String email);
 
-	// Phục vụ màn hình Admin lấy danh sách tài khoản chờ duyệt
-	// (Tài khoản có active = false và chưa được gán household_id)
-	// List<User> findByActiveFalseAndHouseholdIsNull();
+	// Phục vụ màn hình Admin lấy danh sách tài khoản chờ duyệt (bỏ qua tài khoản đã xóa mềm)
+	@Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.active = false AND u.household IS NULL AND u.deleted = false")
+	List<User> findPendingApprovals();
+
+	// Phục vụ màn hình Admin liệt kê TẤT CẢ tài khoản trong hệ thống (bỏ qua tài khoản đã xóa mềm)
+	@Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.deleted = false ORDER BY u.id")
+	List<User> findAllWithRole();
 
 	@Query("""
             SELECT u FROM User u

@@ -52,12 +52,14 @@ public class InitialDataConfig implements CommandLineRunner {
     private final FeeRepository feeRepository;
     private final FeePeriodRepository feePeriodRepository;
     private final UtilityBillRepository utilityBillRepository;
+    private final SystemConfigRepository systemConfigRepository;
     private final ComplaintRepository complaintRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationRecipientRepository notificationRecipientRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.example.backend.service.FeePeriodService feePeriodService;
 
     private final Faker faker = new Faker(Locale.of("vi"));
     private final Random random = new Random();
@@ -74,12 +76,14 @@ public class InitialDataConfig implements CommandLineRunner {
                              FeeRepository feeRepository,
                              FeePeriodRepository feePeriodRepository,
                              UtilityBillRepository utilityBillRepository,
+                             SystemConfigRepository systemConfigRepository,
                              ComplaintRepository complaintRepository,
                              NotificationRepository notificationRepository,
                              NotificationRecipientRepository notificationRecipientRepository,
                              UserRepository userRepository,
                              RoleRepository roleRepository,
-                             PasswordEncoder passwordEncoder) {
+                             PasswordEncoder passwordEncoder,
+                             org.example.backend.service.FeePeriodService feePeriodService) {
         this.apartmentRepository = apartmentRepository;
         this.parkingSlotRepository = parkingSlotRepository;
         this.householdRepository = householdRepository;
@@ -89,32 +93,45 @@ public class InitialDataConfig implements CommandLineRunner {
         this.feeRepository = feeRepository;
         this.feePeriodRepository = feePeriodRepository;
         this.utilityBillRepository = utilityBillRepository;
+        this.systemConfigRepository = systemConfigRepository;
         this.complaintRepository = complaintRepository;
         this.notificationRepository = notificationRepository;
         this.notificationRecipientRepository = notificationRecipientRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.feePeriodService = feePeriodService;
     }
 
     @Override
     @Transactional
     public void run(String... args) {
+        // Đơn giá hệ thống luôn được đảm bảo tồn tại (idempotent), kể cả khi DB đã có dữ liệu cũ
+        // -> hoá đơn điện/nước/internet luôn có đơn giá để tính tiền.
+        seedSystemConfigs();
+
         // Chốt chặn idempotent: chỉ seed khi DB chưa có hạ tầng căn hộ.
         if (apartmentRepository.count() > 0) {
             System.out.println("[InitialDataConfig] Đã có dữ liệu căn hộ -> bỏ qua sinh dữ liệu mẫu.");
-            return;
+        } else {
+            System.out.println("[InitialDataConfig] Bắt đầu sinh dữ liệu mẫu...");
+
+            seedInfrastructure();
+            List<Household> households = seedHouseholdsAndResidents();
+            seedVehiclesAndParking(households);
+            seedFinance(households);
+            seedInteractions(households);
+
+            System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
         }
 
-        System.out.println("[InitialDataConfig] Bắt đầu sinh dữ liệu mẫu...");
-
-        seedInfrastructure();
-        List<Household> households = seedHouseholdsAndResidents();
-        seedVehiclesAndParking(households);
-        seedFinance(households);
-        seedInteractions(households);
-
-        System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
+        // Luôn đảm bảo mọi đợt thu đã có phiếu thu (Payment). Chạy cả với DB cũ:
+        // các đợt thu được seed/tạo trước khi có cơ chế tự sinh phiếu sẽ được backfill,
+        // nhờ vậy màn hình "Thu phí / Công nợ" mới có dữ liệu để hiển thị.
+        int fixedPeriods = feePeriodService.backfillMissingPayments();
+        if (fixedPeriods > 0) {
+            System.out.printf("[InitialDataConfig] Đã backfill phiếu thu cho %d đợt thu chưa có phiếu.%n", fixedPeriods);
+        }
     }
 
 
@@ -291,6 +308,8 @@ public class InitialDataConfig implements CommandLineRunner {
 
         int vehicleCount = 0;
         int parkedCount = 0;
+        BigDecimal carParkingPrice = getSystemConfigValue(SystemConfig.CAR_PARKING_PRICE);
+        BigDecimal motorbikeParkingPrice = getSystemConfigValue(SystemConfig.MOTORBIKE_PARKING_PRICE);
 
         for (Household household : households) {
             int numVehicles = 1 + random.nextInt(2); // 1 hoặc 2 xe
@@ -321,9 +340,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 reg.setSlot(slot);
                 reg.setVehicle(vehicle);
                 reg.setStartDate(vehicle.getRegisteredDate());
-                reg.setMonthlyFee(type == VehicleType.CAR
-                        ? BigDecimal.valueOf(1_200_000)
-                        : BigDecimal.valueOf(120_000));
+                reg.setMonthlyFee(type == VehicleType.CAR ? carParkingPrice : motorbikeParkingPrice);
                 reg.setStatus(ParkingRegistrationStatus.ACTIVE);
                 parkingRegistrationRepository.save(reg);
                 parkedCount++;
@@ -376,6 +393,32 @@ public class InitialDataConfig implements CommandLineRunner {
 
         System.out.printf("[InitialDataConfig] Đã tạo %d loại phí, %d kỳ thu phí, %d hoá đơn sinh hoạt.%n",
                 fees.size(), fees.size(), bills.size());
+    }
+
+    // Seed đơn giá gốc dùng chung cho hoá đơn điện/nước/internet.
+    private void seedSystemConfigs() {
+        saveConfigIfAbsent(SystemConfig.ELECTRICITY_UNIT_PRICE, BigDecimal.valueOf(3_500),
+                "Đơn giá 1 số điện (đ/kWh)");
+        saveConfigIfAbsent(SystemConfig.WATER_UNIT_PRICE, BigDecimal.valueOf(15_000),
+                "Đơn giá 1 khối nước (đ/m³)");
+        saveConfigIfAbsent(SystemConfig.INTERNET_PRICE, BigDecimal.valueOf(250_000),
+                "Giá gói internet/tháng (đ)");
+        saveConfigIfAbsent(SystemConfig.MOTORBIKE_PARKING_PRICE, BigDecimal.valueOf(70_000),
+                "Phí gửi xe máy/tháng (đ)");
+        saveConfigIfAbsent(SystemConfig.CAR_PARKING_PRICE, BigDecimal.valueOf(1_200_000),
+                "Phí gửi ô tô/tháng (đ)");
+    }
+
+    private void saveConfigIfAbsent(String key, BigDecimal value, String description) {
+        if (!systemConfigRepository.existsByConfigKey(key)) {
+            systemConfigRepository.save(new SystemConfig(null, key, value, description));
+        }
+    }
+
+    private BigDecimal getSystemConfigValue(String key) {
+        return systemConfigRepository.findByConfigKey(key)
+                .map(SystemConfig::getConfigValue)
+                .orElseThrow(() -> new IllegalStateException("Missing system config: " + key));
     }
 
     private Fee buildFee(String name, String type, String unit, BigDecimal unitPrice, String description) {

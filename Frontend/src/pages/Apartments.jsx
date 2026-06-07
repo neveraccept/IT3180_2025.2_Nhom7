@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { Button, Input, Select, StatusBadge } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { listApartmentsAPI, searchApartmentsAPI, getApartmentDetailAPI } from "../api/apartmentApi";
+import { updateHouseholdAPI, moveOutHouseholdAPI } from "../api/householdApi";
 
 const PAGE_SIZE = 20;
 
@@ -11,6 +12,10 @@ const PAGE_SIZE = 20;
 const STATUS_MAP = { "Đang ở": "OCCUPIED", "Đang trống": "AVAILABLE" };
 
 const yearOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 4) : "—");
+const buildHouseholdForm = (household) => ({
+  headResidentId: household?.headOfHousehold?.id ? String(household.headOfHousehold.id) : "",
+  relations: Object.fromEntries((household?.residents || []).map((member) => [member.id, member.relationToHead || ""])),
+});
 
 export function Apartments() {
   const [apartments, setApartments] = useState([]);
@@ -24,6 +29,11 @@ export function Apartments() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [householdForm, setHouseholdForm] = useState(buildHouseholdForm(null));
+  const [householdActionMsg, setHouseholdActionMsg] = useState("");
+  const [householdActionError, setHouseholdActionError] = useState("");
+  const [savingHousehold, setSavingHousehold] = useState(false);
+  const [moveOutConfirm, setMoveOutConfirm] = useState(false);
 
   const [filters, setFilters] = useState({
     code: "",
@@ -86,10 +96,14 @@ export function Apartments() {
     setSelectedApartment(apartment);
     setDetail(null);
     setDetailError("");
+    setHouseholdActionMsg("");
+    setHouseholdActionError("");
+    setMoveOutConfirm(false);
     setDetailLoading(true);
     const res = await getApartmentDetailAPI(apartment.id);
     if (res.success && res.data) {
       setDetail(res.data);
+      setHouseholdForm(buildHouseholdForm(res.data.currentHousehold));
     } else {
       setDetailError(res.message || "Không tải được chi tiết căn hộ.");
     }
@@ -100,10 +114,85 @@ export function Apartments() {
     setSelectedApartment(null);
     setDetail(null);
     setDetailError("");
+    setHouseholdActionMsg("");
+    setHouseholdActionError("");
+    setMoveOutConfirm(false);
   };
 
   const household = detail?.currentHousehold || null;
-  const members = household?.residents || [];
+  const members = (household?.residents || []).filter(
+    (member) => member.status !== "MOVED_OUT" && member.residencyStatus !== "MOVED_OUT"
+  );
+
+  const refreshApartmentDetail = async () => {
+    if (!selectedApartment) return;
+    const res = await getApartmentDetailAPI(selectedApartment.id);
+    if (res.success && res.data) {
+      setDetail(res.data);
+      setHouseholdForm(buildHouseholdForm(res.data.currentHousehold));
+      setSelectedApartment((prev) => prev ? {
+        ...prev,
+        status: res.data.status,
+        headOfHouseholdName: res.data.currentHousehold?.headOfHousehold?.fullName || null,
+        currentHouseholdCode: res.data.currentHousehold?.code || null,
+      } : prev);
+    }
+  };
+
+  const handleRelationChange = (memberId, value) => {
+    setHouseholdForm((prev) => ({
+      ...prev,
+      relations: { ...prev.relations, [memberId]: value },
+    }));
+  };
+
+  const handleSaveHousehold = async () => {
+    if (!selectedApartment || !household) return;
+    if (!householdForm.headResidentId) {
+      setHouseholdActionMsg("");
+      setHouseholdActionError("Vui lòng chọn chủ hộ.");
+      return;
+    }
+
+    setSavingHousehold(true);
+    setHouseholdActionMsg("");
+    setHouseholdActionError("");
+    const res = await updateHouseholdAPI(selectedApartment.id, {
+      action: "UPDATE",
+      headResidentId: Number(householdForm.headResidentId),
+      memberRelations: members.map((member) => ({
+        residentId: member.id,
+        relationToHead: householdForm.relations[member.id] || "",
+      })),
+    });
+    setSavingHousehold(false);
+
+    if (res.success) {
+      setHouseholdActionMsg(res.message || "Đã cập nhật thông tin hộ.");
+      await refreshApartmentDetail();
+      loadPage(page);
+    } else {
+      setHouseholdActionError(res.message || "Cập nhật thông tin hộ thất bại.");
+    }
+  };
+
+  const handleMoveOutHousehold = async () => {
+    if (!selectedApartment || !household) return;
+    setSavingHousehold(true);
+    setHouseholdActionMsg("");
+    setHouseholdActionError("");
+    const res = await moveOutHouseholdAPI(selectedApartment.id);
+    setSavingHousehold(false);
+    setMoveOutConfirm(false);
+
+    if (res.success) {
+      setHouseholdActionMsg(res.message || "Đã chuyển hộ ra khỏi căn hộ.");
+      await refreshApartmentDetail();
+      loadPage(page);
+    } else {
+      setHouseholdActionError(res.message || "Chuyển hộ ra khỏi căn hộ thất bại.");
+    }
+  };
 
   return (
     <>
@@ -282,6 +371,7 @@ export function Apartments() {
               </div>
             )}
 
+
             <h4 className="mb-3 text-lg font-black text-slate-900">Thành viên trong căn hộ</h4>
             {detailLoading ? (
               <div className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
@@ -319,6 +409,60 @@ export function Apartments() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {household && members.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-slate-200 p-4">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-64 flex-1">
+                    <Select
+                      label="Chủ hộ"
+                      value={householdForm.headResidentId}
+                      onChange={(e) => setHouseholdForm((prev) => ({ ...prev, headResidentId: e.target.value }))}
+                    >
+                      <option value="">Chọn chủ hộ</option>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>{member.fullName}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={handleSaveHousehold} disabled={savingHousehold}>Lưu thay đổi hộ</Button>
+                    <Button variant="danger" onClick={() => setMoveOutConfirm(true)} disabled={savingHousehold}>Chuyển cả hộ đi</Button>
+                  </div>
+                </div>
+
+                {householdActionMsg && (
+                  <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">{householdActionMsg}</div>
+                )}
+                {householdActionError && (
+                  <div className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{householdActionError}</div>
+                )}
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {members.map((member) => (
+                    <Input
+                      key={member.id}
+                      label={`Quan hệ - ${member.fullName}`}
+                      value={householdForm.relations[member.id] || ""}
+                      onChange={(e) => handleRelationChange(member.id, e.target.value)}
+                    />
+                  ))}
+                </div>
+
+                {moveOutConfirm && (
+                  <div className="mt-4 rounded-xl bg-rose-50 p-4 ring-1 ring-rose-200">
+                    <p className="mb-3 text-sm font-semibold text-rose-800">
+                      Bạn có chắc muốn chuyển cả hộ này ra khỏi căn hộ? Tất cả nhân khẩu ACTIVE sẽ chuyển sang MOVED_OUT và căn hộ trở thành trống.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="secondary" onClick={() => setMoveOutConfirm(false)} disabled={savingHousehold}>Hủy</Button>
+                      <Button variant="danger" onClick={handleMoveOutHousehold} disabled={savingHousehold}>
+                        {savingHousehold ? "Đang chuyển..." : "Xác nhận chuyển hộ"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

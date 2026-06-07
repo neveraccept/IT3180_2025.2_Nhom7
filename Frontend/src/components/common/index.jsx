@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { money, getPeriodSummaryText, adminBankInfo } from "../../utils/helpers";
 
 export function Badge({ children, tone = "gray" }) {
@@ -47,8 +47,8 @@ export function StatusBadge({ status }) {
     DONATION: ["Tự nguyện", "violet"],
     PAID: ["Đã nộp", "green"],
     UNPAID: ["Chưa nộp", "red"],
-    NEW: ["Mới gửi", "red"],
-    IN_PROGRESS: ["Đang xử lý", "yellow"],
+    NEW: ["Chờ xử lý", "yellow"],
+    IN_PROGRESS: ["Đang xử lý", "blue"],
     RESOLVED: ["Đã giải quyết", "green"],
     REJECTED: ["Từ chối", "red"],
     ACTIVE: ["Đang dùng", "green"],
@@ -223,6 +223,72 @@ export function PaymentQRModal({ bill, onClose }) {
         </div>
         <div className="mt-5 flex justify-end"><Button variant="secondary" onClick={onClose}>Đóng</Button></div>
       </motion.div>
+    </div>
+  );
+}
+
+// Phân trang phía client: nhận page (1-based), tổng số dòng, kích thước trang.
+// Hiển thị nút trước/sau + dải số trang (rút gọn bằng dấu "…" khi nhiều trang).
+export function Pagination({ page, total, pageSize, onPageChange, className = "" }) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  if (pageCount <= 1) return null;
+
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+
+  // Dải số trang quanh trang hiện tại (luôn có trang đầu/cuối).
+  const pages = [];
+  const push = (p) => { if (!pages.includes(p) && p >= 1 && p <= pageCount) pages.push(p); };
+  push(1);
+  for (let p = page - 1; p <= page + 1; p++) push(p);
+  push(pageCount);
+  pages.sort((a, b) => a - b);
+  const withGaps = [];
+  pages.forEach((p, i) => {
+    if (i > 0 && p - pages[i - 1] > 1) withGaps.push("…");
+    withGaps.push(p);
+  });
+
+  const go = (p) => onPageChange(Math.min(pageCount, Math.max(1, p)));
+
+  return (
+    <div className={`flex flex-col items-center justify-between gap-3 px-5 py-4 sm:flex-row ${className}`}>
+      <p className="text-sm text-slate-500">
+        Hiển thị <strong className="text-slate-700">{from}</strong>–<strong className="text-slate-700">{to}</strong> trên <strong className="text-slate-700">{total}</strong>
+      </p>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => go(page - 1)}
+          disabled={page <= 1}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {withGaps.map((p, i) =>
+          p === "…" ? (
+            <span key={`gap-${i}`} className="px-2 text-sm text-slate-400">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => go(p)}
+              className={`inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm font-semibold transition ${
+                p === page
+                  ? "bg-sky-600 text-white"
+                  : "text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => go(page + 1)}
+          disabled={page >= pageCount}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

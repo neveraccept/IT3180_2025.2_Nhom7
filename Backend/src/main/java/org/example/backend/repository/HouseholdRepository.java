@@ -28,6 +28,12 @@ public interface HouseholdRepository extends JpaRepository<Household, Long> {
     List<Household> findByApartmentIdInAndStatus(Collection<Long> apartmentIds, HouseholdStatus status);
 
     boolean existsByApartmentIdAndStatus(Long apartmentId, HouseholdStatus status);
+
+    // Liệt kê hộ theo trạng thái (phục vụ sinh phiếu thu khi tạo đợt thu).
+    // Fetch sẵn căn hộ để đọc diện tích khi tính phí theo m² mà không phát sinh truy vấn phụ.
+    @EntityGraph(attributePaths = {"apartment"})
+    List<Household> findByStatus(HouseholdStatus status);
+
 }
 
 

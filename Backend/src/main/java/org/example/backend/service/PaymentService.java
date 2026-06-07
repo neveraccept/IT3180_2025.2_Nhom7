@@ -1,6 +1,7 @@
 package org.example.backend.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
 import org.example.backend.dto.PaymentTransactionDTO;
@@ -75,6 +76,8 @@ public class PaymentService {
 
     // ============================ XÁC NHẬN TIỀN MẶT =========================
 
+    @LogAdminAction(entity = "Payment", action = "UPDATE", description = "Xác nhận thu tiền mặt phiếu nộp",
+            detail = "'Hộ ' + #result.householdCode() + ' - đợt ' + #result.feePeriodName()")
     @Transactional
     public PaymentDetailDTO confirmCashPayment(Long paymentId, Long adminUserId) {
         Payment p = paymentRepository.findById(paymentId)
@@ -122,7 +125,15 @@ public class PaymentService {
             if (Payment.STATUS_PAID.equals(p.getStatus())) {
                 throw new BadRequestException("TARGET_ALREADY_PAID", "Khoản phí đã được thanh toán");
             }
-            amount = p.getAmountDue();
+            if (isDonationPayment(p)) {
+                amount = req.customAmount();
+                if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new BadRequestException("INVALID_DONATION_AMOUNT",
+                            "Vui lòng nhập số tiền đóng góp lớn hơn 0");
+                }
+            } else {
+                amount = p.getAmountDue();
+            }
             ownerHouseholdId = p.getHousehold().getId();
         } else {
             UtilityBill b = utilityBillRepository.findById(targetId)
@@ -239,7 +250,10 @@ public class PaymentService {
                     .orElseThrow(() -> new NotFoundException(
                             "PAYMENT_NOT_FOUND", "Phiếu nộp không tồn tại id=" + tx.getTargetId()));
             p.setStatus(Payment.STATUS_PAID);
-            p.setAmountPaid(p.getAmountDue());
+            p.setAmountPaid(tx.getAmount());
+            if (isDonationPayment(p)) {
+                p.setAmountDue(tx.getAmount());
+            }
             p.setPaymentMethod(Payment.METHOD_ONLINE);
             p.setTransactionCode(tx.getTransactionCode());
             p.setPaidAt(now);
@@ -306,5 +320,11 @@ public class PaymentService {
             }
         }
         return "BM-" + date + "-" + System.nanoTime();
+    }
+
+    private boolean isDonationPayment(Payment p) {
+        return p.getFeePeriod() != null
+                && p.getFeePeriod().getFee() != null
+                && "DONATION".equalsIgnoreCase(p.getFeePeriod().getFee().getType());
     }
 }

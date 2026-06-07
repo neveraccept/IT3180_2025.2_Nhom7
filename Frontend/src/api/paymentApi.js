@@ -5,7 +5,7 @@
 //    ADMIN     GET  /api/admin/payments?householdId=&status=
 //    ADMIN     PUT  /api/admin/payments/{id}/confirm-cash
 //  PaymentDetailDTO = { id, feePeriodId, feePeriodName, feeName, householdId, householdCode,
-//    amountDue, amountPaid, paidDate, status(PENDING|PAID), paymentMethod, transactionCode,
+//    amountDue, amountPaid, paidDate, status(UNPAID|PAID), paymentMethod, transactionCode,
 //    paidAt, note, collectedByName }
 // ============================================================
 import axiosClient, { callApi } from "./axiosClient";

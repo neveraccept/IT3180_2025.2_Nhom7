@@ -8,7 +8,14 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
-/** F7.1 – Nhập hoá đơn điện/nước/internet theo hộ và theo tháng. */
+/**
+ * F7.1 – Nhập hoá đơn điện/nước/internet theo hộ và theo tháng.
+ *
+ * Với hoá đơn ĐIỆN/NƯỚC: nhập chỉ số cũ/mới, hệ thống tự tính số tiền
+ * = (newIndex - oldIndex) * đơn giá (lấy từ SystemConfig). amount để trống.
+ * Với hoá đơn INTERNET: không cần chỉ số; nếu để trống amount sẽ lấy giá gói
+ * internet trong SystemConfig.
+ */
 public record CreateUtilityBillRequest(
         @NotNull(message = "householdId không được để trống")
         Long householdId,
@@ -25,7 +32,14 @@ public record CreateUtilityBillRequest(
         @Min(value = 2000, message = "Năm không hợp lệ")
         Integer year,
 
-        @NotNull(message = "Số tiền không được để trống")
+        // Không bắt buộc: INTERNET không cần chỉ số.
+        @Min(value = 0, message = "Chỉ số không hợp lệ")
+        Integer oldIndex,
+
+        @Min(value = 0, message = "Chỉ số không hợp lệ")
+        Integer newIndex,
+
+        // Không bắt buộc: điện/nước tự tính; internet có thể bỏ trống để lấy giá cấu hình.
         @DecimalMin(value = "0.0", inclusive = false, message = "Số tiền phải lớn hơn 0")
         BigDecimal amount
 ) {}

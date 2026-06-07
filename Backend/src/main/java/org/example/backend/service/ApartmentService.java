@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.ApartmentDTO;
 import org.example.backend.dto.ApartmentDetailDTO;
 import org.example.backend.dto.response.PageResponse;
@@ -75,6 +76,8 @@ public class ApartmentService {
 
     //  chỉnh sửa thông tin căn hộ
 
+    @LogAdminAction(entity = "Apartment", action = "UPDATE", description = "Cập nhật thông tin căn hộ",
+            detail = "'Căn hộ: ' + #result.code()")
     @Transactional
     public ApartmentDetailDTO update(Long id, ApartmentUpdateRequest req) {
         Apartment ap = requireApartment(id);

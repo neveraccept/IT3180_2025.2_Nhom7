@@ -1,23 +1,49 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, AlertCircle } from "lucide-react";
-import { approveAccountAPI } from "../api/authApi";
-import { useAppContext } from "../context/AppContext";
+import { getPendingAccountsAPI, approveAccountAPI, rejectAccountAPI } from "../api/authApi";
 import { Badge, Button, Card, DataTable } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
-export function Registrations({ registrations, setRegistrations }) {
-  const { addUser, users: accountUsers = [] } = useAppContext();
-  const regs = registrations;
-  const setRegs = setRegistrations;
-  const [loading, setLoading] = useState(false);
+// Map UserDTO (tài khoản chờ duyệt) -> dòng hiển thị.
+const toReg = (dto) => ({
+  id: dto.id,
+  fullName: dto.fullName || dto.username,
+  username: dto.username,
+  apartment: dto.requestedApartmentCode || "__",
+  email: dto.email || "__",
+  phone: dto.phone || "__",
+});
+
+export function Registrations() {
+  const [pendingRegs, setPendingRegs] = useState([]);
+  const [history, setHistory] = useState([]); // lịch sử xử lý trong phiên làm việc
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const [acting, setActing] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [modalError, setModalError] = useState("");
   const [toast, setToast] = useState(null);
 
-  const pendingRegs = regs.filter((r) => r.status === "pending");
-  const selectedReg = confirmAction?.id ? regs.find((r) => r.id === confirmAction.id) : null;
+  const selectedReg = confirmAction?.id ? pendingRegs.find((r) => r.id === confirmAction.id) : null;
+
+  const fetchPending = async () => {
+    setLoading(true);
+    setLoadError("");
+    const res = await getPendingAccountsAPI();
+    if (res.success) {
+      setPendingRegs((Array.isArray(res.data) ? res.data : []).map(toReg));
+    } else {
+      setLoadError(res.message || "Không tải được danh sách chờ duyệt.");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchPending();
+  }, []);
 
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
@@ -37,107 +63,69 @@ export function Registrations({ registrations, setRegistrations }) {
   };
 
   const closeConfirm = () => {
-    if (loading) return;
+    if (acting) return;
     setConfirmAction(null);
     setRejectReason("");
     setModalError("");
   };
 
+  const nowText = () =>
+    new Date().toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" });
+
   const confirmApprove = async () => {
     if (!selectedReg) return;
-
-    if (selectedReg.status !== "pending") {
-      setModalError("Yêu cầu này đã được xử lý rồi.");
-      return;
-    }
-
-    setLoading(true);
+    setActing(true);
     setModalError("");
-
     try {
-      // Duyệt qua backend khi có id tài khoản thật: PUT /api/auth/{id}/approve
-      // (backend chưa có API liệt kê tài khoản chờ duyệt nên danh sách hiển thị vẫn lưu cục bộ).
-      const backendId = selectedReg.userId ?? selectedReg.id;
-      if (backendId != null && Number.isFinite(Number(backendId))) {
-        const res = await approveAccountAPI(backendId);
-        if (!res.success) {
-          setModalError(res.message || "Duyệt tài khoản thất bại.");
-          setLoading(false);
-          return;
-        }
+      // Duyệt qua backend: PUT /api/users/{id}/approve
+      const res = await approveAccountAPI(selectedReg.id);
+      if (!res.success) {
+        setModalError(res.message || "Duyệt tài khoản thất bại.");
+        return;
       }
 
-      const existedAccount = accountUsers.some((u) => u.username === selectedReg.username);
-      if (!existedAccount) {
-        addUser({
-          username: selectedReg.username,
-          password: selectedReg.password || "",
-          fullName: selectedReg.fullName,
-          name: selectedReg.fullName,
-          role: "RESIDENT",
-          email: selectedReg.email,
-          phone: selectedReg.phone,
-          apartment: selectedReg.apartment,
-          active: "Hoạt động",
-        });
-      }
-
-      setRegs((prev) =>
-        prev.map((r) =>
-          r.id === selectedReg.id
-            ? {
-                ...r,
-                status: "approved",
-                approvedAt: new Date().toLocaleString("vi-VN", {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                }),
-              }
-            : r
-        )
-      );
-
+      setHistory((prev) => [{ ...selectedReg, status: "approved", processedAt: nowText() }, ...prev]);
+      setPendingRegs((prev) => prev.filter((r) => r.id !== selectedReg.id));
       closeConfirm();
-      showToast("Duyệt thành công! Tài khoản đã được thêm vào phần Tài khoản.", "green");
+      showToast("Duyệt thành công! Tài khoản đã được kích hoạt.", "green");
     } catch (err) {
       console.error("Approve error:", err);
       setModalError("Lỗi: " + err.message);
     } finally {
-      setLoading(false);
+      setActing(false);
     }
   };
 
-  const confirmReject = () => {
+  const confirmReject = async () => {
     if (!selectedReg) return;
-
     if (!rejectReason.trim()) {
       setModalError("Vui lòng nhập lý do từ chối.");
       return;
     }
 
-    if (selectedReg.status !== "pending") {
-      setModalError("Yêu cầu này đã được xử lý rồi.");
-      return;
+    setActing(true);
+    setModalError("");
+    try {
+      // Từ chối qua backend: DELETE /api/users/{id}/reject
+      const res = await rejectAccountAPI(selectedReg.id);
+      if (!res.success) {
+        setModalError(res.message || "Từ chối tài khoản thất bại.");
+        return;
+      }
+
+      setHistory((prev) => [
+        { ...selectedReg, status: "rejected", rejectReason: rejectReason.trim(), processedAt: nowText() },
+        ...prev,
+      ]);
+      setPendingRegs((prev) => prev.filter((r) => r.id !== selectedReg.id));
+      closeConfirm();
+      showToast("Đã từ chối yêu cầu đăng ký.", "red");
+    } catch (err) {
+      console.error("Reject error:", err);
+      setModalError("Lỗi: " + err.message);
+    } finally {
+      setActing(false);
     }
-
-    setRegs((prev) =>
-      prev.map((r) =>
-        r.id === selectedReg.id
-          ? {
-              ...r,
-              status: "rejected",
-              rejectReason: rejectReason.trim(),
-              rejectedAt: new Date().toLocaleString("vi-VN", {
-                dateStyle: "short",
-                timeStyle: "short",
-              }),
-            }
-          : r
-      )
-    );
-
-    closeConfirm();
-    showToast("Đã từ chối yêu cầu đăng ký.", "red");
   };
 
   return (
@@ -157,7 +145,17 @@ export function Registrations({ registrations, setRegistrations }) {
         </div>
       )}
 
-      {pendingRegs.length === 0 ? (
+      {loadError && (
+        <div className="mb-5 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+          {loadError}
+        </div>
+      )}
+
+      {loading ? (
+        <Card className="py-12 text-center">
+          <div className="text-lg font-semibold text-slate-500">Đang tải danh sách...</div>
+        </Card>
+      ) : pendingRegs.length === 0 ? (
         <Card className="py-12 text-center">
           <div className="text-lg font-semibold text-slate-500">Không có yêu cầu đăng ký nào chờ duyệt</div>
         </Card>
@@ -176,22 +174,13 @@ export function Registrations({ registrations, setRegistrations }) {
                     <div><span className="font-semibold">Căn hộ:</span> {reg.apartment}</div>
                     <div><span className="font-semibold">Email:</span> {reg.email}</div>
                     <div><span className="font-semibold">SĐT:</span> {reg.phone}</div>
-                    <div className="md:col-span-2"><span className="font-semibold">Ngày đăng ký:</span> {reg.createdAt}</div>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 md:items-end">
-                  <Button
-                    variant="primary"
-                    onClick={() => openApproveConfirm(reg.id)}
-                    disabled={loading}
-                  >
+                  <Button variant="primary" onClick={() => openApproveConfirm(reg.id)} disabled={acting}>
                     <CheckCircle2 className="h-4 w-4" /> Duyệt
                   </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => openRejectConfirm(reg.id)}
-                    disabled={loading}
-                  >
+                  <Button variant="danger" onClick={() => openRejectConfirm(reg.id)} disabled={acting}>
                     <AlertCircle className="h-4 w-4" /> Từ chối
                   </Button>
                 </div>
@@ -201,7 +190,7 @@ export function Registrations({ registrations, setRegistrations }) {
         </div>
       )}
 
-      {regs.some((r) => r.status !== "pending") && (
+      {history.length > 0 && (
         <>
           <SectionHeader title="Lịch Sử Duyệt" className="mt-8" />
           <DataTable columns={[
@@ -210,9 +199,8 @@ export function Registrations({ registrations, setRegistrations }) {
             { key: "apartment", label: "Căn hộ" },
             { key: "email", label: "Email" },
             { key: "status", label: "Trạng thái", render: (r) => <Badge tone={r.status === "approved" ? "green" : "red"}>{r.status === "approved" ? "Đã duyệt" : "Từ chối"}</Badge> },
-            { key: "createdAt", label: "Ngày đăng ký" },
-            { key: "approvedAt", label: "Ngày xử lý", render: (r) => r.approvedAt || r.rejectedAt || "__" },
-          ]} rows={regs.filter((r) => r.status !== "pending")} />
+            { key: "processedAt", label: "Ngày xử lý" },
+          ]} rows={history} />
         </>
       )}
 
@@ -244,7 +232,7 @@ export function Registrations({ registrations, setRegistrations }) {
                 <p className="mt-1 text-sm leading-6 text-slate-500">
                   {confirmAction.type === "approve"
                     ? "Bạn có chắc chắn muốn duyệt yêu cầu này không?"
-                    : "Bạn có chắc chắn muốn từ chối yêu cầu này không?"}
+                    : "Bạn có chắc chắn muốn từ chối yêu cầu này không? Tài khoản sẽ bị xóa khỏi hệ thống."}
                 </p>
               </div>
             </div>
@@ -282,16 +270,16 @@ export function Registrations({ registrations, setRegistrations }) {
             )}
 
             <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={closeConfirm} disabled={loading}>
+              <Button variant="secondary" onClick={closeConfirm} disabled={acting}>
                 Hủy
               </Button>
               {confirmAction.type === "approve" ? (
-                <Button onClick={confirmApprove} disabled={loading}>
-                  {loading ? "Đang duyệt..." : "Xác nhận duyệt"}
+                <Button onClick={confirmApprove} disabled={acting}>
+                  {acting ? "Đang duyệt..." : "Xác nhận duyệt"}
                 </Button>
               ) : (
-                <Button variant="danger" onClick={confirmReject} disabled={loading}>
-                  Xác nhận từ chối
+                <Button variant="danger" onClick={confirmReject} disabled={acting}>
+                  {acting ? "Đang xử lý..." : "Xác nhận từ chối"}
                 </Button>
               )}
             </div>
@@ -301,5 +289,3 @@ export function Registrations({ registrations, setRegistrations }) {
     </>
   );
 }
-
-

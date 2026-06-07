@@ -1,5 +1,7 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.HouseholdSummaryDTO;
 import org.example.backend.dto.request.AssignHouseholdRequest;
 import org.example.backend.dto.request.UpdateHouseholdRequest;
@@ -53,6 +55,8 @@ public class HouseholdLifecycleService {
     }
     //  cán hộ dân vào căn hộ trống
 
+    @LogAdminAction(entity = "Household", action = "CREATE", description = "Gán hộ dân vào căn hộ",
+            detail = "'Hộ ' + #result.code() + ' vào căn hộ ' + #result.apartmentCode()")
     @Transactional
     public HouseholdSummaryDTO assignHousehold(Long apartmentId, AssignHouseholdRequest req) {
 
@@ -113,6 +117,7 @@ public class HouseholdLifecycleService {
 
     // Cập nhật hoặc Chuyển hộ ra khỏi căn hộ
 
+    @LogAdminAction(entity = "Household", action = "UPDATE", description = "Cập nhật/chuyển hộ dân khỏi căn hộ")
     @Transactional
     public HouseholdSummaryDTO updateHousehold(Long apartmentId, UpdateHouseholdRequest req) {
 
@@ -162,8 +167,35 @@ public class HouseholdLifecycleService {
             }
             h.setHeadOfHousehold(newHead);
         }
+        if (req.memberRelations() != null) {
+            for (UpdateHouseholdRequest.MemberRelationUpdate relationUpdate : req.memberRelations()) {
+                if (relationUpdate == null || relationUpdate.residentId() == null) {
+                    continue;
+                }
+                Resident member = residentRepository.findById(relationUpdate.residentId())
+                        .orElseThrow(() -> new NotFoundException(
+                                "RESIDENT_NOT_FOUND",
+                                "Không tìm thấy nhân khẩu id=" + relationUpdate.residentId()));
+                if (member.getHousehold() == null
+                        || !member.getHousehold().getId().equals(h.getId())) {
+                    throw new BadRequestException(
+                            "MEMBER_NOT_IN_HOUSEHOLD",
+                            "Nhân khẩu không thuộc hộ này");
+                }
+                if (member.getStatus() != ResidentStatus.ACTIVE) {
+                    throw new BadRequestException(
+                            "MEMBER_NOT_ACTIVE",
+                            "Nhân khẩu đang ở trạng thái " + member.getStatus());
+                }
+                member.setRelationToHead(
+                        relationUpdate.relationToHead() == null ? null : relationUpdate.relationToHead().trim());
+                residentRepository.save(member);
+            }
+        }
         h = householdRepository.save(h);
 
+        AuditContext.detail("Cập nhật thông tin hộ " + h.getCode()
+                + " (căn hộ " + (h.getApartment() != null ? h.getApartment().getCode() : "?") + ")");
         return mapper.toHouseholdSummary(h);
     }
 
@@ -171,6 +203,7 @@ public class HouseholdLifecycleService {
     private HouseholdSummaryDTO doMoveOut(Apartment ap, Household h) {
         h.setStatus(HouseholdStatus.MOVED_OUT);
         householdRepository.save(h);
+        AuditContext.detail("Chuyển hộ " + h.getCode() + " ra khỏi căn hộ " + ap.getCode());
 
         // Đồng thời đánh dấu toàn bộ nhân khẩu ACTIVE trong hộ là MOVED_OUT
         residentRepository.markAllResidentsMovedOut(h.getId(),

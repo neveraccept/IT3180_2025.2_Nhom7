@@ -10,9 +10,12 @@ import {
   updateResidentAPI,
   moveOutResidentAPI,
   registerTemporaryResidenceAPI,
+  registerPermanentResidenceAPI,
 } from "../api/residentApi";
 
 const PAGE_SIZE = 20;
+const VISIBLE_RESIDENT_STATUS = "ACTIVE";
+const HEAD_MOVE_OUT_MESSAGE = "Nhân khẩu này là chủ hộ. Vui lòng thao tác ở phần Căn hộ để đổi chủ hộ hoặc chuyển cả hộ đi.";
 
 const GENDER_LABEL = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
 const yearOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 4) : "—");
@@ -56,6 +59,7 @@ export function Residents() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
+  const [actionError, setActionError] = useState("");
 
   // Xác nhận chuyển khỏi hộ
   const [moveOutConfirm, setMoveOutConfirm] = useState(null);
@@ -63,7 +67,12 @@ export function Residents() {
   const loadPage = async (targetPage = 0, applied = appliedFilters) => {
     setLoading(true);
     setError("");
-    const res = await searchResidentsAPI({ ...applied, page: targetPage, size: PAGE_SIZE });
+    const res = await searchResidentsAPI({
+      ...applied,
+      status: VISIBLE_RESIDENT_STATUS,
+      page: targetPage,
+      size: PAGE_SIZE,
+    });
     if (res.success && res.data) {
       setResidents(res.data.items || []);
       setTotalPages(res.data.totalPages || 0);
@@ -99,6 +108,10 @@ export function Residents() {
   };
 
   const openCreateForm = () => {
+    setDetail(null);
+    setMoveOutConfirm(null);
+    setActionMsg("");
+    setActionError("");
     setFormData(emptyForm);
     setEditingId(null);
     setFormError("");
@@ -106,6 +119,10 @@ export function Residents() {
   };
 
   const openEditForm = (resident) => {
+    setDetail(null);
+    setMoveOutConfirm(null);
+    setActionMsg("");
+    setActionError("");
     setFormData({
       householdId: resident.householdId ?? "",
       fullName: resident.fullName || "",
@@ -179,6 +196,7 @@ export function Residents() {
     setDetail({ id });
     setDetailError("");
     setActionMsg("");
+    setActionError("");
     setDetailLoading(true);
     const res = await getResidentByIdAPI(id);
     if (res.success && res.data) {
@@ -196,6 +214,7 @@ export function Residents() {
 
   const handleRegisterTemporary = async (id) => {
     setActionMsg("");
+    setActionError("");
     const res = await registerTemporaryResidenceAPI(id);
     if (res.success) {
       setActionMsg(res.message || "Đăng ký tạm trú thành công.");
@@ -204,6 +223,32 @@ export function Residents() {
     } else {
       setDetailError(res.message || "Đăng ký tạm trú thất bại.");
     }
+  };
+
+  const handleRegisterPermanent = async (id) => {
+    setActionMsg("");
+    setActionError("");
+    const res = await registerPermanentResidenceAPI(id);
+    if (res.success) {
+      setActionMsg(res.message || "Đăng ký thường trú thành công.");
+      if (res.data) setDetail(res.data);
+      loadPage(page);
+    } else {
+      setDetailError(res.message || "Đăng ký thường trú thất bại.");
+    }
+  };
+
+  const openMoveOutConfirm = (resident) => {
+    if (resident?.headOfHousehold) {
+      setActionMsg("");
+      setActionError(HEAD_MOVE_OUT_MESSAGE);
+      return;
+    }
+    setDetail(null);
+    setShowForm(false);
+    setFormError("");
+    setActionError("");
+    setMoveOutConfirm({ id: resident.id, name: resident.fullName });
   };
 
   const handleConfirmMoveOut = async () => {
@@ -363,6 +408,9 @@ export function Residents() {
                 {actionMsg && (
                   <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">{actionMsg}</div>
                 )}
+                {actionError && (
+                  <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">{actionError}</div>
+                )}
 
                 <div className="mt-5 flex flex-wrap justify-end gap-3">
                   {detail.status === "ACTIVE" && (
@@ -371,7 +419,10 @@ export function Residents() {
                       {detail.residencyStatus !== "TEMPORARY" && (
                         <Button variant="soft" onClick={() => handleRegisterTemporary(detail.id)}>Đăng ký tạm trú</Button>
                       )}
-                      <Button variant="danger" onClick={() => setMoveOutConfirm({ id: detail.id, name: detail.fullName })}>Chuyển khỏi hộ</Button>
+                      {detail.residencyStatus === "TEMPORARY" && (
+                        <Button variant="soft" onClick={() => handleRegisterPermanent(detail.id)}>Đăng ký thường trú</Button>
+                      )}
+                      <Button variant="danger" onClick={() => openMoveOutConfirm(detail)}>Chuyển khỏi hộ</Button>
                     </>
                   )}
                   <Button variant="secondary" onClick={closeDetail}>Đóng</Button>

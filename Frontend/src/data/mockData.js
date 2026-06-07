@@ -11,6 +11,7 @@ import {
   Bell,
   BarChart3,
   KeyRound,
+  History,
 } from "lucide-react";
 
 export const adminNav = [
@@ -26,6 +27,7 @@ export const adminNav = [
   { key: "complaints", label: "Khiếu nại", icon: MessageSquareWarning },
   { key: "notifications", label: "Thông báo", icon: Bell },
   { key: "statistics", label: "Thống kê", icon: BarChart3 },
+  { key: "auditLogs", label: "Lịch sử hệ thống", icon: History },
 ];
 
 export const residentNav = [

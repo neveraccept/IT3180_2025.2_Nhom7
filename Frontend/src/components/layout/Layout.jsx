@@ -14,26 +14,11 @@ import { Utilities } from "../../pages/Utilities";
 import { Complaints } from "../../pages/Complaints";
 import { Notifications } from "../../pages/Notifications";
 import { Statistics } from "../../pages/Statistics";
+import { AuditLogs } from "../../pages/AuditLogs";
 import { MyFees } from "../../pages/MyFees";
 import { Profile } from "../../pages/Profile";
 
-export function Layout({
-  user,
-  setUser,
-  logout,
-  registrations,
-  setRegistrations,
-  feesList,
-  setFeesList,
-  paymentRecords,
-  setPaymentRecords,
-  syncPaymentsForMandatoryFee,
-  removePaymentsForFee,
-  complaintsList,
-  setComplaintsList,
-  notificationList,
-  setNotificationList,
-}) {
+export function Layout({ user, setUser, logout }) {
   const nav = user.role === "ADMIN" ? adminNav : residentNav;
   const [active, setActive] = useState("dashboard");
   const [open, setOpen] = useState(false);
@@ -106,18 +91,6 @@ export function Layout({
             user={user}
             setUser={setUser}
             role={user.role}
-            registrations={registrations}
-            setRegistrations={setRegistrations}
-            feesList={feesList}
-            setFeesList={setFeesList}
-            paymentRecords={paymentRecords}
-            setPaymentRecords={setPaymentRecords}
-            syncPaymentsForMandatoryFee={syncPaymentsForMandatoryFee}
-            removePaymentsForFee={removePaymentsForFee}
-            complaintsList={complaintsList}
-            setComplaintsList={setComplaintsList}
-            notificationList={notificationList}
-            setNotificationList={setNotificationList}
             dashboardTarget={dashboardTarget}
             onDashboardTargetHandled={clearDashboardTarget}
             onOpenComplaint={openComplaintFromDashboard}
@@ -134,18 +107,6 @@ export function Page({
   user,
   setUser,
   role,
-  registrations,
-  setRegistrations,
-  feesList,
-  setFeesList,
-  paymentRecords,
-  setPaymentRecords,
-  syncPaymentsForMandatoryFee,
-  removePaymentsForFee,
-  complaintsList,
-  setComplaintsList,
-  notificationList,
-  setNotificationList,
   dashboardTarget,
   onDashboardTargetHandled,
   onOpenComplaint,
@@ -155,38 +116,17 @@ export function Page({
     return (
       <Dashboard
         role={role}
-        user={user}
-        paymentRecords={paymentRecords}
-        complaintsList={complaintsList}
-        notificationList={notificationList}
         onOpenComplaint={onOpenComplaint}
         onOpenNotification={onOpenNotification}
       />
     );
   }
-  if (active === "registrations") return <Registrations registrations={registrations} setRegistrations={setRegistrations} />;
-  if (active === "accounts") return <Accounts registrations={registrations} />;
+  if (active === "registrations") return <Registrations />;
+  if (active === "accounts") return <Accounts />;
   if (active === "apartments") return <Apartments />;
   if (active === "residents") return <Residents />;
-  if (active === "fees") {
-    return (
-      <Fees
-        feesList={feesList}
-        setFeesList={setFeesList}
-        syncPaymentsForMandatoryFee={syncPaymentsForMandatoryFee}
-        removePaymentsForFee={removePaymentsForFee}
-      />
-    );
-  }
-  if (active === "payments") {
-    return (
-      <Payments
-        feesList={feesList}
-        paymentRecords={paymentRecords}
-        setPaymentRecords={setPaymentRecords}
-      />
-    );
-  }
+  if (active === "fees") return <Fees />;
+  if (active === "payments") return <Payments />;
   if (active === "vehicles") return <Vehicles role={role} user={user} />;
   if (active === "utilities") return <Utilities />;
   if (active === "complaints") {
@@ -194,8 +134,6 @@ export function Page({
       <Complaints
         role={role}
         user={user}
-        complaintsList={complaintsList}
-        setComplaintsList={setComplaintsList}
         initialComplaintId={dashboardTarget.complaintId}
         onInitialComplaintHandled={onDashboardTargetHandled}
       />
@@ -205,23 +143,18 @@ export function Page({
     return (
       <Notifications
         role={role}
-        notificationList={notificationList}
-        setNotificationList={setNotificationList}
         initialNotificationId={dashboardTarget.notificationId}
         onInitialNotificationHandled={onDashboardTargetHandled}
       />
     );
   }
-  if (active === "statistics") return <Statistics paymentRecords={paymentRecords} />;
-  if (active === "myFees") return <MyFees user={user} paymentRecords={paymentRecords} />;
+  if (active === "statistics") return <Statistics />;
+  if (active === "auditLogs") return <AuditLogs />;
+  if (active === "myFees") return <MyFees user={user} />;
   if (active === "profile") return <Profile user={user} setUser={setUser} />;
   return (
     <Dashboard
       role={role}
-      user={user}
-      paymentRecords={paymentRecords}
-      complaintsList={complaintsList}
-      notificationList={notificationList}
       onOpenComplaint={onOpenComplaint}
       onOpenNotification={onOpenNotification}
     />

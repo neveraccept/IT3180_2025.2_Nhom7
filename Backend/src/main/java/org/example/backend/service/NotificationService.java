@@ -90,6 +90,18 @@ public class NotificationService {
         return PageResponse.of(page);
     }
 
+    // F9.1 (xem lại) - Admin xem danh sách thông báo mình đã gửi (kèm số người nhận)
+
+    @Transactional(readOnly = true)
+    public PageResponse<NotificationDTO> getSentNotifications(Pageable pageable) {
+        User me = currentUserService.getCurrentUser();
+        Page<NotificationDTO> page = notificationRepository
+                .findBySenderId(me.getId(), pageable)
+                .map(n -> mapper.toSentDto(
+                        n, (int) recipientRepository.countByNotificationId(n.getId())));
+        return PageResponse.of(page);
+    }
+
     // F9.4 - Đánh dấu thông báo đã đọc
 
     @Transactional

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, AlertCircle } from "lucide-react";
 import { money } from "../utils/helpers";
-import { Button, Card, Input, Select, StatusBadge } from "../components/common";
+import { Button, Card, Input, Select, StatusBadge, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import {
   searchUtilityBillsAPI,
@@ -11,12 +11,14 @@ import {
   deleteUtilityBillAPI,
   confirmCashUtilityBillAPI,
 } from "../api/utilityApi";
+import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
 
 // ============================================================
 //  Module 7 — Quản lý hoá đơn điện/nước/internet (ADMIN).
-//  Nguồn dữ liệu: backend UtilityBillController.
-//  LƯU Ý: backend lưu trực tiếp `amount` cho mỗi hoá đơn (không có chỉ số cũ/mới,
-//  không có bảng đơn giá) → form nhập thẳng số tiền. Giữ nguyên UI/Tailwind.
+//  Nguồn dữ liệu: backend UtilityBillController + SystemConfigController.
+//  - Điện/Nước: nhập chỉ số cũ/mới, backend tự tính tiền theo đơn giá trong SystemConfig.
+//  - Internet: lấy giá gói trong SystemConfig (có thể nhập tay để ghi đè).
+//  - Đơn giá gốc được quản lý ở card "Đơn giá hệ thống".
 // ============================================================
 export function Utilities() {
   const utilityTypes = [
@@ -31,6 +33,11 @@ export function Utilities() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
 
+  // Phân trang phía server: 20 hoá đơn/trang.
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 20;
+
   const [showForm, setShowForm] = useState(false);
   const [editingBill, setEditingBill] = useState(null);
   const [error, setError] = useState("");
@@ -38,12 +45,59 @@ export function Utilities() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const [searchFilters, setSearchFilters] = useState({ householdId: "", type: "", month: "", year: "", status: "" });
-  const emptyForm = { householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "" };
+  const emptyForm = { householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
   const [formData, setFormData] = useState(emptyForm);
 
-  const getUtilityLabel = (type) => utilityTypes.find((item) => item.value === type)?.label || type;
+  // Đơn giá hệ thống (điện/nước/internet)
+  const [configs, setConfigs] = useState([]);
+  const [configDraft, setConfigDraft] = useState({});
+  const [configSaving, setConfigSaving] = useState("");
+  const [configMsg, setConfigMsg] = useState("");
 
-  const loadBills = useCallback(async () => {
+  const getUtilityLabel = (type) => utilityTypes.find((item) => item.value === type)?.label || type;
+  const isMetered = (type) => type === "ELECTRICITY" || type === "WATER";
+  const configValue = (key) => Number(configs.find((c) => c.configKey === key)?.configValue || 0);
+  const utilityConfigKeys = [
+    CONFIG_KEYS.ELECTRICITY_UNIT_PRICE,
+    CONFIG_KEYS.WATER_UNIT_PRICE,
+    CONFIG_KEYS.INTERNET_PRICE,
+  ];
+
+  const configLabel = (key) =>
+    ({
+      [CONFIG_KEYS.ELECTRICITY_UNIT_PRICE]: "Đơn giá điện (đ/số)",
+      [CONFIG_KEYS.WATER_UNIT_PRICE]: "Đơn giá nước (đ/khối)",
+      [CONFIG_KEYS.INTERNET_PRICE]: "Giá internet (đ/tháng)",
+    }[key] || key);
+
+  const loadConfigs = useCallback(async () => {
+    const res = await listSystemConfigsAPI();
+    if (res.success) {
+      const list = res.data || [];
+      setConfigs(list);
+      setConfigDraft(Object.fromEntries(list.map((c) => [c.configKey, String(c.configValue ?? "")])));
+    }
+  }, []);
+
+  const handleSaveConfig = async (key) => {
+    const value = Number(configDraft[key]);
+    if (!(value >= 0)) {
+      setConfigMsg("Đơn giá không hợp lệ");
+      return;
+    }
+    setConfigSaving(key);
+    setConfigMsg("");
+    const res = await updateSystemConfigAPI(key, value);
+    setConfigSaving("");
+    if (!res.success) {
+      setConfigMsg(res.message || "Cập nhật đơn giá thất bại");
+      return;
+    }
+    setConfigMsg("Đã cập nhật đơn giá. Áp dụng cho các hoá đơn tạo mới.");
+    await loadConfigs();
+  };
+
+  const loadBills = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setPageError("");
     const res = await searchUtilityBillsAPI({
@@ -52,21 +106,29 @@ export function Utilities() {
       month: searchFilters.month || undefined,
       year: searchFilters.year || undefined,
       status: searchFilters.status || undefined,
+      page: targetPage - 1,
+      size: PAGE_SIZE,
     });
-    if (res.success) setBills(res.data?.items || []);
-    else setPageError(res.message || "Không tải được danh sách hoá đơn");
+    if (res.success) {
+      setBills(res.data?.items || []);
+      setTotal(res.data?.totalElements || 0);
+      setPage(targetPage);
+    } else {
+      setPageError(res.message || "Không tải được danh sách hoá đơn");
+    }
     setLoading(false);
   }, [searchFilters]);
 
   useEffect(() => {
-    loadBills();
+    loadBills(1);
+    loadConfigs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = () => loadBills();
+  const handleSearch = () => loadBills(1);
   const handleResetSearch = () => {
     setSearchFilters({ householdId: "", type: "", month: "", year: "", status: "" });
-    setTimeout(loadBills, 0);
+    setTimeout(() => loadBills(1), 0);
   };
 
   const openCreateForm = () => {
@@ -82,6 +144,8 @@ export function Utilities() {
       type: bill.type,
       month: bill.month,
       year: bill.year,
+      oldIndex: bill.oldIndex != null ? String(bill.oldIndex) : "",
+      newIndex: bill.newIndex != null ? String(bill.newIndex) : "",
       amount: bill.amount != null ? String(bill.amount) : "",
     });
     setEditingBill(bill);
@@ -90,35 +154,45 @@ export function Utilities() {
   };
 
   const handleSave = async () => {
-    const amount = Number(formData.amount || 0);
     if (!editingBill && !String(formData.householdId).trim()) {
       setError("Vui lòng nhập mã hộ (householdId)");
       return;
     }
-    if (amount <= 0) {
+
+    const metered = isMetered(formData.type);
+    const oldIndex = formData.oldIndex === "" ? null : Number(formData.oldIndex);
+    const newIndex = formData.newIndex === "" ? null : Number(formData.newIndex);
+    const amount = formData.amount === "" ? null : Number(formData.amount);
+
+    if (metered) {
+      // Điện/nước: cần chỉ số; số tiền do backend tự tính.
+      if (oldIndex == null || newIndex == null) {
+        setError("Vui lòng nhập chỉ số cũ và chỉ số mới");
+        return;
+      }
+      if (newIndex < oldIndex) {
+        setError("Chỉ số mới phải lớn hơn hoặc bằng chỉ số cũ");
+        return;
+      }
+    } else if (amount != null && amount <= 0) {
+      // Internet: nhập tay thì phải > 0; bỏ trống sẽ lấy giá gói trong cấu hình.
       setError("Số tiền phải lớn hơn 0");
       return;
     }
 
     setSaving(true);
     setError("");
+    // Điện/nước gửi chỉ số (amount để backend tính); internet gửi amount (có thể null).
+    const payload = metered
+      ? { type: formData.type, month: Number(formData.month), year: Number(formData.year), oldIndex, newIndex }
+      : { type: formData.type, month: Number(formData.month), year: Number(formData.year), amount };
+
     let res;
     if (editingBill) {
-      // Backend chỉ cho sửa khi UNPAID; gửi các trường có thể đổi.
-      res = await updateUtilityBillAPI(editingBill.id, {
-        type: formData.type,
-        month: Number(formData.month),
-        year: Number(formData.year),
-        amount,
-      });
+      // Backend chỉ cho sửa khi UNPAID.
+      res = await updateUtilityBillAPI(editingBill.id, payload);
     } else {
-      res = await createUtilityBillAPI({
-        householdId: Number(formData.householdId),
-        type: formData.type,
-        month: Number(formData.month),
-        year: Number(formData.year),
-        amount,
-      });
+      res = await createUtilityBillAPI({ householdId: Number(formData.householdId), ...payload });
     }
     setSaving(false);
     if (!res.success) {
@@ -127,7 +201,7 @@ export function Utilities() {
     }
     setShowForm(false);
     setEditingBill(null);
-    await loadBills();
+    await loadBills(page);
   };
 
   const handleConfirmCash = async () => {
@@ -139,7 +213,7 @@ export function Utilities() {
     }
     setShowForm(false);
     setEditingBill(null);
-    await loadBills();
+    await loadBills(page);
   };
 
   const handleConfirmDelete = async () => {
@@ -152,8 +226,18 @@ export function Utilities() {
     }
     setShowForm(false);
     setEditingBill(null);
-    await loadBills();
+    await loadBills(page);
   };
+
+  // Tạm tính số tiền điện/nước = (chỉ số mới - chỉ số cũ) * đơn giá hiện hành.
+  const meteredPreview = (() => {
+    if (!isMetered(formData.type)) return null;
+    const o = Number(formData.oldIndex);
+    const n = Number(formData.newIndex);
+    if (formData.oldIndex === "" || formData.newIndex === "" || Number.isNaN(o) || Number.isNaN(n) || n < o) return null;
+    const price = configValue(formData.type === "ELECTRICITY" ? CONFIG_KEYS.ELECTRICITY_UNIT_PRICE : CONFIG_KEYS.WATER_UNIT_PRICE);
+    return (n - o) * price;
+  })();
 
   return (
     <>
@@ -202,6 +286,37 @@ export function Utilities() {
         </div>
       </Card>
 
+      {/* === Đơn giá hệ thống === */}
+      <Card className="mb-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-black text-slate-900">Đơn giá hệ thống</h3>
+            <p className="text-sm text-slate-500">Đơn giá gốc dùng để tính tiền điện/nước/internet khi tạo hoá đơn mới.</p>
+          </div>
+        </div>
+        {configMsg && (
+          <div className="mb-3 rounded-xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-200">{configMsg}</div>
+        )}
+        <div className="grid gap-4 md:grid-cols-3">
+          {configs.filter((c) => utilityConfigKeys.includes(c.configKey)).map((c) => (
+            <div key={c.configKey} className="rounded-2xl border border-slate-200 p-4">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">{configLabel(c.configKey)}</label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  value={configDraft[c.configKey] ?? ""}
+                  onChange={(e) => setConfigDraft({ ...configDraft, [c.configKey]: e.target.value })}
+                />
+                <Button onClick={() => handleSaveConfig(c.configKey)} disabled={configSaving === c.configKey}>
+                  {configSaving === c.configKey ? "..." : "Lưu"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -231,7 +346,52 @@ export function Utilities() {
                 </Select>
               </div>
 
-              <Input label="Số tiền (đ)" type="number" min="0" placeholder="VD: 350000" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
+              {isMetered(formData.type) ? (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Input
+                      label="Chỉ số cũ"
+                      type="number"
+                      min="0"
+                      placeholder="VD: 1200"
+                      value={formData.oldIndex}
+                      onChange={(e) => setFormData({ ...formData, oldIndex: e.target.value })}
+                    />
+                    <Input
+                      label="Chỉ số mới"
+                      type="number"
+                      min="0"
+                      placeholder="VD: 1320"
+                      value={formData.newIndex}
+                      onChange={(e) => setFormData({ ...formData, newIndex: e.target.value })}
+                    />
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                    Đơn giá hiện hành:{" "}
+                    <strong>
+                      {money(configValue(formData.type === "ELECTRICITY" ? CONFIG_KEYS.ELECTRICITY_UNIT_PRICE : CONFIG_KEYS.WATER_UNIT_PRICE))}
+                    </strong>{" "}
+                    / {formData.type === "ELECTRICITY" ? "số" : "khối"}.
+                    {meteredPreview != null && (
+                      <span className="ml-1">Tạm tính: <strong className="text-slate-900">{money(meteredPreview)}</strong></span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Input
+                    label="Số tiền (đ)"
+                    type="number"
+                    min="0"
+                    placeholder={`Bỏ trống = lấy giá gói (${money(configValue(CONFIG_KEYS.INTERNET_PRICE))})`}
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  />
+                  <p className="-mt-1 text-xs font-medium text-slate-500">
+                    Để trống để dùng giá gói internet trong cấu hình hệ thống.
+                  </p>
+                </>
+              )}
 
               {editingBill && (
                 <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
@@ -289,6 +449,7 @@ export function Utilities() {
                 <th className="px-5 py-4">Hộ</th>
                 <th className="px-5 py-4">Loại hóa đơn</th>
                 <th className="px-5 py-4">Tháng/Năm</th>
+                <th className="px-5 py-4">Chỉ số (cũ → mới)</th>
                 <th className="px-5 py-4">Số tiền</th>
                 <th className="px-5 py-4">Trạng thái</th>
                 <th className="px-5 py-4 text-right">Thao tác</th>
@@ -296,16 +457,19 @@ export function Utilities() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
               )}
               {!loading && bills.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
               )}
               {!loading && bills.map((bill) => (
                 <tr key={bill.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.householdCode || bill.householdId}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{getUtilityLabel(bill.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{bill.month}/{bill.year}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">
+                    {bill.oldIndex != null && bill.newIndex != null ? `${bill.oldIndex} → ${bill.newIndex}` : "—"}
+                  </td>
                   <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">{money(bill.amount)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700"><StatusBadge status={bill.status} /></td>
                   <td className="px-5 py-4 text-right">
@@ -316,6 +480,11 @@ export function Utilities() {
             </tbody>
           </table>
         </div>
+        {!loading && total > 0 && (
+          <div className="border-t border-slate-200">
+            <Pagination page={page} total={total} pageSize={PAGE_SIZE} onPageChange={(p) => loadBills(p)} />
+          </div>
+        )}
       </div>
     </>
   );

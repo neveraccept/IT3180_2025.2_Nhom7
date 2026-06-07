@@ -24,7 +24,7 @@ public record RegisterRequest(
 
     String phone,
 
-    @NotBlank(message = "Mã căn hộ yêu cầu không được để trống")
+    @NotBlank(message = "Vui lòng chọn căn hộ")
     String requestedApartmentCode
 ) {
 }
