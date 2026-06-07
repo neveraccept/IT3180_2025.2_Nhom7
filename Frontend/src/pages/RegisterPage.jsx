@@ -1,6 +1,6 @@
 // ============================================================
 //  RegisterPage — cư dân tự đăng ký (UC-REGISTER), bước 1: nhập thông tin
-//  Gửi OTP (POST /api/auth/register/send-otp) -> chuyển sang /verify-otp
+//  Gửi OTP (POST /api/auth/send-otp, purpose=REGISTER) -> chuyển sang /verify-otp
 //  mang theo payload đăng ký để OtpVerifyPage hoàn tất.
 // ============================================================
 import { useState } from "react";

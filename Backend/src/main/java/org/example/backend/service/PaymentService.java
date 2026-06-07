@@ -65,11 +65,13 @@ public class PaymentService {
 
     // ============================ XEM PHIẾU NỘP =============================
 
-    /** Admin: danh sách phiếu nộp, lọc tuỳ chọn theo householdId/status. */
+    /** Admin: danh sách phiếu nộp, lọc tuỳ chọn theo householdId/status/tên khoản thu. */
     @Transactional(readOnly = true)
-    public PageResponse<PaymentDetailDTO> listPayments(Long householdId, String status, Pageable pageable) {
+    public PageResponse<PaymentDetailDTO> listPayments(Long householdId, String status,
+                                                       String keyword, Pageable pageable) {
         String s = (status == null || status.isBlank()) ? null : status.trim().toUpperCase();
-        return PageResponse.of(paymentRepository.search(householdId, s, pageable)
+        String k = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+        return PageResponse.of(paymentRepository.search(householdId, s, k, pageable)
                 .map(PaymentDetailDTO::from));
     }
 
@@ -85,7 +87,7 @@ public class PaymentService {
     @LogAdminAction(entity = "Payment", action = "UPDATE", description = "Xác nhận thu tiền mặt phiếu nộp",
             detail = "'Hộ ' + #result.householdCode() + ' - đợt ' + #result.feePeriodName()")
     @Transactional
-    public PaymentDetailDTO confirmCashPayment(Long paymentId, Long adminUserId) {
+    public PaymentDetailDTO confirmCashPayment(Long paymentId, Long adminUserId, BigDecimal customAmount) {
         Payment p = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new NotFoundException(
                         "PAYMENT_NOT_FOUND", "Không tìm thấy phiếu nộp id=" + paymentId));
@@ -95,7 +97,21 @@ public class PaymentService {
                     "PAYMENT_ALREADY_PAID", "Phiếu nộp đã thanh toán, không thể xác nhận lại");
         }
 
-        p.setAmountPaid(p.getAmountDue());
+        // Khoản tự nguyện chưa chốt số tiền: Admin nhập số tiền hộ đóng góp khi thu tiền mặt.
+        // Khoản bắt buộc: luôn thu đúng số tiền phải đóng (bỏ qua customAmount nếu lỡ truyền).
+        BigDecimal paidAmount;
+        if (isDonationPayment(p)) {
+            if (customAmount == null || customAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BadRequestException("INVALID_DONATION_AMOUNT",
+                        "Vui lòng nhập số tiền đóng góp lớn hơn 0");
+            }
+            paidAmount = customAmount;
+            p.setAmountDue(paidAmount);
+        } else {
+            paidAmount = p.getAmountDue();
+        }
+
+        p.setAmountPaid(paidAmount);
         p.setStatus(Payment.STATUS_PAID);
         p.setPaymentMethod(Payment.METHOD_CASH);
         p.setPaidDate(LocalDate.now());

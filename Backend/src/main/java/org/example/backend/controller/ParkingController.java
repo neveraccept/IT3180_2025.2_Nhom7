@@ -2,10 +2,13 @@ package org.example.backend.controller;
 
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.response.PageResponse;
+import org.example.backend.dto.ParkingFeeGenerationResultDTO;
 import org.example.backend.dto.ParkingRegistrationDTO;
 import org.example.backend.dto.ParkingSlotDTO;
 import org.example.backend.dto.ParkingSummaryDTO;
 import org.example.backend.dto.request.CreateParkingRegistrationRequest;
+import org.example.backend.dto.request.GenerateParkingFeeRequest;
+import org.example.backend.service.ParkingFeeService;
 import org.example.backend.service.ParkingService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
@@ -25,9 +28,12 @@ import org.springframework.web.bind.annotation.*;
 public class ParkingController {
 
     private final ParkingService parkingService;
+    private final ParkingFeeService parkingFeeService;
 
-    public ParkingController(ParkingService parkingService) {
+    public ParkingController(ParkingService parkingService,
+                            ParkingFeeService parkingFeeService) {
         this.parkingService = parkingService;
+        this.parkingFeeService = parkingFeeService;
     }
 
     // F6.4 - Danh sách chỗ gửi. GET /api/parking-slots
@@ -63,6 +69,18 @@ public class ParkingController {
             @PathVariable Long id) {
         ParkingRegistrationDTO dto = parkingService.endRegistration(id);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đã kết thúc lượt gửi xe"));
+    }
+
+    // Sinh hoá đơn phí gửi xe theo tháng cho từng hộ. POST /api/admin/parking-fees/generate
+    // Tạo đợt thu "Phí gửi xe tháng M/YYYY" và sinh phiếu nộp cho mỗi hộ có lượt gửi xe hiệu lực.
+    @PostMapping("/admin/parking-fees/generate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ParkingFeeGenerationResultDTO>> generateParkingFees(
+            @Valid @RequestBody GenerateParkingFeeRequest req) {
+        ParkingFeeGenerationResultDTO result =
+                parkingFeeService.generateInvoices(req.month(), req.year());
+        return ResponseEntity.ok(ApiResponse.ok(result,
+                "Đã tạo " + result.invoiceCount() + " hoá đơn phí gửi xe"));
     }
 
     // Cư dân xem lượt gửi xe của hộ. GET /api/parking-registrations/my-household

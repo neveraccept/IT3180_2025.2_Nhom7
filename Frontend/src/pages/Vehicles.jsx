@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, AlertCircle } from "lucide-react";
+import { Search, Plus, AlertCircle, Receipt } from "lucide-react";
 import { money } from "../utils/helpers";
 import { Badge, Button, Card, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
@@ -15,6 +15,7 @@ import {
   createParkingRegistrationAPI,
   endParkingRegistrationAPI,
   listMyParkingRegistrationsAPI,
+  generateParkingFeesAPI,
 } from "../api/vehicleApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
 
@@ -71,6 +72,12 @@ function AdminVehicles() {
 
   // Bộ lọc chỗ gửi: ALL | OCCUPIED (đang có xe) | EMPTY (đang trống)
   const [slotFilter, setSlotFilter] = useState("ALL");
+
+  // Sinh hoá đơn phí gửi xe theo tháng.
+  const [showFeeForm, setShowFeeForm] = useState(false);
+  const [feeForm, setFeeForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+  const [feeError, setFeeError] = useState("");
+  const [feeSaving, setFeeSaving] = useState(false);
 
   // Phân trang chỗ gửi xe: 20 chỗ/trang.
   const [slotPage, setSlotPage] = useState(1);
@@ -306,12 +313,32 @@ function AdminVehicles() {
     loadSummary();
   };
 
+  const handleGenerateFees = async () => {
+    setFeeError("");
+    setFeeSaving(true);
+    const res = await generateParkingFeesAPI({ month: feeForm.month, year: feeForm.year });
+    setFeeSaving(false);
+    if (!res.success) {
+      setFeeError(res.message || "Tạo hoá đơn phí gửi xe thất bại");
+      return;
+    }
+    setShowFeeForm(false);
+    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hoá đơn phí gửi xe (xem ở mục Thu phí)`);
+  };
+
   return (
     <>
       <SectionHeader
         title="Quản lý gửi xe"
         desc="Đăng ký xe cho hộ, quản lý chỗ gửi và các lượt gửi/cho thuê. Tra cứu xe theo từng hộ."
-        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Đăng ký xe</Button>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => { setFeeError(""); setShowFeeForm(true); }}>
+              <Receipt className="h-4 w-4" /> Tạo hóa đơn phí gửi xe
+            </Button>
+            <Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Đăng ký xe</Button>
+          </div>
+        }
       />
 
       {toast && (
@@ -530,6 +557,32 @@ function AdminVehicles() {
                 <Button variant="secondary" onClick={() => setShowParkForm(false)}>Hủy</Button>
                 <Button onClick={handleCreateRegistration}>Tạo lượt gửi</Button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL: sinh hoá đơn phí gửi xe theo tháng */}
+      {showFeeForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-bold">Tạo hóa đơn phí gửi xe</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Hệ thống tạo phiếu thu phí gửi xe cho mỗi hộ (= tổng phí tháng các lượt gửi xe đang hiệu lực của hộ).
+              Hóa đơn sẽ xuất hiện ở mục <strong>Thu phí / Công nợ</strong>; hộ dân có thể nộp tiền mặt hoặc thanh toán VNPay.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select label="Tháng" value={feeForm.month} onChange={(e) => setFeeForm({ ...feeForm, month: Number(e.target.value) })}>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => <option key={m} value={m}>Tháng {m}</option>)}
+              </Select>
+              <Select label="Năm" value={feeForm.year} onChange={(e) => setFeeForm({ ...feeForm, year: Number(e.target.value) })}>
+                {[2024, 2025, 2026, 2027, 2028].map((y) => <option key={y} value={y}>{y}</option>)}
+              </Select>
+            </div>
+            {feeError && <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{feeError}</div>}
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowFeeForm(false)} disabled={feeSaving}>Hủy</Button>
+              <Button onClick={handleGenerateFees} disabled={feeSaving}>{feeSaving ? "Đang tạo…" : "Tạo hóa đơn"}</Button>
             </div>
           </motion.div>
         </div>

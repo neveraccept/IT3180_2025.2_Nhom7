@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, AlertCircle } from "lucide-react";
+import { Search, Plus, AlertCircle, CheckCheck, X } from "lucide-react";
 import { money } from "../utils/helpers";
 import { Button, Card, Input, Select, StatusBadge, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
@@ -10,6 +10,7 @@ import {
   updateUtilityBillAPI,
   deleteUtilityBillAPI,
   confirmCashUtilityBillAPI,
+  confirmCashUtilityBillsBatchAPI,
 } from "../api/utilityApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
 
@@ -43,6 +44,12 @@ export function Utilities() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Thao tác hàng loạt: tập id hoá đơn (UNPAID) đang được tick chọn.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const [searchFilters, setSearchFilters] = useState({ householdId: "", type: "", month: "", year: "", status: "" });
   const emptyForm = { householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
@@ -97,9 +104,15 @@ export function Utilities() {
     await loadConfigs();
   };
 
+  const showToast = (message, tone = "green") => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const loadBills = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setPageError("");
+    setSelectedIds(new Set());
     const res = await searchUtilityBillsAPI({
       householdId: searchFilters.householdId || undefined,
       type: searchFilters.type || undefined,
@@ -216,6 +229,41 @@ export function Utilities() {
     await loadBills(page);
   };
 
+  // ----- Lựa chọn hàng loạt (chỉ hoá đơn chưa nộp) -----
+  const selectableIds = bills.filter((b) => b.status !== "PAID").map((b) => b.id);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+
+  const toggleRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedIds((prev) => {
+      if (selectableIds.every((id) => prev.has(id))) return new Set();
+      return new Set(selectableIds);
+    });
+  };
+
+  const handleBulkConfirm = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setConfirming(true);
+    const res = await confirmCashUtilityBillsBatchAPI(ids);
+    setConfirming(false);
+    setBulkConfirm(false);
+    if (res.failed > 0) {
+      showToast(`Đã xác nhận ${res.ok}/${ids.length} hoá đơn. ${res.failed} hoá đơn lỗi.`, res.ok > 0 ? "green" : "red");
+    } else {
+      showToast(`Đã xác nhận tiền mặt cho ${res.ok} hoá đơn`);
+    }
+    await loadBills(page);
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteConfirm) return;
     const res = await deleteUtilityBillAPI(deleteConfirm.id);
@@ -246,6 +294,10 @@ export function Utilities() {
         desc="Nhập hoá đơn theo từng hộ và từng tháng, ghi nhận đã nộp, tra cứu theo hộ."
         action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Nhập hóa đơn</Button>}
       />
+
+      {toast && (
+        <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ring-1 ${toast.tone === "red" ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>{toast.message}</div>
+      )}
 
       {pageError && (
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
@@ -441,11 +493,42 @@ export function Utilities() {
         </div>
       )}
 
+      {/* Thanh thao tác hàng loạt: hiện khi đang chọn ít nhất 1 hoá đơn chưa nộp. */}
+      {selectedIds.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 flex flex-col gap-3 rounded-2xl bg-sky-50 px-5 py-4 ring-1 ring-sky-200 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm font-semibold text-sky-800">
+            Đã chọn <strong>{selectedIds.size}</strong> hoá đơn chưa nộp
+          </p>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-4 w-4" /> Bỏ chọn
+            </Button>
+            <Button onClick={() => setBulkConfirm(true)}>
+              <CheckCheck className="h-4 w-4" /> Xác nhận tiền mặt hàng loạt
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="px-5 py-4">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-sky-600 focus:ring-sky-400"
+                    checked={allSelected}
+                    disabled={selectableIds.length === 0}
+                    onChange={toggleAll}
+                    title="Chọn tất cả hoá đơn chưa nộp trên trang"
+                  />
+                </th>
                 <th className="px-5 py-4">Hộ</th>
                 <th className="px-5 py-4">Loại hóa đơn</th>
                 <th className="px-5 py-4">Tháng/Năm</th>
@@ -457,13 +540,26 @@ export function Utilities() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
               )}
               {!loading && bills.length === 0 && (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
               )}
-              {!loading && bills.map((bill) => (
-                <tr key={bill.id} className="hover:bg-slate-50/80">
+              {!loading && bills.map((bill) => {
+                const unpaid = bill.status !== "PAID";
+                const checked = selectedIds.has(bill.id);
+                return (
+                <tr key={bill.id} className={`transition ${checked ? "bg-sky-50/70" : "hover:bg-slate-50/80"}`}>
+                  <td className="px-5 py-4">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 cursor-pointer rounded border-slate-300 text-sky-600 focus:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      checked={checked}
+                      disabled={!unpaid}
+                      onChange={() => toggleRow(bill.id)}
+                      title={unpaid ? "Chọn hoá đơn này" : "Hoá đơn đã nộp"}
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.householdCode || bill.householdId}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{getUtilityLabel(bill.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{bill.month}/{bill.year}</td>
@@ -476,7 +572,8 @@ export function Utilities() {
                     <button onClick={() => handleEdit(bill)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -486,6 +583,21 @@ export function Utilities() {
           </div>
         )}
       </div>
+
+      {bulkConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-3 text-lg font-black">Xác nhận tiền mặt hàng loạt</h3>
+            <p className="mb-5 text-sm text-slate-600">
+              Xác nhận <strong>{selectedIds.size}</strong> hoá đơn đã được thu bằng tiền mặt? Thao tác này không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setBulkConfirm(false)} disabled={confirming}>Hủy</Button>
+              <Button onClick={handleBulkConfirm} disabled={confirming}>{confirming ? "Đang xử lý…" : "Xác nhận tất cả"}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   );
 }
