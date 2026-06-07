@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 public class UserService {
     private final UserRepository userRepo;
     private final RoleRepository roleRepo;
-    private final EmailOtpRepository emailOtpRepo;
     private final ApartmentRepository apartmentRepo;
     private final HouseholdRepository householdRepo;
     private final PasswordEncoder passwordEncoder;
@@ -37,7 +36,6 @@ public class UserService {
                        ApartmentRepository apartmentRepo,
                        HouseholdRepository householdRepo,
                        PasswordEncoder passwordEncoder,
-                       EmailOtpRepository emailOtpRepo,
                        EmailService emailService,
                        UserMapper userMapper) {
         this.userRepo = userRepo;
@@ -46,7 +44,6 @@ public class UserService {
         this.householdRepo = householdRepo;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
-        this.emailOtpRepo = emailOtpRepo;
         this.userMapper = userMapper;
     }
 
@@ -68,10 +65,6 @@ public class UserService {
         if (userRepo.existsByEmail(req.email())) {
             throw new IllegalArgumentException("Email đã được sử dụng!");
         }
-
-        // Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-        emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(req.email(), "REGISTER")
-                .orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
 
         Role role = roleRepo.findByName(req.role())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.role()));
