@@ -16,6 +16,7 @@ import {
   endParkingRegistrationAPI,
   listMyParkingRegistrationsAPI,
 } from "../api/vehicleApi";
+import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
 
 // ============================================================
 //  Module 6 — Phương tiện (Vehicle) + chỗ gửi xe (Parking).
@@ -64,6 +65,9 @@ function AdminVehicles() {
   const [showParkForm, setShowParkForm] = useState(false);
   const [parkForm, setParkForm] = useState({ slotId: "", vehicleId: "", monthlyFee: "", startDate: "", endDate: "" });
   const [parkError, setParkError] = useState("");
+  const [configs, setConfigs] = useState([]);
+  const [configDraft, setConfigDraft] = useState({});
+  const [configSaving, setConfigSaving] = useState("");
 
   // Bộ lọc chỗ gửi: ALL | OCCUPIED (đang có xe) | EMPTY (đang trống)
   const [slotFilter, setSlotFilter] = useState("ALL");
@@ -111,6 +115,16 @@ function AdminVehicles() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const parkingConfigKeys = [
+    CONFIG_KEYS.MOTORBIKE_PARKING_PRICE,
+    CONFIG_KEYS.CAR_PARKING_PRICE,
+  ];
+  const parkingConfigLabel = (key) =>
+    ({
+      [CONFIG_KEYS.MOTORBIKE_PARKING_PRICE]: "Đơn giá xe máy (đ/tháng)",
+      [CONFIG_KEYS.CAR_PARKING_PRICE]: "Đơn giá ô tô (đ/tháng)",
+    }[key] || key);
+
   const loadSummary = useCallback(async () => {
     const res = await getParkingSummaryAPI();
     if (res.success) setSummary(res.data);
@@ -119,11 +133,37 @@ function AdminVehicles() {
     const res = await listParkingSlotsAPI();
     if (res.success) setSlots(res.data?.items || []);
   }, []);
+  const loadConfigs = useCallback(async () => {
+    const res = await listSystemConfigsAPI();
+    if (res.success) {
+      const list = res.data || [];
+      setConfigs(list);
+      setConfigDraft(Object.fromEntries(list.map((c) => [c.configKey, String(c.configValue ?? "")])));
+    }
+  }, []);
 
   useEffect(() => {
     loadSummary();
     loadSlots();
-  }, [loadSummary, loadSlots]);
+    loadConfigs();
+  }, [loadSummary, loadSlots, loadConfigs]);
+
+  const handleSaveConfig = async (key) => {
+    const value = Number(configDraft[key]);
+    if (!(value >= 0)) {
+      showToast("Đơn giá không hợp lệ", "red");
+      return;
+    }
+    setConfigSaving(key);
+    const res = await updateSystemConfigAPI(key, value);
+    setConfigSaving("");
+    if (!res.success) {
+      showToast(res.message || "Cập nhật đơn giá thất bại", "red");
+      return;
+    }
+    showToast("Đã cập nhật đơn giá gửi xe");
+    await loadConfigs();
+  };
 
   const findSlotByPlate = (plate) => {
     const normalizedPlate = String(plate || "").trim().toLowerCase();
@@ -283,6 +323,31 @@ function AdminVehicles() {
         <Card><p className="text-sm font-semibold text-slate-500">Chỗ còn trống</p><p className="mt-2 text-3xl font-black text-emerald-600">{summary?.empty ?? "—"}</p></Card>
         <Card><p className="text-sm font-semibold text-slate-500">Đang gán xe hộ</p><p className="mt-2 text-3xl font-black text-sky-600">{summary?.used ?? "—"}</p></Card>
       </div>
+
+      <Card className="mb-5">
+        <div className="mb-3">
+          <h3 className="text-base font-black text-slate-900">Đơn giá hệ thống</h3>
+          <p className="text-sm text-slate-500">Đơn giá mặc định dùng khi gán xe hộ vào chỗ gửi.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {configs.filter((c) => parkingConfigKeys.includes(c.configKey)).map((c) => (
+            <div key={c.configKey} className="rounded-2xl border border-slate-200 p-4">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">{parkingConfigLabel(c.configKey)}</label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  value={configDraft[c.configKey] ?? ""}
+                  onChange={(e) => setConfigDraft({ ...configDraft, [c.configKey]: e.target.value })}
+                />
+                <Button onClick={() => handleSaveConfig(c.configKey)} disabled={configSaving === c.configKey}>
+                  {configSaving === c.configKey ? "..." : "Lưu"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {pageError && (
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>

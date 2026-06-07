@@ -25,6 +25,11 @@ const txStatusBadge = (status) => {
   const [label, tone] = map[status] || [status, "gray"];
   return <Badge tone={tone}>{label}</Badge>;
 };
+const feeTypeBadge = (feeType) => {
+  if (feeType === "DONATION") return <Badge tone="violet">Đóng góp</Badge>;
+  if (feeType === "MANDATORY") return <Badge tone="red">Bắt buộc</Badge>;
+  return <Badge tone="gray">Hóa đơn</Badge>;
+};
 
 export function MyFees() {
   const [payments, setPayments] = useState([]);
@@ -34,6 +39,7 @@ export function MyFees() {
   const [pageError, setPageError] = useState("");
   const [filters, setFilters] = useState({ status: "ALL" });
   const [payingId, setPayingId] = useState(null);
+  const [donationAmounts, setDonationAmounts] = useState({});
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -55,10 +61,19 @@ export function MyFees() {
   }, [loadAll]);
 
   // Gọi backend lấy URL VNPay rồi redirect.
-  const payWithVnpay = async (targetType, targetId, rowKey) => {
+  const payWithVnpay = async (targetType, targetId, rowKey, feeType) => {
+    const payload = { targetType, targetId };
+    if (feeType === "DONATION") {
+      const customAmount = Number(donationAmounts[rowKey]);
+      if (!(customAmount > 0)) {
+        setPageError("Vui lòng nhập số tiền đóng góp lớn hơn 0 trước khi thanh toán.");
+        return;
+      }
+      payload.customAmount = customAmount;
+    }
     setPayingId(rowKey);
     setPageError("");
-    const res = await createVnpayUrlAPI({ targetType, targetId });
+    const res = await createVnpayUrlAPI(payload);
     if (res.success && res.data?.paymentUrl) {
       window.location.href = res.data.paymentUrl; // chuyển sang cổng VNPay
       return;
@@ -76,6 +91,7 @@ export function MyFees() {
     name: p.feeName || p.feePeriodName || "Khoản phí",
     period: p.feePeriodName || "__",
     amount: Number(p.amountDue || 0),
+    feeType: p.feeType || "MANDATORY",
     status: p.status === "PAID" ? "PAID" : "UNPAID",
   }));
   const billRows = bills.map((b) => ({
@@ -86,6 +102,7 @@ export function MyFees() {
     name: `Hoá đơn ${utilityLabel(b.type).toLowerCase()}`,
     period: `Tháng ${b.month}/${b.year}`,
     amount: Number(b.amount || 0),
+    feeType: "UTILITY",
     status: b.status === "PAID" ? "PAID" : "UNPAID",
   }));
 
@@ -140,6 +157,7 @@ export function MyFees() {
               <tr>
                 <th className="px-5 py-4">Nhóm</th>
                 <th className="px-5 py-4">Nội dung</th>
+                <th className="px-5 py-4">Loại phí</th>
                 <th className="px-5 py-4">Kỳ</th>
                 <th className="px-5 py-4">Số tiền</th>
                 <th className="px-5 py-4">Trạng thái</th>
@@ -147,18 +165,32 @@ export function MyFees() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading && <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>}
-              {!loading && allRows.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có khoản phí nào phù hợp với bộ lọc.</td></tr>}
+              {loading && <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>}
+              {!loading && allRows.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có khoản phí nào phù hợp với bộ lọc.</td></tr>}
               {!loading && allRows.map((r) => (
                 <tr key={r.key} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.group}</td>
                   <td className="px-5 py-4 font-semibold text-slate-800">{r.name}</td>
+                  <td className="whitespace-nowrap px-5 py-4">{feeTypeBadge(r.feeType)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.period}</td>
-                  <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">{money(r.amount)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">
+                    {r.feeType === "DONATION" && r.status === "UNPAID" ? (
+                      <input
+                        className="w-40 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                        type="number"
+                        min="0"
+                        placeholder="Nhập số tiền"
+                        value={donationAmounts[r.key] ?? ""}
+                        onChange={(e) => setDonationAmounts({ ...donationAmounts, [r.key]: e.target.value })}
+                      />
+                    ) : (
+                      money(r.amount)
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-5 py-4"><StatusBadge status={r.status} /></td>
                   <td className="px-5 py-4 text-right">
                     {r.status === "UNPAID" ? (
-                      <Button onClick={() => payWithVnpay(r.targetType, r.targetId, r.key)} disabled={payingId === r.key}>
+                      <Button onClick={() => payWithVnpay(r.targetType, r.targetId, r.key, r.feeType)} disabled={payingId === r.key}>
                         <CreditCard className="h-4 w-4" /> {payingId === r.key ? "Đang chuyển…" : "Thanh toán VNPay"}
                       </Button>
                     ) : (

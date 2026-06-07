@@ -308,6 +308,8 @@ public class InitialDataConfig implements CommandLineRunner {
 
         int vehicleCount = 0;
         int parkedCount = 0;
+        BigDecimal carParkingPrice = getSystemConfigValue(SystemConfig.CAR_PARKING_PRICE);
+        BigDecimal motorbikeParkingPrice = getSystemConfigValue(SystemConfig.MOTORBIKE_PARKING_PRICE);
 
         for (Household household : households) {
             int numVehicles = 1 + random.nextInt(2); // 1 hoặc 2 xe
@@ -338,9 +340,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 reg.setSlot(slot);
                 reg.setVehicle(vehicle);
                 reg.setStartDate(vehicle.getRegisteredDate());
-                reg.setMonthlyFee(type == VehicleType.CAR
-                        ? BigDecimal.valueOf(1_200_000)
-                        : BigDecimal.valueOf(120_000));
+                reg.setMonthlyFee(type == VehicleType.CAR ? carParkingPrice : motorbikeParkingPrice);
                 reg.setStatus(ParkingRegistrationStatus.ACTIVE);
                 parkingRegistrationRepository.save(reg);
                 parkedCount++;
@@ -403,12 +403,22 @@ public class InitialDataConfig implements CommandLineRunner {
                 "Đơn giá 1 khối nước (đ/m³)");
         saveConfigIfAbsent(SystemConfig.INTERNET_PRICE, BigDecimal.valueOf(250_000),
                 "Giá gói internet/tháng (đ)");
+        saveConfigIfAbsent(SystemConfig.MOTORBIKE_PARKING_PRICE, BigDecimal.valueOf(70_000),
+                "Phí gửi xe máy/tháng (đ)");
+        saveConfigIfAbsent(SystemConfig.CAR_PARKING_PRICE, BigDecimal.valueOf(1_200_000),
+                "Phí gửi ô tô/tháng (đ)");
     }
 
     private void saveConfigIfAbsent(String key, BigDecimal value, String description) {
         if (!systemConfigRepository.existsByConfigKey(key)) {
             systemConfigRepository.save(new SystemConfig(null, key, value, description));
         }
+    }
+
+    private BigDecimal getSystemConfigValue(String key) {
+        return systemConfigRepository.findByConfigKey(key)
+                .map(SystemConfig::getConfigValue)
+                .orElseThrow(() -> new IllegalStateException("Missing system config: " + key));
     }
 
     private Fee buildFee(String name, String type, String unit, BigDecimal unitPrice, String description) {

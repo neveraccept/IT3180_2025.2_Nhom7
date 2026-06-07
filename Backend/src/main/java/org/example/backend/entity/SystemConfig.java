@@ -27,6 +27,10 @@ public class SystemConfig {
     public static final String WATER_UNIT_PRICE = "WATER_UNIT_PRICE";
     /** Giá 1 gói internet/tháng (đ). */
     public static final String INTERNET_PRICE = "INTERNET_PRICE";
+    /** Phí gửi xe máy/tháng (đ). */
+    public static final String MOTORBIKE_PARKING_PRICE = "MOTORBIKE_PARKING_PRICE";
+    /** Phí gửi ô tô/tháng (đ). */
+    public static final String CAR_PARKING_PRICE = "CAR_PARKING_PRICE";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

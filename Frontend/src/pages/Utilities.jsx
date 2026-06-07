@@ -57,6 +57,11 @@ export function Utilities() {
   const getUtilityLabel = (type) => utilityTypes.find((item) => item.value === type)?.label || type;
   const isMetered = (type) => type === "ELECTRICITY" || type === "WATER";
   const configValue = (key) => Number(configs.find((c) => c.configKey === key)?.configValue || 0);
+  const utilityConfigKeys = [
+    CONFIG_KEYS.ELECTRICITY_UNIT_PRICE,
+    CONFIG_KEYS.WATER_UNIT_PRICE,
+    CONFIG_KEYS.INTERNET_PRICE,
+  ];
 
   const configLabel = (key) =>
     ({
@@ -293,7 +298,7 @@ export function Utilities() {
           <div className="mb-3 rounded-xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-200">{configMsg}</div>
         )}
         <div className="grid gap-4 md:grid-cols-3">
-          {configs.map((c) => (
+          {configs.filter((c) => utilityConfigKeys.includes(c.configKey)).map((c) => (
             <div key={c.configKey} className="rounded-2xl border border-slate-200 p-4">
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">{configLabel(c.configKey)}</label>
               <div className="flex gap-2">

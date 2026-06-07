@@ -1,6 +1,7 @@
 package org.example.backend.service;
 
 import org.example.backend.dto.SystemConfigDTO;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.entity.SystemConfig;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.exception.NotFoundException;
@@ -40,6 +41,8 @@ public class SystemConfigService {
     }
 
     /** Cập nhật giá trị đơn giá theo key. */
+    @LogAdminAction(entity = "SystemConfig", action = "UPDATE", description = "Cập nhật đơn giá hệ thống",
+            detail = "#key + ' = ' + #value")
     @Transactional
     public SystemConfigDTO updateValue(String key, BigDecimal value) {
         if (value == null || value.compareTo(BigDecimal.ZERO) < 0) {

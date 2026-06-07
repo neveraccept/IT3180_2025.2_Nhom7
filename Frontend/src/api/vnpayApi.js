@@ -1,7 +1,7 @@
 // ============================================================
 //  vnpayApi — Module 5: Thanh toán online qua VNPay
 //  Map PaymentVnpayController:
-//    RESIDENT  POST /api/payments/vnpay/create-url   body { targetType, targetId }
+//    RESIDENT  POST /api/payments/vnpay/create-url   body { targetType, targetId, customAmount? }
 //    RESIDENT  GET  /api/payments/vnpay/my-history
 //    ADMIN     GET  /api/admin/payment-transactions?status=&householdId=&targetType=&fromDate=&toDate=
 //    ADMIN     GET  /api/admin/payment-transactions/{id}
@@ -22,9 +22,9 @@ export const VNPAY_TARGET = {
 };
 
 // RESIDENT: tạo giao dịch + URL thanh toán VNPay.
-// payload = { targetType, targetId }. Trả về { paymentUrl, transactionCode }.
-export const createVnpayUrlAPI = ({ targetType, targetId }) =>
-  callApi(axiosClient.post("/api/payments/vnpay/create-url", { targetType, targetId }));
+// payload = { targetType, targetId, customAmount? }. Trả về { paymentUrl, transactionCode }.
+export const createVnpayUrlAPI = ({ targetType, targetId, customAmount }) =>
+  callApi(axiosClient.post("/api/payments/vnpay/create-url", { targetType, targetId, customAmount }));
 
 // RESIDENT: lịch sử giao dịch online của hộ mình.
 export const listMyVnpayHistoryAPI = ({ page = 0, size = 100, sort = "createdAt,desc" } = {}) =>

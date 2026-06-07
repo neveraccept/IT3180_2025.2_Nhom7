@@ -9,6 +9,7 @@ import org.example.backend.dto.request.CreateParkingRegistrationRequest;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.ParkingRegistration;
 import org.example.backend.entity.ParkingSlot;
+import org.example.backend.entity.SystemConfig;
 import org.example.backend.entity.Vehicle;
 import org.example.backend.entity.enums.ParkingRegistrationStatus;
 import org.example.backend.entity.enums.ParkingSlotStatus;
@@ -35,33 +36,31 @@ import java.util.stream.Collectors;
 /**
  * M6 - F6.4 (quản lý chỗ gửi), F6.1 gán chỗ cho xe hộ và F6.5 cho thuê chỗ thừa.
  *
- * Quy tắc phí gửi xe (monthlyFee) theo SDD:
- *   - MOTORBIKE: 70.000đ/tháng (mặc định khi gán xe hộ).
- *   - CAR      : 1.200.000đ/tháng (mặc định khi gán xe hộ).
- *   - Cho thuê ngoài: phí nhập tay theo thoả thuận.
+ * Quy tắc phí gửi xe (monthlyFee): gán xe hộ lấy đơn giá mặc định từ SystemConfig,
+ * cho thuê ngoài dùng phí nhập tay theo thoả thuận.
  */
 @Service
 public class ParkingService {
-
-    private static final BigDecimal MOTORBIKE_FEE = new BigDecimal("70000");
-    private static final BigDecimal CAR_FEE = new BigDecimal("1200000");
 
     private final ParkingSlotRepository slotRepository;
     private final ParkingRegistrationRepository registrationRepository;
     private final VehicleRepository vehicleRepository;
     private final ParkingMapper mapper;
     private final CurrentUserService currentUserService;
+    private final SystemConfigService systemConfigService;
 
     public ParkingService(ParkingSlotRepository slotRepository,
                           ParkingRegistrationRepository registrationRepository,
                           VehicleRepository vehicleRepository,
                           ParkingMapper mapper,
-                          CurrentUserService currentUserService) {
+                          CurrentUserService currentUserService,
+                          SystemConfigService systemConfigService) {
         this.slotRepository = slotRepository;
         this.registrationRepository = registrationRepository;
         this.vehicleRepository = vehicleRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
+        this.systemConfigService = systemConfigService;
     }
 
     // F6.4 - Danh sách chỗ gửi (có phân trang), kèm biển số xe và mã căn hộ.
@@ -214,6 +213,8 @@ public class ParkingService {
     }
 
     private BigDecimal defaultFee(VehicleType type) {
-        return type == VehicleType.CAR ? CAR_FEE : MOTORBIKE_FEE;
+        return systemConfigService.getValue(type == VehicleType.CAR
+                ? SystemConfig.CAR_PARKING_PRICE
+                : SystemConfig.MOTORBIKE_PARKING_PRICE);
     }
 }
