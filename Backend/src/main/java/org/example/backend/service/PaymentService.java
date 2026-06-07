@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -42,6 +43,7 @@ public class PaymentService {
     private final HouseholdRepository householdRepository;
     private final UserRepository userRepository;
     private final VnpayService vnpayService;
+    private static final long VNPAY_EXPIRE_MINUTES = 15;
 
     public PaymentService(PaymentRepository paymentRepository,
                           PaymentTransactionRepository txRepository,
@@ -125,6 +127,10 @@ public class PaymentService {
             if (Payment.STATUS_PAID.equals(p.getStatus())) {
                 throw new BadRequestException("TARGET_ALREADY_PAID", "Khoản phí đã được thanh toán");
             }
+            if (p.getFeePeriod() == null || !"OPEN".equalsIgnoreCase(p.getFeePeriod().getStatus())) {
+                throw new BadRequestException("FEE_PERIOD_CLOSED",
+                        "Đợt thu phí đã đóng, không thể thanh toán online");
+            }
             if (isDonationPayment(p)) {
                 amount = req.customAmount();
                 if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -157,7 +163,14 @@ public class PaymentService {
                         targetType, targetId, PaymentTransaction.STATUS_PENDING);
         if (pending.isPresent()) {
             PaymentTransaction old = pending.get();
-            return new VnpayPaymentUrlResponse(old.getPaymentUrl(), old.getTransactionCode());
+            if (old.getCreatedAt() != null
+                    && old.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(VNPAY_EXPIRE_MINUTES))
+                    && old.getPaymentUrl() != null
+                    && !old.getPaymentUrl().isBlank()) {
+                return new VnpayPaymentUrlResponse(old.getPaymentUrl(), old.getTransactionCode());
+            }
+            old.setStatus(PaymentTransaction.STATUS_CANCELLED);
+            txRepository.save(old);
         }
 
         // 4) Lưu giao dịch PENDING
@@ -221,6 +234,48 @@ public class PaymentService {
         }
 
         // 5) Lưu dữ liệu VNPay trả về (không lưu chữ ký)
+        applyVnpayResult(tx, params);
+
+        txRepository.save(tx);
+
+        return new IpnResponse("00", "Confirm Success");
+    }
+
+    /** Return URL co the den truoc IPN, nen dung du lieu da ky de chot trang thai neu con PENDING. */
+    @Transactional
+    public String processVnpayReturn(Map<String, String> params) {
+        if (!vnpayService.verifySignature(params)) {
+            log.warn("VNPay return chu ky khong hop le. params={}", params.keySet());
+            return "INVALID";
+        }
+
+        String txnRef = params.get("vnp_TxnRef");
+        PaymentTransaction tx = txRepository.findByTransactionCodeForUpdate(txnRef).orElse(null);
+        if (tx == null) {
+            return "NOT_FOUND";
+        }
+
+        if (!PaymentTransaction.STATUS_PENDING.equals(tx.getStatus())) {
+            return tx.getStatus();
+        }
+
+        String vnpAmount = params.get("vnp_Amount");
+        long expected = tx.getAmount().multiply(BigDecimal.valueOf(100)).longValueExact();
+        if (vnpAmount == null || !Objects.equals(String.valueOf(expected), vnpAmount)) {
+            log.warn("VNPay return lech so tien tx={} expected={} got={}", txnRef, expected, vnpAmount);
+            tx.setStatus(PaymentTransaction.STATUS_FAILED);
+            tx.setVnpayResponseCode(params.get("vnp_ResponseCode"));
+            txRepository.save(tx);
+            return tx.getStatus();
+        }
+
+        applyVnpayResult(tx, params);
+        txRepository.save(tx);
+        return tx.getStatus();
+    }
+
+    private void applyVnpayResult(PaymentTransaction tx, Map<String, String> params) {
+        String responseCode = params.get("vnp_ResponseCode");
         tx.setVnpayResponseCode(responseCode);
         tx.setVnpayTransactionNo(params.get("vnp_TransactionNo"));
         tx.setVnpayBankCode(params.get("vnp_BankCode"));
@@ -229,15 +284,12 @@ public class PaymentService {
         if ("00".equals(responseCode)) {
             tx.setStatus(PaymentTransaction.STATUS_SUCCESS);
             tx.setPaidAt(LocalDateTime.now());
-            markTargetPaid(tx);                                    // cập nhật payments/utility_bills
+            markTargetPaid(tx);
         } else if ("24".equals(responseCode)) {
-            tx.setStatus(PaymentTransaction.STATUS_CANCELLED);     // cư dân huỷ
+            tx.setStatus(PaymentTransaction.STATUS_CANCELLED);
         } else {
-            tx.setStatus(PaymentTransaction.STATUS_FAILED);        // thất bại
+            tx.setStatus(PaymentTransaction.STATUS_FAILED);
         }
-        txRepository.save(tx);
-
-        return new IpnResponse("00", "Confirm Success");
     }
 
     /** Cập nhật bản ghi khoản phí/hoá đơn tương ứng khi VNPay thành công. */

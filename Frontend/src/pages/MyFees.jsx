@@ -92,6 +92,7 @@ export function MyFees() {
     period: p.feePeriodName || "__",
     amount: Number(p.amountDue || 0),
     feeType: p.feeType || "MANDATORY",
+    feePeriodStatus: p.feePeriodStatus || "OPEN",
     status: p.status === "PAID" ? "PAID" : "UNPAID",
   }));
   const billRows = bills.map((b) => ({
@@ -103,6 +104,7 @@ export function MyFees() {
     period: `Tháng ${b.month}/${b.year}`,
     amount: Number(b.amount || 0),
     feeType: "UTILITY",
+    feePeriodStatus: "OPEN",
     status: b.status === "PAID" ? "PAID" : "UNPAID",
   }));
 
@@ -189,7 +191,9 @@ export function MyFees() {
                   </td>
                   <td className="whitespace-nowrap px-5 py-4"><StatusBadge status={r.status} /></td>
                   <td className="px-5 py-4 text-right">
-                    {r.status === "UNPAID" ? (
+                    {r.status === "UNPAID" && r.feePeriodStatus === "CLOSED" ? (
+                      <span className="font-semibold text-slate-500">Đợt thu đã đóng</span>
+                    ) : r.status === "UNPAID" ? (
                       <Button onClick={() => payWithVnpay(r.targetType, r.targetId, r.key, r.feeType)} disabled={payingId === r.key}>
                         <CreditCard className="h-4 w-4" /> {payingId === r.key ? "Đang chuyển…" : "Thanh toán VNPay"}
                       </Button>

@@ -7,6 +7,7 @@ import org.example.backend.entity.Fee;
 import org.example.backend.entity.FeePeriod;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.Payment;
+import org.example.backend.entity.PaymentTransaction;
 import org.example.backend.entity.enums.HouseholdStatus;
 import org.example.backend.entity.enums.ResidentStatus;
 import org.example.backend.exception.NotFoundException;
@@ -14,6 +15,7 @@ import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
 import org.example.backend.repository.HouseholdRepository;
 import org.example.backend.repository.PaymentRepository;
+import org.example.backend.repository.PaymentTransactionRepository;
 import org.example.backend.repository.ResidentRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,9 @@ public class FeePeriodService {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
 
     public Page<FeePeriodDTO> getAllFeePeriods(Pageable pageable) {
         return feePeriodRepository.findAll(pageable).map(this::convertToDto);
@@ -159,6 +164,11 @@ public class FeePeriodService {
                 .orElseThrow(() -> new NotFoundException("FEE_PERIOD_NOT_FOUND", "Đợt thu phí không tồn tại"));
         feePeriod.setStatus("CLOSED");
         feePeriodRepository.save(feePeriod);
+        paymentTransactionRepository.updatePendingFeeTransactionsByFeePeriod(
+                id,
+                PaymentTransaction.TARGET_FEE_PAYMENT,
+                PaymentTransaction.STATUS_PENDING,
+                PaymentTransaction.STATUS_CANCELLED);
         AuditContext.detail("Đóng đợt thu: " + feePeriod.getName());
     }
 
