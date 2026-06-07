@@ -41,3 +41,6 @@ export const listSentNotificationsAPI = ({ page = 0, size = 50, sort = "id,desc"
 // ADMIN | RESIDENT: đánh dấu một thông báo đã đọc.
 export const markNotificationReadAPI = (id) =>
   callApi(axiosClient.put(`/api/notifications/${id}/read`));
+
+export const markNotificationUnreadAPI = (id) =>
+  callApi(axiosClient.put(`/api/notifications/${id}/unread`));

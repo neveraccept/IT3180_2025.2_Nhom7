@@ -8,6 +8,7 @@ import {
   listMyNotificationsAPI,
   listSentNotificationsAPI,
   markNotificationReadAPI,
+  markNotificationUnreadAPI,
   SCOPE_LABEL,
 } from "../api/notificationApi";
 import { searchApartmentsAPI, getApartmentDetailAPI } from "../api/apartmentApi";
@@ -81,20 +82,40 @@ export function Notifications({
 
   const selectedNotification = notifications.find((n) => n.id === selectedNotificationId) || null;
 
-  // Đánh dấu đã đọc
-  const handleMarkRead = async () => {
-    if (!selectedNotification || selectedNotification.isRead) return;
-    setMarkingRead(true);
-    const res = await markNotificationReadAPI(selectedNotification.id);
-    if (res.success) {
+  const openNotificationDetail = async (item) => {
+    setSelectedNotificationId(item.id);
+    onInitialNotificationHandled?.();
+    if (role === "ADMIN" || item.isRead) return;
+
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+    );
+    const res = await markNotificationReadAPI(item.id);
+    if (!res.success) {
       setNotifications((prev) =>
-        prev.map((n) => (n.id === selectedNotification.id ? { ...n, isRead: true } : n))
+        prev.map((n) => (n.id === item.id ? { ...n, isRead: false } : n))
       );
     }
-    setMarkingRead(false);
-    setSelectedNotificationId(null);
-    onInitialNotificationHandled?.();
   };
+
+  const handleMarkUnread = async () => {
+    if (!selectedNotification || role === "ADMIN") return;
+    setMarkingRead(true);
+    const res = await markNotificationUnreadAPI(selectedNotification.id);
+    if (res.success) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === selectedNotification.id ? { ...n, isRead: false, readAt: null } : n))
+      );
+      setSelectedNotificationId(null);
+      onInitialNotificationHandled?.();
+    }
+    setMarkingRead(false);
+  };
+
+  useEffect(() => {
+    if (!selectedNotification || role === "ADMIN" || selectedNotification.isRead) return;
+    openNotificationDetail(selectedNotification);
+  }, [selectedNotification?.id, role]);
 
   const closeDetail = () => {
     setSelectedNotificationId(null);
@@ -355,10 +376,7 @@ export function Notifications({
             notifications.map((item) => (
               <button
                 key={item.id}
-                onClick={() => {
-                  setSelectedNotificationId(item.id);
-                  onInitialNotificationHandled?.();
-                }}
+                onClick={() => openNotificationDetail(item)}
                 className="flex w-full items-start justify-between rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
               >
                 <div className="flex gap-3">
@@ -432,9 +450,9 @@ export function Notifications({
               <Button variant="secondary" onClick={closeDetail}>
                 Đóng
               </Button>
-              {role !== "ADMIN" && !selectedNotification.isRead && (
-                <Button onClick={handleMarkRead} disabled={markingRead}>
-                  {markingRead ? "Đang đánh dấu..." : "Đã đọc"}
+              {role !== "ADMIN" && (
+                <Button onClick={handleMarkUnread} disabled={markingRead}>
+                  {markingRead ? "Đang đánh dấu..." : "Đánh dấu chưa đọc"}
                 </Button>
               )}
             </div>

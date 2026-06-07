@@ -60,4 +60,11 @@ public class NotificationController {
         NotificationDTO dto = notificationService.markAsRead(id);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đã đánh dấu đã đọc"));
     }
+
+    @PutMapping("/{id}/unread")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
+    public ResponseEntity<ApiResponse<NotificationDTO>> markAsUnread(@PathVariable Long id) {
+        NotificationDTO dto = notificationService.markAsUnread(id);
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Đã đánh dấu chưa đọc"));
+    }
 }

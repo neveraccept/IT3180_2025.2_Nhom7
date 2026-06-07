@@ -7,7 +7,7 @@ import { SectionHeader } from "../components/layout/SectionHeader";
 import { getResidentStatisticsAPI } from "../api/reportApi";
 import { listFeePeriodsAPI } from "../api/feeApi";
 import { listAllComplaintsAPI, CATEGORY_LABEL } from "../api/complaintApi";
-import { listMyNotificationsAPI, listSentNotificationsAPI } from "../api/notificationApi";
+import { listMyNotificationsAPI, listSentNotificationsAPI, markNotificationReadAPI, markNotificationUnreadAPI } from "../api/notificationApi";
 import { listMyHouseholdPaymentsAPI } from "../api/paymentApi";
 import { listMyUtilityBillsAPI } from "../api/utilityApi";
 
@@ -17,6 +17,7 @@ export function Dashboard({ role }) {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [notificationActionLoading, setNotificationActionLoading] = useState(false);
 
   // Admin state
   const [stats, setStats] = useState(null);
@@ -111,6 +112,40 @@ export function Dashboard({ role }) {
     setSelectedNotification(null);
   };
 
+  const openNotification = async (notification) => {
+    if (role === "ADMIN" || notification.isRead) {
+      setSelectedNotification(notification);
+      return;
+    }
+
+    const readNotification = { ...notification, isRead: true };
+    setSelectedNotification(readNotification);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+    );
+
+    const res = await markNotificationReadAPI(notification.id);
+    if (!res.success) {
+      setSelectedNotification(notification);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, isRead: false } : n))
+      );
+    }
+  };
+
+  const markSelectedNotificationUnread = async () => {
+    if (!selectedNotification || role === "ADMIN") return;
+    setNotificationActionLoading(true);
+    const res = await markNotificationUnreadAPI(selectedNotification.id);
+    if (res.success) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === selectedNotification.id ? { ...n, isRead: false, readAt: null } : n))
+      );
+      setSelectedNotification(null);
+    }
+    setNotificationActionLoading(false);
+  };
+
   if (role !== "ADMIN") {
     return (
       <>
@@ -176,7 +211,7 @@ export function Dashboard({ role }) {
                 recentNotifications.map((n) => (
                   <button
                     key={n.id}
-                    onClick={() => setSelectedNotification(n)}
+                    onClick={() => openNotification(n)}
                     className="flex w-full gap-3 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-slate-100"
                   >
                     {n.isRead ? (
@@ -210,8 +245,11 @@ export function Dashboard({ role }) {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
                 {selectedNotification.content}
               </div>
-              <div className="mt-5 flex justify-end">
+              <div className="mt-5 flex justify-end gap-3">
                 <Button variant="secondary" onClick={closeModals}>Đóng</Button>
+                <Button onClick={markSelectedNotificationUnread} disabled={notificationActionLoading}>
+                  {notificationActionLoading ? "Đang đánh dấu..." : "Đánh dấu chưa đọc"}
+                </Button>
               </div>
             </motion.div>
           </div>
@@ -332,7 +370,7 @@ export function Dashboard({ role }) {
               recentNotifications.map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => setSelectedNotification(n)}
+                  onClick={() => openNotification(n)}
                   className="flex w-full gap-3 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-slate-100"
                 >
                   <Bell className="mt-1 h-5 w-5 text-sky-600" />

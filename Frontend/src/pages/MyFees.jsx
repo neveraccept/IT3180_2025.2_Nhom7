@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { CreditCard } from "lucide-react";
+import { Fragment, useState, useEffect, useCallback, useMemo } from "react";
+import { CheckCircle2, ChevronDown, ChevronRight, CreditCard } from "lucide-react";
 import { money } from "../utils/helpers";
-import { Badge, Button, Card, Pagination, Select, StatusBadge } from "../components/common";
+import { Badge, Button, Card, Input, Pagination, Select, StatusBadge } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { listMyHouseholdPaymentsAPI } from "../api/paymentApi";
 import { listMyUtilityBillsAPI } from "../api/utilityApi";
@@ -34,6 +34,40 @@ const transactionTypeLabel = (type) => {
 };
 
 const HISTORY_PAGE_SIZE = 10;
+const MY_FEES_PAGE_SIZE = 10;
+
+const normalizeText = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const extractMonthKey = (value) => {
+  const text = String(value || "");
+  const match = text.match(/(?:th[aá]ng\s*)?(\d{1,2})[/-](\d{4})/i);
+  if (!match) return "";
+  const month = Number(match[1]);
+  if (month < 1 || month > 12) return "";
+  return `${match[2]}-${String(month).padStart(2, "0")}`;
+};
+
+const monthLabel = (key) => {
+  const [year, month] = String(key || "").split("-");
+  return month && year ? `Tháng ${Number(month)}/${year}` : key;
+};
+
+const parseCsvIds = (value) =>
+  String(value || "")
+    .split(",")
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isFinite(id) && id > 0);
+
+const parseCsvAmounts = (value) =>
+  String(value || "")
+    .split(",")
+    .map((amount) => Number(amount.trim()))
+    .filter((amount) => Number.isFinite(amount));
 
 export function MyFees() {
   const [payments, setPayments] = useState([]);
@@ -41,12 +75,14 @@ export function MyFees() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
-  const [filters, setFilters] = useState({ status: "ALL" });
+  const [filters, setFilters] = useState({ status: "ALL", keyword: "", month: "ALL", feeType: "ALL" });
+  const [myFeesPage, setMyFeesPage] = useState(1);
   const [historyFilter, setHistoryFilter] = useState("ALL");
   const [historyPage, setHistoryPage] = useState(1);
   const [payingId, setPayingId] = useState(null);
   const [donationAmounts, setDonationAmounts] = useState({});
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [expandedHistoryKeys, setExpandedHistoryKeys] = useState([]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -71,6 +107,10 @@ export function MyFees() {
     setHistoryPage(1);
   }, [historyFilter]);
 
+  useEffect(() => {
+    setMyFeesPage(1);
+  }, [filters]);
+
   const feeRows = useMemo(() => payments.map((p) => ({
     key: `FEE-${p.id}`,
     targetType: VNPAY_TARGET.FEE_PAYMENT,
@@ -81,6 +121,7 @@ export function MyFees() {
     amount: Number(p.amountDue || 0),
     feeType: p.feeType || "MANDATORY",
     feePeriodStatus: p.feePeriodStatus || "OPEN",
+    monthKey: extractMonthKey(p.feePeriodName),
     status: p.status === "PAID" ? "PAID" : "UNPAID",
   })), [payments]);
 
@@ -94,20 +135,47 @@ export function MyFees() {
     amount: Number(b.amount || 0),
     feeType: "UTILITY",
     feePeriodStatus: "OPEN",
+    monthKey: b.month && b.year ? `${b.year}-${String(b.month).padStart(2, "0")}` : "",
     status: b.status === "PAID" ? "PAID" : "UNPAID",
   })), [bills]);
+
+  const feeRowsById = useMemo(
+    () => new Map(feeRows.map((row) => [Number(row.targetId), row])),
+    [feeRows]
+  );
+
+  const billRowsById = useMemo(
+    () => new Map(billRows.map((row) => [Number(row.targetId), row])),
+    [billRows]
+  );
 
   const visibleRows = useMemo(
     () => [...feeRows.filter((r) => String(r.feePeriodStatus).toUpperCase() !== "CLOSED"), ...billRows],
     [feeRows, billRows]
   );
 
-  const allRows = visibleRows.filter((r) => filters.status === "ALL" || r.status === filters.status);
+  const monthOptions = useMemo(
+    () => Array.from(new Set(visibleRows.map((r) => r.monthKey).filter(Boolean))).sort().reverse(),
+    [visibleRows]
+  );
+
+  const allRows = visibleRows.filter((r) => {
+    const keyword = normalizeText(filters.keyword);
+    const matchesKeyword = !keyword || normalizeText(`${r.name} ${r.period} ${r.group}`).includes(keyword);
+    const matchesStatus = filters.status === "ALL" || r.status === filters.status;
+    const matchesMonth = filters.month === "ALL" || r.monthKey === filters.month;
+    const matchesType = filters.feeType === "ALL" || r.feeType === filters.feeType;
+    return matchesKeyword && matchesStatus && matchesMonth && matchesType;
+  });
   const selectableRows = allRows.filter(
     (r) => r.status === "UNPAID" && String(r.feePeriodStatus).toUpperCase() !== "CLOSED"
   );
   const selectedRows = selectableRows.filter((r) => selectedKeys.includes(r.key));
   const allSelectableChecked = selectableRows.length > 0 && selectableRows.every((r) => selectedKeys.includes(r.key));
+  const paginatedRows = allRows.slice(
+    (myFeesPage - 1) * MY_FEES_PAGE_SIZE,
+    myFeesPage * MY_FEES_PAGE_SIZE
+  );
 
   const effectiveAmount = (row) => {
     if (row.feeType === "DONATION" && row.status === "UNPAID") {
@@ -210,16 +278,94 @@ export function MyFees() {
     setPageError(res.message || "Không tạo được liên kết thanh toán VNPay");
   };
 
-  const filteredHistory = history.filter((t) => {
+  const allHistoryRows = history.flatMap((t) => {
+    const baseRow = (line, index) => ({
+      ...t,
+      lineKey: `${t.id}-${line.type}-${line.id ?? index}`,
+      lineType: line.type,
+      lineName: line.name,
+      lineAmount: Number(line.amount || 0),
+    });
+
+    if (t.targetType === VNPAY_TARGET.FEE_PAYMENT_BATCH || t.targetType === VNPAY_TARGET.MIXED_PAYMENT_BATCH) {
+      const feeIds = parseCsvIds(t.targetIds);
+      const utilityIds = parseCsvIds(t.utilityBillIds);
+      const feeAmounts = parseCsvAmounts(t.targetAmounts);
+      const feeLines = feeIds.map((id, index) => {
+        const row = feeRowsById.get(id);
+        return baseRow({
+          id,
+          type: VNPAY_TARGET.FEE_PAYMENT,
+          name: row ? `${row.name}${row.period ? ` - ${row.period}` : ""}` : `Khoản phí #${id}`,
+          amount: feeAmounts[index] ?? row?.amount ?? 0,
+        }, index);
+      });
+      const utilityLines = utilityIds.map((id, index) => {
+        const row = billRowsById.get(id);
+        return baseRow({
+          id,
+          type: VNPAY_TARGET.UTILITY_BILL,
+          name: row ? `${row.name}${row.period ? ` - ${row.period}` : ""}` : `Hoá đơn #${id}`,
+          amount: row?.amount ?? 0,
+        }, feeIds.length + index);
+      });
+      return [...feeLines, ...utilityLines];
+    }
+
+    const sourceRow = t.targetType === VNPAY_TARGET.FEE_PAYMENT
+      ? feeRowsById.get(Number(t.targetId))
+      : billRowsById.get(Number(t.targetId));
+    return [baseRow({
+      id: t.targetId,
+      type: t.targetType,
+      name: sourceRow ? `${sourceRow.name}${sourceRow.period ? ` - ${sourceRow.period}` : ""}` : `#${t.targetId}`,
+      amount: t.amount,
+    }, 0)];
+  });
+
+  const groupedAllHistoryRows = Array.from(
+    allHistoryRows
+      .reduce((map, row) => {
+        const key = row.transactionCode || `TX-${row.id}`;
+        const current = map.get(key) || {
+          ...row,
+          rowKey: `${row.id}-${key}`,
+          lines: [],
+        };
+        current.lines.push({
+          key: row.lineKey,
+          type: row.lineType,
+          name: row.lineName,
+          amount: row.lineAmount,
+        });
+        map.set(key, current);
+        return map;
+      }, new Map())
+      .values()
+  ).map((row) => {
+    const fallbackAmount = row.lines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+    return {
+      ...row,
+      summaryType: row.lines.length > 1 ? `Thanh toán gộp (${row.lines.length} khoản)` : transactionTypeLabel(row.lines[0]?.type),
+      summaryName: row.lines.length > 1 ? row.lines.map((line) => line.name).join(", ") : row.lines[0]?.name || "__",
+      summaryAmount: Number(row.amount || fallbackAmount || 0),
+    };
+  });
+
+  const groupedHistoryRows = groupedAllHistoryRows.filter((t) => {
     if (historyFilter === "SUCCESS") return t.status === "SUCCESS";
     if (historyFilter === "PENDING") return t.status === "PENDING";
     if (historyFilter === "FAILED") return t.status === "FAILED" || t.status === "CANCELLED";
     return true;
   });
-  const paginatedHistory = filteredHistory.slice(
+  const paginatedGroupedHistory = groupedHistoryRows.slice(
     (historyPage - 1) * HISTORY_PAGE_SIZE,
     historyPage * HISTORY_PAGE_SIZE
   );
+
+  const toggleHistory = (key) => {
+    setExpandedHistoryKeys((prev) => prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]);
+  };
 
   return (
     <>
@@ -239,11 +385,29 @@ export function MyFees() {
       </div>
 
       <Card className="mb-5">
-        <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_auto] md:items-end">
+        <div className="grid gap-3 lg:grid-cols-[minmax(180px,1.5fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] lg:items-end">
+          <Input
+            label="Tìm theo tên"
+            placeholder="Nhập tên khoản phí"
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+          />
           <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="ALL">Tất cả</option>
             <option value="PAID">Đã nộp</option>
             <option value="UNPAID">Chưa nộp</option>
+          </Select>
+          <Select label="Tháng" value={filters.month} onChange={(e) => setFilters({ ...filters, month: e.target.value })}>
+            <option value="ALL">Tất cả</option>
+            {monthOptions.map((key) => (
+              <option key={key} value={key}>{monthLabel(key)}</option>
+            ))}
+          </Select>
+          <Select label="Loại phí" value={filters.feeType} onChange={(e) => setFilters({ ...filters, feeType: e.target.value })}>
+            <option value="ALL">Tất cả</option>
+            <option value="MANDATORY">Bắt buộc</option>
+            <option value="DONATION">Đóng góp</option>
+            <option value="UTILITY">Hoá đơn</option>
           </Select>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-slate-600">
@@ -266,8 +430,9 @@ export function MyFees() {
                     aria-label="Chọn tất cả khoản phí có thể thanh toán"
                     type="checkbox"
                     checked={allSelectableChecked}
+                    disabled={selectableRows.length === 0}
                     onChange={toggleAll}
-                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
                   />
                 </th>
                 <th className="px-5 py-4">Nhóm</th>
@@ -282,7 +447,7 @@ export function MyFees() {
             <tbody className="divide-y divide-slate-100">
               {loading && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu...</td></tr>}
               {!loading && allRows.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có khoản phí nào phù hợp với bộ lọc.</td></tr>}
-              {!loading && allRows.map((r) => {
+              {!loading && paginatedRows.map((r) => {
                 const canSelect = selectableRows.some((row) => row.key === r.key);
                 return (
                   <tr key={r.key} className="hover:bg-slate-50/80">
@@ -322,7 +487,13 @@ export function MyFees() {
                           <CreditCard className="h-4 w-4" /> {payingId === r.key ? "Đang chuyển..." : "Thanh toán VNPay"}
                         </Button>
                       ) : (
-                        <span className="font-semibold text-emerald-600">Đã thanh toán</span>
+                        <span
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
+                          title="Đã thanh toán"
+                          aria-label="Đã thanh toán"
+                        >
+                          <CheckCircle2 className="h-5 w-5" />
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -331,18 +502,36 @@ export function MyFees() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={myFeesPage}
+          total={allRows.length}
+          pageSize={MY_FEES_PAGE_SIZE}
+          onPageChange={setMyFeesPage}
+        />
       </div>
 
       <div className="mt-8">
         <SectionHeader title="Lịch sử thanh toán VNPay" desc="Các giao dịch online của hộ bạn." />
         <Card className="mb-4">
-          <div className="grid gap-3 md:max-w-sm">
-            <Select label="Lọc lịch sử" value={historyFilter} onChange={(e) => setHistoryFilter(e.target.value)}>
-              <option value="ALL">Tất cả giao dịch</option>
-              <option value="SUCCESS">Đã thanh toán thành công</option>
-              <option value="PENDING">Đang chờ</option>
-              <option value="FAILED">Thất bại</option>
-            </Select>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "ALL", label: `Tất cả (${groupedAllHistoryRows.length})` },
+              { key: "SUCCESS", label: `Thành công (${groupedAllHistoryRows.filter((t) => t.status === "SUCCESS").length})` },
+              { key: "PENDING", label: `Đang chờ (${groupedAllHistoryRows.filter((t) => t.status === "PENDING").length})` },
+              { key: "FAILED", label: `Thất bại/Huỷ (${groupedAllHistoryRows.filter((t) => t.status === "FAILED" || t.status === "CANCELLED").length})` },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setHistoryFilter(f.key)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${
+                  historyFilter === f.key
+                    ? "bg-sky-600 text-white ring-sky-600"
+                    : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
         </Card>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -350,30 +539,64 @@ export function MyFees() {
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                 <tr>
+                  <th className="w-12 px-5 py-4"></th>
                   <th className="px-5 py-4">Mã giao dịch</th>
                   <th className="px-5 py-4">Loại</th>
+                  <th className="px-5 py-4">Nội dung</th>
                   <th className="px-5 py-4">Số tiền</th>
                   <th className="px-5 py-4">Trạng thái</th>
                   <th className="px-5 py-4">Thời gian</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredHistory.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Chưa có giao dịch nào phù hợp.</td></tr>}
-                {paginatedHistory.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/80">
-                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{t.transactionCode}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{transactionTypeLabel(t.targetType)}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(t.amount)}</td>
-                    <td className="whitespace-nowrap px-5 py-4">{txStatusBadge(t.status)}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-500">{t.createdAt ? new Date(t.createdAt).toLocaleString("vi-VN") : "__"}</td>
-                  </tr>
-                ))}
+                {groupedHistoryRows.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Chưa có giao dịch nào phù hợp.</td></tr>}
+                {paginatedGroupedHistory.map((t) => {
+                  const expanded = expandedHistoryKeys.includes(t.rowKey);
+                  const canExpand = t.lines.length > 1;
+                  return (
+                    <Fragment key={t.rowKey}>
+                      <tr className="hover:bg-slate-50/80">
+                        <td className="px-5 py-4">
+                          {canExpand && (
+                            <button
+                              type="button"
+                              onClick={() => toggleHistory(t.rowKey)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-800"
+                              aria-label={expanded ? "Thu gọn chi tiết" : "Mở chi tiết"}
+                            >
+                              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{t.transactionCode}</td>
+                        <td className="whitespace-nowrap px-5 py-4 text-slate-700">{t.summaryType}</td>
+                        <td className="max-w-xl px-5 py-4 font-semibold text-slate-800">
+                          <span className="line-clamp-2">{t.summaryName}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">{money(t.summaryAmount)}</td>
+                        <td className="whitespace-nowrap px-5 py-4">{txStatusBadge(t.status)}</td>
+                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">{t.createdAt ? new Date(t.createdAt).toLocaleString("vi-VN") : "__"}</td>
+                      </tr>
+                      {expanded && t.lines.map((line) => (
+                        <tr key={line.key} className="bg-slate-50/70">
+                          <td className="px-5 py-3"></td>
+                          <td className="px-5 py-3"></td>
+                          <td className="whitespace-nowrap px-5 py-3 text-slate-600">{transactionTypeLabel(line.type)}</td>
+                          <td className="px-5 py-3 text-sm font-semibold text-slate-700">{line.name}</td>
+                          <td className="whitespace-nowrap px-5 py-3 font-semibold text-slate-700">{money(line.amount)}</td>
+                          <td className="px-5 py-3"></td>
+                          <td className="px-5 py-3"></td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <Pagination
             page={historyPage}
-            total={filteredHistory.length}
+            total={groupedHistoryRows.length}
             pageSize={HISTORY_PAGE_SIZE}
             onPageChange={setHistoryPage}
           />
