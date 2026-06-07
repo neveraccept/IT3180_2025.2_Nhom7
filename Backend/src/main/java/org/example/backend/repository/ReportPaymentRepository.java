@@ -54,7 +54,37 @@ public interface ReportPaymentRepository extends JpaRepository<Payment, Long> {
                                                @Param("from") LocalDate from,
                                                @Param("to") LocalDate to);
 
-    // ---- F10.2: khoản đóng góp theo đợt (chỉ hộ thực sự đóng góp) ----
+    // ---- F10.1 (nhiều đợt thu cùng lúc): tổng hợp theo danh sách feePeriodIds ----
+
+    @Query("SELECT COUNT(p) FROM Payment p WHERE p.feePeriod.id IN :feePeriodIds")
+    long countByFeePeriodIdIn(@Param("feePeriodIds") List<Long> feePeriodIds);
+
+    @Query("SELECT COALESCE(SUM(p.amountDue), 0) FROM Payment p WHERE p.feePeriod.id IN :feePeriodIds")
+    BigDecimal sumAmountDueByFeePeriodIn(@Param("feePeriodIds") List<Long> feePeriodIds);
+
+    @Query("""
+            SELECT COUNT(p) FROM Payment p
+            WHERE p.feePeriod.id IN :feePeriodIds
+              AND p.status = 'PAID'
+              AND (:from IS NULL OR p.paidDate >= :from)
+              AND (:to IS NULL OR p.paidDate <= :to)
+            """)
+    long countPaidByFeePeriodInRange(@Param("feePeriodIds") List<Long> feePeriodIds,
+                                     @Param("from") LocalDate from,
+                                     @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT COALESCE(SUM(p.amountPaid), 0) FROM Payment p
+            WHERE p.feePeriod.id IN :feePeriodIds
+              AND (:from IS NULL OR p.paidDate >= :from)
+              AND (:to IS NULL OR p.paidDate <= :to)
+            """)
+    BigDecimal sumAmountPaidByFeePeriodInRange(@Param("feePeriodIds") List<Long> feePeriodIds,
+                                               @Param("from") LocalDate from,
+                                               @Param("to") LocalDate to);
+
+    // ---- F10.2: khoản đóng góp theo KHOẢN THU tự nguyện (Fee type=DONATION) ----
+    // Gom toàn bộ phiếu thuộc mọi đợt của khoản đóng góp này mà hộ thực sự đã đóng (amount_paid > 0).
 
     @Query("""
             SELECT h.code             AS householdCode,
@@ -66,11 +96,11 @@ public interface ReportPaymentRepository extends JpaRepository<Payment, Long> {
             JOIN p.household h
             JOIN h.apartment a
             LEFT JOIN h.headOfHousehold r
-            WHERE p.feePeriod.id = :feePeriodId
+            WHERE p.feePeriod.fee.id = :feeId
               AND p.amountPaid > 0
             ORDER BY p.paidDate DESC, h.code ASC
             """)
-    List<DonationContributionProjection> findContributions(@Param("feePeriodId") Long feePeriodId);
+    List<DonationContributionProjection> findContributionsByFee(@Param("feeId") Long feeId);
 
     // ---- F10.3: gộp theo hộ gia đình (toàn bộ phiếu nộp) ----
 

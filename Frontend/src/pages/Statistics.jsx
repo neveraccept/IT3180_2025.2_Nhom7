@@ -20,7 +20,7 @@ import {
   exportTransactionPdfAPI,
   downloadBlob,
 } from "../api/reportApi";
-import { listFeePeriodsAPI } from "../api/feeApi";
+import { listFeePeriodsAPI, searchFeesAPI } from "../api/feeApi";
 import { searchVnpayTransactionsAPI } from "../api/vnpayApi";
 
 const REPORT_PAGE_SIZE = 20;
@@ -35,12 +35,14 @@ const reportLabels = {
 
 export function Statistics() {
   const [feePeriods, setFeePeriods] = useState([]);
+  const [donationFees, setDonationFees] = useState([]);
 
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState(null);
 
   const [reportType, setReportType] = useState("households");
-  const [selectedPeriodId, setSelectedPeriodId] = useState("");
+  const [selectedPeriodIds, setSelectedPeriodIds] = useState([]); // multi-select đợt thu
+  const [selectedFeeId, setSelectedFeeId] = useState(""); // khoản đóng góp tự nguyện
   const [format, setFormat] = useState("excel");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -115,7 +117,7 @@ export function Statistics() {
         c.paidDate || "?",
       ]);
       return {
-        title: `${reportLabels[type]}${data?.feePeriodName ? ` - ${data.feePeriodName}` : ""}`,
+        title: `${reportLabels[type]}${data?.feeName ? ` - ${data.feeName}` : ""}`,
         columns: ["Căn hộ", "Chủ hộ", "Số tiền", "Ngày nộp"],
         rows,
         summary: `Số hộ đóng góp: ${data?.contributorCount ?? rows.length} | Tổng tiền: ${money(data?.totalAmount || 0)}`,
@@ -138,8 +140,12 @@ export function Statistics() {
   };
 
   const handleApplyReport = async () => {
-    if ((reportType === "fee-period" || reportType === "donation") && !selectedPeriodId) {
-      showToast("Vui lòng chọn đợt thu.", "error");
+    if (reportType === "fee-period" && selectedPeriodIds.length === 0) {
+      showToast("Vui lòng chọn ít nhất một đợt thu.", "error");
+      return;
+    }
+    if (reportType === "donation" && !selectedFeeId) {
+      showToast("Vui lòng chọn khoản đóng góp.", "error");
       return;
     }
 
@@ -153,9 +159,9 @@ export function Statistics() {
     } else if (reportType === "residents") {
       res = await getResidentStatisticsAPI(range);
     } else if (reportType === "fee-period") {
-      res = await getFeePeriodStatisticsAPI(selectedPeriodId, range);
+      res = await getFeePeriodStatisticsAPI(selectedPeriodIds, range);
     } else if (reportType === "donation") {
-      res = await getDonationStatisticsAPI(selectedPeriodId);
+      res = await getDonationStatisticsAPI(selectedFeeId);
     } else {
       res = await searchVnpayTransactionsAPI({
         status: statusFilter || undefined,
@@ -176,16 +182,26 @@ export function Statistics() {
   };
 
   useEffect(() => {
-    if ((reportType === "fee-period" || reportType === "donation") && feePeriods.length === 0) {
+    if (reportType === "fee-period" && feePeriods.length === 0) {
       listFeePeriodsAPI().then((res) => {
         if (res.success) setFeePeriods(res.data?.items || []);
       });
     }
-  }, [reportType, feePeriods.length]);
+    if (reportType === "donation" && donationFees.length === 0) {
+      // Chỉ lấy các khoản thu tự nguyện (type=DONATION) cho ô chọn khoản đóng góp.
+      searchFeesAPI({ type: "DONATION" }).then((res) => {
+        if (res.success) setDonationFees(res.data?.items || []);
+      });
+    }
+  }, [reportType, feePeriods.length, donationFees.length]);
 
   const handleExport = async () => {
-    if ((reportType === "fee-period" || reportType === "donation") && !selectedPeriodId) {
-      showToast("Vui lòng chọn đợt thu.", "error");
+    if (reportType === "fee-period" && selectedPeriodIds.length === 0) {
+      showToast("Vui lòng chọn ít nhất một đợt thu.", "error");
+      return;
+    }
+    if (reportType === "donation" && !selectedFeeId) {
+      showToast("Vui lòng chọn khoản đóng góp.", "error");
       return;
     }
 
@@ -206,14 +222,14 @@ export function Statistics() {
         filename = `thong-ke-dan-cu.${ext}`;
       } else if (reportType === "fee-period") {
         res = isPdf
-          ? await exportFeePeriodPdfAPI(selectedPeriodId)
-          : await exportFeePeriodExcelAPI(selectedPeriodId);
-        filename = `tinh-trang-dot-thu-${selectedPeriodId}.${ext}`;
+          ? await exportFeePeriodPdfAPI(selectedPeriodIds)
+          : await exportFeePeriodExcelAPI(selectedPeriodIds);
+        filename = `tinh-trang-dot-thu.${ext}`;
       } else if (reportType === "donation") {
         res = isPdf
-          ? await exportDonationPdfAPI(selectedPeriodId)
-          : await exportDonationExcelAPI(selectedPeriodId);
-        filename = `dong-gop-dot-${selectedPeriodId}.${ext}`;
+          ? await exportDonationPdfAPI(selectedFeeId)
+          : await exportDonationExcelAPI(selectedFeeId);
+        filename = `khoan-dong-gop-${selectedFeeId}.${ext}`;
       } else {
         const params = {
           status: statusFilter || undefined,
@@ -237,7 +253,6 @@ export function Statistics() {
     }
   };
 
-  const needsPeriod = reportType === "fee-period" || reportType === "donation";
   const needsDates = reportType === "transactions";
 
   return (
@@ -268,7 +283,8 @@ export function Statistics() {
             value={reportType}
             onChange={(e) => {
               setReportType(e.target.value);
-              setSelectedPeriodId("");
+              setSelectedPeriodIds([]);
+              setSelectedFeeId("");
               setReportPage(1);
               setReportResult(null);
             }}
@@ -286,13 +302,75 @@ export function Statistics() {
           </Select>
         </div>
 
-        {needsPeriod && (
+        {reportType === "fee-period" && (
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700">
+                Đợt thu (chọn một hoặc nhiều)
+              </span>
+              {feePeriods.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs font-bold text-sky-600 hover:underline"
+                  onClick={() =>
+                    setSelectedPeriodIds(
+                      selectedPeriodIds.length === feePeriods.length
+                        ? []
+                        : feePeriods.map((p) => String(p.id))
+                    )
+                  }
+                >
+                  {selectedPeriodIds.length === feePeriods.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                </button>
+              )}
+            </div>
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3">
+              {feePeriods.length === 0 ? (
+                <p className="px-1 py-2 text-sm text-slate-400">Đang tải danh sách đợt thu...</p>
+              ) : (
+                feePeriods.map((p) => {
+                  const id = String(p.id);
+                  const checked = selectedPeriodIds.includes(id);
+                  return (
+                    <label
+                      key={p.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-200"
+                        checked={checked}
+                        onChange={() =>
+                          setSelectedPeriodIds((prev) =>
+                            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                          )
+                        }
+                      />
+                      <span>{p.name}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            {selectedPeriodIds.length > 0 && (
+              <p className="mt-1.5 text-xs font-semibold text-slate-500">
+                Đã chọn {selectedPeriodIds.length} đợt thu.
+              </p>
+            )}
+          </div>
+        )}
+
+        {reportType === "donation" && (
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Select label="Đợt thu" value={selectedPeriodId} onChange={(e) => setSelectedPeriodId(e.target.value)}>
-              <option value="">-- Chọn đợt thu --</option>
-              {feePeriods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+            <Select
+              label="Khoản đóng góp (tự nguyện)"
+              value={selectedFeeId}
+              onChange={(e) => setSelectedFeeId(e.target.value)}
+            >
+              <option value="">-- Chọn khoản đóng góp --</option>
+              {donationFees.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
                 </option>
               ))}
             </Select>

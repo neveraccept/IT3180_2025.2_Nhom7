@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.ParkingRegistrationDTO;
 import org.example.backend.dto.ParkingSlotDTO;
@@ -100,6 +101,7 @@ public class ParkingService {
     }
 
     // F6.1 (gán xe hộ) + F6.5 (cho thuê chỗ thừa).
+    @LogAdminAction(entity = "ParkingRegistration", action = "CREATE", description = "Gán/cho thuê chỗ gửi xe")
     @Transactional
     public ParkingRegistrationDTO createRegistration(CreateParkingRegistrationRequest req) {
         ParkingSlot slot = slotRepository.findById(req.slotId())
@@ -169,6 +171,7 @@ public class ParkingService {
     }
 
     // F6.2 / F6.5 - Kết thúc một lượt đăng ký/cho thuê, trả chỗ về EMPTY.
+    @LogAdminAction(entity = "ParkingRegistration", action = "UPDATE", description = "Kết thúc lượt gửi xe, trả chỗ về trống")
     @Transactional
     public ParkingRegistrationDTO endRegistration(Long id) {
         ParkingRegistration reg = registrationRepository.findById(id)

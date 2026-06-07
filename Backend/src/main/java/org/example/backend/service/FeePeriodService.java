@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.FeePeriodDTO;
 import org.example.backend.entity.Fee;
 import org.example.backend.entity.FeePeriod;
@@ -52,6 +53,7 @@ public class FeePeriodService {
         return convertToDto(feePeriod);
     }
 
+    @LogAdminAction(entity = "FeePeriod", action = "CREATE", description = "Tạo đợt thu phí & sinh phiếu thu cho các hộ")
     @Transactional
     public FeePeriodDTO createFeePeriod(FeePeriodDTO dto) {
         Fee fee = feeRepository.findById(dto.getFeeId())
@@ -76,6 +78,7 @@ public class FeePeriodService {
      * (vd: đợt thu được seed/khởi tạo trước khi có cơ chế tự sinh phiếu).
      * Idempotent — đợt nào đã có phiếu sẽ được bỏ qua. Trả về số đợt được backfill.
      */
+    @LogAdminAction(entity = "FeePeriod", action = "UPDATE", description = "Backfill sinh phiếu thu còn thiếu cho các đợt thu")
     @Transactional
     public int backfillMissingPayments() {
         int periodsFixed = 0;
@@ -133,6 +136,7 @@ public class FeePeriodService {
         };
     }
 
+    @LogAdminAction(entity = "FeePeriod", action = "UPDATE", description = "Cập nhật đợt thu phí")
     @Transactional
     public FeePeriodDTO updateFeePeriod(Long id, FeePeriodDTO dto) {
         FeePeriod feePeriod = feePeriodRepository.findById(id)
@@ -144,6 +148,7 @@ public class FeePeriodService {
         return convertToDto(feePeriodRepository.save(feePeriod));
     }
 
+    @LogAdminAction(entity = "FeePeriod", action = "UPDATE", description = "Đóng đợt thu phí (CLOSED)")
     @Transactional
     public void closeFeePeriod(Long id) {
         FeePeriod feePeriod = feePeriodRepository.findById(id)

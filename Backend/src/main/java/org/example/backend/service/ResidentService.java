@@ -1,6 +1,7 @@
 package org.example.backend.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.ResidentSummaryDTO;
 import org.example.backend.dto.ResidentDetailDTO;
@@ -35,6 +36,7 @@ public class ResidentService {
     private final ApartmentMapper apartmentMapper;
 
     //Thêm nhân khẩu vào hộ khẩu
+    @LogAdminAction(entity = "Resident", action = "CREATE", description = "Thêm nhân khẩu vào hộ khẩu")
     public ResidentDetailDTO createResident(CreateResidentRequest req) {
 
         Household household = householdRepository.findById(req.householdId())
@@ -72,6 +74,7 @@ public class ResidentService {
     }
 
     // Sửa nhân khẩu
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Cập nhật thông tin nhân khẩu")
     public ResidentDetailDTO updateResident(Long id, UpdateResidentRequest req) {
 
         Resident r = findActiveResidentOrThrow(id);
@@ -94,6 +97,7 @@ public class ResidentService {
     }
 
     //  Chuyển nhân khẩu khỏi hộ
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu ra khỏi hộ (MOVED_OUT)")
     public ResidentDetailDTO moveOutResident(Long id) {
 
         Resident r = findActiveResidentOrThrow(id);
@@ -113,11 +117,13 @@ public class ResidentService {
     }
 
     //  Đăng ký tạm trú
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Đăng ký tạm trú cho nhân khẩu")
     public ResidentDetailDTO registerTemporaryResidence(Long id) {
         return changeResidencyStatus(id, ResidencyStatus.TEMPORARY);
     }
 
     //  Chuyển tạm trú về thường trú
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu về thường trú")
     public ResidentDetailDTO registerPermanentResidence(Long id) {
         return changeResidencyStatus(id, ResidencyStatus.PERMANENT);
     }

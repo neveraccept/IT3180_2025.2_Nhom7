@@ -32,11 +32,21 @@ const dateParams = ({ from, to } = {}) => {
   return params;
 };
 
-export const getFeePeriodStatisticsAPI = (feePeriodId, range = {}) =>
-  callApi(axiosClient.get(`/api/reports/fee-periods/${feePeriodId}/statistics`, { params: dateParams(range) }));
+// Gộp danh sách id đợt thu thành chuỗi "1,2,3" để Spring bind vào List<Long> feePeriodIds.
+const joinIds = (ids) =>
+  (Array.isArray(ids) ? ids : [ids]).filter((v) => v !== "" && v != null).join(",");
 
-export const getDonationStatisticsAPI = (feePeriodId) =>
-  callApi(axiosClient.get(`/api/reports/donations/${feePeriodId}/statistics`));
+// F10.1 - Thống kê MỘT hoặc NHIỀU đợt thu cùng lúc (feePeriodIds là mảng id).
+export const getFeePeriodStatisticsAPI = (feePeriodIds, range = {}) =>
+  callApi(
+    axiosClient.get("/api/reports/fee-periods/statistics", {
+      params: { feePeriodIds: joinIds(feePeriodIds), ...dateParams(range) },
+    })
+  );
+
+// F10.2 - Thống kê khoản đóng góp tự nguyện theo KHOẢN THU (feeId).
+export const getDonationStatisticsAPI = (feeId) =>
+  callApi(axiosClient.get(`/api/reports/donations/${feeId}/statistics`));
 
 export const getHouseholdStatisticsAPI = (range = {}) =>
   callApi(axiosClient.get("/api/reports/households/statistics", { params: dateParams(range) }));
@@ -48,11 +58,16 @@ export const getResidentStatisticsAPI = (range = {}) =>
 //  Xuất Excel (responseType: 'blob')
 // ============================================================
 
-export const exportFeePeriodExcelAPI = (feePeriodId) =>
-  callApi(axiosClient.get(`/api/reports/fee-periods/${feePeriodId}/excel`, { responseType: "blob" }));
+export const exportFeePeriodExcelAPI = (feePeriodIds) =>
+  callApi(
+    axiosClient.get("/api/reports/fee-periods/excel", {
+      responseType: "blob",
+      params: { feePeriodIds: joinIds(feePeriodIds) },
+    })
+  );
 
-export const exportDonationExcelAPI = (feePeriodId) =>
-  callApi(axiosClient.get(`/api/reports/donations/${feePeriodId}/excel`, { responseType: "blob" }));
+export const exportDonationExcelAPI = (feeId) =>
+  callApi(axiosClient.get(`/api/reports/donations/${feeId}/excel`, { responseType: "blob" }));
 
 export const exportHouseholdExcelAPI = () =>
   callApi(axiosClient.get("/api/reports/households/excel", { responseType: "blob" }));
@@ -74,11 +89,16 @@ export const exportTransactionExcelAPI = ({ status, from, to } = {}) => {
 //  Xuất PDF (responseType: 'blob')
 // ============================================================
 
-export const exportFeePeriodPdfAPI = (feePeriodId) =>
-  callApi(axiosClient.get(`/api/reports/fee-periods/${feePeriodId}/pdf`, { responseType: "blob" }));
+export const exportFeePeriodPdfAPI = (feePeriodIds) =>
+  callApi(
+    axiosClient.get("/api/reports/fee-periods/pdf", {
+      responseType: "blob",
+      params: { feePeriodIds: joinIds(feePeriodIds) },
+    })
+  );
 
-export const exportDonationPdfAPI = (feePeriodId) =>
-  callApi(axiosClient.get(`/api/reports/donations/${feePeriodId}/pdf`, { responseType: "blob" }));
+export const exportDonationPdfAPI = (feeId) =>
+  callApi(axiosClient.get(`/api/reports/donations/${feeId}/pdf`, { responseType: "blob" }));
 
 export const exportHouseholdPdfAPI = () =>
   callApi(axiosClient.get("/api/reports/households/pdf", { responseType: "blob" }));

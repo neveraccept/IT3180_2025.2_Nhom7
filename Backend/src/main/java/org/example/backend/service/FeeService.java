@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.FeeDTO;
 import org.example.backend.entity.Fee;
 import org.example.backend.exception.BadRequestException;
@@ -34,6 +35,7 @@ public class FeeService {
     @Autowired
     private FeePeriodRepository feePeriodRepository;
 
+    @LogAdminAction(entity = "Fee", action = "CREATE", description = "Tạo khoản thu")
     @Transactional
     public FeeDTO createFee(FeeDTO dto) {
         if(feeRepository.existsByName(dto.getName())) {
@@ -46,6 +48,7 @@ public class FeeService {
         return convertToDto(feeRepository.save(fee));
     }
 
+    @LogAdminAction(entity = "Fee", action = "UPDATE", description = "Cập nhật khoản thu")
     @Transactional
     public FeeDTO updateFee(Long id, FeeDTO dto) {
         Fee fee = feeRepository.findById(id)
@@ -92,6 +95,7 @@ public class FeeService {
         }
     }
 
+    @LogAdminAction(entity = "Fee", action = "DELETE", description = "Xóa hoặc ngừng sử dụng khoản thu")
     @Transactional
     public void deleteOrDeactivateFee(Long id) {
         Fee fee = feeRepository.findById(id)

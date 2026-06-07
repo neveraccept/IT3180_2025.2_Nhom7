@@ -43,20 +43,21 @@ public class ReportController {
 
     // ===================== THỐNG KÊ (JSON) =====================
 
-    // F10.1 - Thống kê tình trạng đợt thu (lọc tuỳ chọn theo khoảng ngày thanh toán)
-    @GetMapping("/fee-periods/{id}/statistics")
+    // F10.1 - Thống kê tình trạng MỘT HOẶC NHIỀU đợt thu (feePeriodIds=1,2,3),
+    // lọc tuỳ chọn theo khoảng ngày thanh toán.
+    @GetMapping("/fee-periods/statistics")
     public ResponseEntity<ApiResponse<FeePeriodStatisticsDTO>> feePeriodStatistics(
-            @PathVariable Long id,
+            @RequestParam List<Long> feePeriodIds,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(ApiResponse.ok(reportService.getFeePeriodStatistics(id, from, to)));
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getFeePeriodStatistics(feePeriodIds, from, to)));
     }
 
-    // F10.2 - Thống kê khoản đóng góp theo đợt
-    @GetMapping("/donations/{feePeriodId}/statistics")
+    // F10.2 - Thống kê khoản đóng góp tự nguyện theo KHOẢN THU (Fee type=DONATION)
+    @GetMapping("/donations/{feeId}/statistics")
     public ResponseEntity<ApiResponse<DonationStatisticsDTO>> donationStatistics(
-            @PathVariable Long feePeriodId) {
-        return ResponseEntity.ok(ApiResponse.ok(reportService.getDonationStatistics(feePeriodId)));
+            @PathVariable Long feeId) {
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getDonationStatistics(feeId)));
     }
 
     // F10.3 - Thống kê theo hộ gia đình (lọc tuỳ chọn theo khoảng ngày thanh toán)
@@ -77,14 +78,14 @@ public class ReportController {
 
     // ===================== XUáº¤T EXCEL (F10.5) =====================
 
-    @GetMapping("/fee-periods/{id}/excel")
-    public ResponseEntity<byte[]> feePeriodExcel(@PathVariable Long id) {
-        return excel(reportService.exportFeePeriodExcel(id), "tinh-trang-dot-thu-" + id);
+    @GetMapping("/fee-periods/excel")
+    public ResponseEntity<byte[]> feePeriodExcel(@RequestParam List<Long> feePeriodIds) {
+        return excel(reportService.exportFeePeriodExcel(feePeriodIds), "tinh-trang-dot-thu");
     }
 
-    @GetMapping("/donations/{feePeriodId}/excel")
-    public ResponseEntity<byte[]> donationExcel(@PathVariable Long feePeriodId) {
-        return excel(reportService.exportDonationExcel(feePeriodId), "dong-gop-dot-" + feePeriodId);
+    @GetMapping("/donations/{feeId}/excel")
+    public ResponseEntity<byte[]> donationExcel(@PathVariable Long feeId) {
+        return excel(reportService.exportDonationExcel(feeId), "khoan-dong-gop-" + feeId);
     }
 
     @GetMapping("/households/excel")
@@ -108,14 +109,14 @@ public class ReportController {
 
     // ===================== XUáº¤T PDF (F10.6) =====================
 
-    @GetMapping("/fee-periods/{id}/pdf")
-    public ResponseEntity<byte[]> feePeriodPdf(@PathVariable Long id) {
-        return pdf(reportService.exportFeePeriodPdf(id), "tinh-trang-dot-thu-" + id);
+    @GetMapping("/fee-periods/pdf")
+    public ResponseEntity<byte[]> feePeriodPdf(@RequestParam List<Long> feePeriodIds) {
+        return pdf(reportService.exportFeePeriodPdf(feePeriodIds), "tinh-trang-dot-thu");
     }
 
-    @GetMapping("/donations/{feePeriodId}/pdf")
-    public ResponseEntity<byte[]> donationPdf(@PathVariable Long feePeriodId) {
-        return pdf(reportService.exportDonationPdf(feePeriodId), "dong-gop-dot-" + feePeriodId);
+    @GetMapping("/donations/{feeId}/pdf")
+    public ResponseEntity<byte[]> donationPdf(@PathVariable Long feeId) {
+        return pdf(reportService.exportDonationPdf(feeId), "khoan-dong-gop-" + feeId);
     }
 
     @GetMapping("/households/pdf")

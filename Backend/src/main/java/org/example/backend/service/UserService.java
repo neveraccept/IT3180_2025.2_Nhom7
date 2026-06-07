@@ -29,6 +29,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final UserMapper userMapper;
+    private final HouseholdLifecycleService householdLifecycleService;
 
     @Autowired
     public UserService(UserRepository userRepo,
@@ -38,7 +39,8 @@ public class UserService {
                        PasswordEncoder passwordEncoder,
                        EmailOtpRepository emailOtpRepo,
                        EmailService emailService,
-                       UserMapper userMapper) {
+                       UserMapper userMapper,
+                       HouseholdLifecycleService householdLifecycleService) {
         this.userRepo = userRepo;
         this.roleRepo = roleRepo;
         this.apartmentRepo = apartmentRepo;
@@ -47,6 +49,7 @@ public class UserService {
         this.emailService = emailService;
         this.emailOtpRepo = emailOtpRepo;
         this.userMapper = userMapper;
+        this.householdLifecycleService = householdLifecycleService;
     }
 
     //Admin tạo tài khoản nội bộ
@@ -221,8 +224,12 @@ public class UserService {
     /**
      * Xóa mềm tài khoản (Admin): đặt deleted = true và active = false.
      * Không xóa cứng để tránh lỗi khóa ngoại với hóa đơn, khiếu nại, xe... đang tham chiếu tới user.
+     *
+     * Đồng bộ 2 chiều: nếu tài khoản đang gắn với một hộ dân ACTIVE thì tự động chuyển hộ đó
+     * ra khỏi căn hộ (Household -> MOVED_OUT, nhân khẩu -> MOVED_OUT, căn hộ -> AVAILABLE).
+     * forceMoveOut cũng sẽ vô hiệu hóa toàn bộ tài khoản của hộ (bao gồm tài khoản này).
      */
-    @LogAdminAction(entity = "User", action = "DELETE", description = "Xóa mềm tài khoản")
+    @LogAdminAction(entity = "User", action = "DELETE", description = "Xóa mềm tài khoản & chuyển hộ dân ra khỏi căn hộ")
     @Transactional
     public void deleteUser(Long id) {
         User user = userRepo.findById(id)
@@ -232,6 +239,13 @@ public class UserService {
             throw new IllegalArgumentException("Tài khoản này đã bị xóa trước đó!");
         }
 
+        Household household = user.getHousehold();
+        if (household != null && household.getStatus() == HouseholdStatus.ACTIVE) {
+            // Chuyển hộ ra khỏi căn hộ; thao tác này cũng xóa mềm các tài khoản gắn với hộ.
+            householdLifecycleService.forceMoveOut(household.getId());
+        }
+
+        // Đảm bảo tài khoản đang xóa luôn ở trạng thái deleted (kể cả khi không thuộc hộ nào).
         user.setDeleted(true);
         user.setActive(false);
         userRepo.saveAndFlush(user);

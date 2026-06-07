@@ -52,6 +52,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
               AND u.household.id IN :householdIds
             """)
 	List<User> findActiveResidentsByHouseholdIds(@Param("householdIds") List<Long> householdIds);
+
+	// Phục vụ đồng bộ 2 chiều Hộ dân <-> Tài khoản: lấy mọi tài khoản gắn với một hộ.
+	List<User> findByHousehold_Id(Long householdId);
 }
 
 

@@ -1,6 +1,7 @@
 package org.example.backend.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
 import org.example.backend.dto.PaymentTransactionDTO;
@@ -75,6 +76,7 @@ public class PaymentService {
 
     // ============================ XÁC NHẬN TIỀN MẶT =========================
 
+    @LogAdminAction(entity = "Payment", action = "UPDATE", description = "Xác nhận thu tiền mặt phiếu nộp")
     @Transactional
     public PaymentDetailDTO confirmCashPayment(Long paymentId, Long adminUserId) {
         Payment p = paymentRepository.findById(paymentId)
