@@ -7,7 +7,6 @@ import org.example.backend.dto.request.UpdateHouseholdRequest;
 import org.example.backend.entity.Apartment;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.Resident;
-import org.example.backend.entity.User;
 import org.example.backend.entity.enums.ApartmentStatus;
 import org.example.backend.entity.enums.HouseholdStatus;
 import org.example.backend.entity.enums.ResidencyStatus;
@@ -17,13 +16,10 @@ import org.example.backend.exception.NotFoundException;
 import org.example.backend.repository.ApartmentRepository;
 import org.example.backend.repository.HouseholdRepository;
 import org.example.backend.repository.ResidentRepository;
-import org.example.backend.repository.UserRepository;
 import org.example.backend.service.mapper.ApartmentMapper;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class HouseholdLifecycleService {
@@ -31,18 +27,15 @@ public class HouseholdLifecycleService {
     private final ApartmentRepository apartmentRepository;
     private final HouseholdRepository householdRepository;
     private final ResidentRepository residentRepository;
-    private final UserRepository userRepository;
     private final ApartmentMapper mapper;
 
     public HouseholdLifecycleService(ApartmentRepository apartmentRepository,
                                      HouseholdRepository householdRepository,
                                      ResidentRepository residentRepository,
-                                     UserRepository userRepository,
                                      ApartmentMapper mapper) {
         this.apartmentRepository = apartmentRepository;
         this.householdRepository = householdRepository;
         this.residentRepository = residentRepository;
-        this.userRepository = userRepository;
         this.mapper = mapper;
     }
 
@@ -214,39 +207,8 @@ public class HouseholdLifecycleService {
         ap.setStatus(ApartmentStatus.AVAILABLE);
         apartmentRepository.save(ap);
 
-        // Đồng bộ: hộ chuyển ra -> tự động xóa mềm (vô hiệu hóa) các tài khoản gắn với hộ.
-        deactivateAccountsOfHousehold(h.getId());
-
         // Trả về snapshot trạng thái sau khi move out để FE refresh
         return mapper.toHouseholdSummary(h);
-    }
-
-    /**
-     * Đồng bộ một chiều User -> Hộ dân: dùng khi xóa tài khoản (UserService) cần đẩy hộ tương ứng
-     * ra khỏi căn hộ. Idempotent — nếu hộ đã MOVED_OUT thì bỏ qua.
-     */
-    @Transactional
-    public void forceMoveOut(Long householdId) {
-        Household h = householdRepository.findById(householdId).orElse(null);
-        if (h == null || h.getStatus() != HouseholdStatus.ACTIVE) {
-            return;
-        }
-        doMoveOut(h.getApartment(), h);
-    }
-
-    /** Vô hiệu hóa & xóa mềm toàn bộ tài khoản đang gắn với một hộ dân. */
-    private void deactivateAccountsOfHousehold(Long householdId) {
-        List<User> users = userRepository.findByHousehold_Id(householdId);
-        for (User u : users) {
-            if (u.isDeleted() && !u.isActive()) {
-                continue; // đã xử lý trước đó
-            }
-            u.setActive(false);
-            u.setDeleted(true);
-        }
-        if (!users.isEmpty()) {
-            userRepository.saveAll(users);
-        }
     }
 
 
