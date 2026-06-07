@@ -247,7 +247,7 @@ export function Accounts() {
                 />
                 <Input
                   label="Căn hộ"
-                  placeholder="VD: 1201"
+                  placeholder="VD: A12-01"
                   value={formData.apartment}
                   disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
@@ -271,12 +271,6 @@ export function Accounts() {
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   />
                 </div>
-              )}
-
-              {mode === "create" && (
-                <p className="text-xs text-slate-500">
-                  Lưu ý: email phải được xác thực OTP trước khi tạo tài khoản nội bộ (theo quy tắc của backend).
-                </p>
               )}
 
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}

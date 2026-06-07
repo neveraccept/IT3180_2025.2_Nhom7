@@ -260,7 +260,7 @@ export function Notifications({
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Nhập mã căn hộ (VD: 1201)"
+                    placeholder="Nhập mã căn hộ (VD: A12-01)"
                     value={aptCodeInput}
                     onChange={(e) => {
                       setAptCodeInput(e.target.value);

@@ -201,7 +201,7 @@ export function Apartments() {
       <div className="mb-5 grid gap-3 md:grid-cols-4">
         <Input
           label="Số căn hộ"
-          placeholder="VD: 1201"
+          placeholder="VD: A12-01"
           value={filters.code}
           onChange={(e) => setFilters({ ...filters, code: e.target.value })}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
