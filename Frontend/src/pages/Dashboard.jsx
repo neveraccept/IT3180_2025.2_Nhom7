@@ -66,17 +66,21 @@ export function Dashboard({ role }) {
           listMyUtilityBillsAPI(),
         ]);
         if (!cancelled) {
-          const fees = (paymentsRes.data?.items || []).filter((p) => p.status === "UNPAID");
+          const fees = (paymentsRes.data?.items || []).filter(
+            (p) => p.status === "UNPAID" && String(p.feePeriodStatus || "OPEN").toUpperCase() !== "CLOSED"
+          );
           const bills = (billsRes.data?.items || []).filter((b) => b.status === "UNPAID");
           setUnpaidItems([
             ...fees.map((p) => ({
               id: `FEE-${p.id}`,
+              sortId: Number(p.id || 0),
               name: p.feeName || p.feePeriodName || "Khoản phí",
               period: p.feePeriodName || "",
               amount: Number(p.amountDue || 0),
             })),
             ...bills.map((b) => ({
               id: `BILL-${b.id}`,
+              sortId: Number(b.id || 0),
               name: `Hóa đơn ${b.type === "ELECTRICITY" ? "Điện" : b.type === "WATER" ? "Nước" : "Internet"}`,
               period: `Tháng ${b.month}/${b.year}`,
               amount: Number(b.amount || 0),
@@ -94,6 +98,9 @@ export function Dashboard({ role }) {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const unpaidTotal = unpaidItems.reduce((s, r) => s + r.amount, 0);
+  const recentUnpaidItems = [...unpaidItems]
+    .sort((a, b) => b.sortId - a.sortId)
+    .slice(0, 5);
   // 5 thông báo gần nhất (mới nhất lên trước).
   const recentNotifications = [...notifications]
     .sort((a, b) => new Date(b.sentAt || 0) - new Date(a.sentAt || 0))
@@ -135,7 +142,7 @@ export function Dashboard({ role }) {
                 </div>
               )}
               {!loading &&
-                unpaidItems.map((item) => (
+                recentUnpaidItems.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4"
@@ -150,6 +157,11 @@ export function Dashboard({ role }) {
                     <Badge tone="red">Chưa nộp</Badge>
                   </div>
                 ))}
+              {!loading && unpaidItems.length > 5 && (
+                <p className="pt-1 text-center text-xs font-semibold text-slate-400">
+                  Đang hiển thị 5 khoản mới nhất / {unpaidItems.length} khoản chưa nộp.
+                </p>
+              )}
             </div>
           </Card>
 
