@@ -12,6 +12,7 @@ public record UserDTO(
      Boolean active,
      Boolean emailVerified,
      String requestedApartmentCode,
+     String apartmentCode,
      Long householdId,
      String role,
      // Nhân khẩu mà tài khoản đại diện (null với tài khoản nội bộ). Phục vụ tab "Tài khoản" trong trang Căn hộ.

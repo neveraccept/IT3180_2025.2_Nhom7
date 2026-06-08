@@ -9,6 +9,11 @@ import org.springframework.stereotype.Component;
 public class UserMapper {
 
     public UserDTO toDto(User user) {
+        String apartmentCode = null;
+        if (user.getHousehold() != null && user.getHousehold().getApartment() != null) {
+            apartmentCode = user.getHousehold().getApartment().getCode();
+        }
+
         return new UserDTO(
                 user.getId(),
                 user.getUsername(),
@@ -18,6 +23,7 @@ public class UserMapper {
                 user.isActive(),
                 user.isEmailVerified(),
                 user.getRequestedApartmentCode(),
+                apartmentCode,
                 user.getHousehold() != null ? user.getHousehold().getId() : null,
                 user.getRole() != null ? user.getRole().getName() : null,
                 user.getResident() != null ? user.getResident().getId() : null,

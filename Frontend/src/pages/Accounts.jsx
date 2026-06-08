@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Trash2, Lock, Unlock } from "lucide-react";
-import { getAllUsersAPI, createInternalAccountAPI, deleteUserAPI, lockUserAPI, unlockUserAPI } from "../api/authApi";
+import { Search, Plus, Trash2, Lock, Unlock, Pencil, Save } from "lucide-react";
+import { getAllUsersAPI, createInternalAccountAPI, updateUserAPI, deleteUserAPI, lockUserAPI, unlockUserAPI } from "../api/authApi";
 import { Badge, Button, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
@@ -12,8 +12,8 @@ const toRow = (dto) => ({
   fullName: dto.fullName || dto.username,
   email: dto.email || "",
   phone: dto.phone || "",
-  // Backend chưa trả mã căn hộ thực tế trong UserDTO -> dùng mã đã khai khi đăng ký.
-  apartment: dto.requestedApartmentCode || "",
+  // Ưu tiên căn hộ thực tế qua household; fallback về mã đã khai khi đăng ký.
+  apartment: dto.apartmentCode || dto.requestedApartmentCode || "",
   role: dto.role || "RESIDENT",
   active: dto.active ? "Hoạt động" : "Khoá",
 });
@@ -35,7 +35,7 @@ export function Accounts() {
   };
 
   const [showForm, setShowForm] = useState(false);
-  const [mode, setMode] = useState("create"); // "create" | "view"
+  const [mode, setMode] = useState("create"); // "create" | "view" | "edit"
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -155,6 +155,14 @@ export function Accounts() {
     setShowForm(false);
   };
 
+  const validateAccountInfo = () => {
+    if (!formData.fullName.trim() || !formData.username.trim() || !formData.email.trim()) {
+      setError("Vui lòng nhập đầy đủ họ tên, username và email");
+      return false;
+    }
+    return true;
+  };
+
   const validateCreateForm = () => {
     if (
       !formData.fullName.trim() ||
@@ -202,6 +210,33 @@ export function Accounts() {
     fetchUsers();
   };
 
+  const handleUpdate = async () => {
+    if (!selectedAccount?.id || !validateAccountInfo()) return;
+
+    setSaving(true);
+    setError("");
+    const res = await updateUserAPI(selectedAccount.id, {
+      username: formData.username.trim(),
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      requestedApartmentCode: formData.apartment.trim() || null,
+      role: formData.role,
+    });
+    setSaving(false);
+
+    if (!res.success) {
+      setError(res.message || "Cập nhật tài khoản thất bại.");
+      return;
+    }
+
+    const updated = toRow(res.data);
+    setSelectedAccount(updated);
+    setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+    setMode("view");
+    showToast("Đã cập nhật thông tin tài khoản.", "green");
+  };
+
   return (
     <>
       <SectionHeader
@@ -218,7 +253,7 @@ export function Accounts() {
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
           >
             <h3 className="mb-4 text-xl font-black text-slate-900">
-              {mode === "view" ? "Chi tiết tài khoản" : "Tạo tài khoản mới"}
+              {mode === "create" ? "Tạo tài khoản mới" : mode === "edit" ? "Chỉnh sửa tài khoản" : "Chi tiết tài khoản"}
             </h3>
 
             <div className="space-y-4">
@@ -297,6 +332,15 @@ export function Accounts() {
                   {mode === "view" && (
                     <>
                       <Button
+                        variant="soft"
+                        onClick={() => {
+                          setError("");
+                          setMode("edit");
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" /> Chỉnh sửa
+                      </Button>
+                      <Button
                         variant="secondary"
                         onClick={handleToggleLock}
                         disabled={toggling}
@@ -315,6 +359,11 @@ export function Accounts() {
                   <Button variant="secondary" onClick={handleCancel}>Đóng</Button>
                   {mode === "create" && (
                     <Button onClick={handleCreate} disabled={saving}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</Button>
+                  )}
+                  {mode === "edit" && (
+                    <Button onClick={handleUpdate} disabled={saving}>
+                      <Save className="h-4 w-4" /> {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                    </Button>
                   )}
                 </div>
               </div>

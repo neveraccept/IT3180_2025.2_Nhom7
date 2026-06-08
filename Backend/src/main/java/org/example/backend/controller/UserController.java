@@ -111,13 +111,13 @@ public class UserController {
     }
 
     // API cập nhật thông tin đăng ký của tài khoản cư dân đang chờ duyệt (Admin có thể chỉnh sửa lại thông tin trước khi duyệt)
-    @PutMapping("{id}")
-    public ResponseEntity<ApiResponse<UserDTO>> updatePendingResident(
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<UserDTO>> updateUser(
             @PathVariable Long id,
             @RequestBody AdminUpdateRegisterRequest request) {
 
-        UserDTO updatedUser = userService.updatePendingResidentInfo(id, request);
-        return ResponseEntity.ok(ApiResponse.ok(updatedUser, "Cập nhật thông tin đăng ký thành công!"));
+        UserDTO updatedUser = userService.updateAccountInfo(id, request);
+        return ResponseEntity.ok(ApiResponse.ok(updatedUser, "Cập nhật thông tin tài khoản thành công!"));
     }
 
     // API lấy danh sách TẤT CẢ tài khoản trong hệ thống (chỉ ADMIN truy cập được — xem SecurityConfig)

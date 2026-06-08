@@ -179,32 +179,58 @@ public class UserService {
         user.setHousehold(household);
     }
 
-    // Admin chỉnh sửa thông tin đăng ký của cư dân khi phát hiện điền nhầm (chỉ áp dụng với tài khoản CHƯA duyệt).
+    // Admin chỉnh sửa thông tin tài khoản.
+    @LogAdminAction(entity = "User", action = "UPDATE", description = "Cập nhật thông tin tài khoản",
+            detail = "'Tài khoản: ' + #result.username()")
     @Transactional
-    public UserDTO updatePendingResidentInfo(Long id, AdminUpdateRegisterRequest req) {
+    public UserDTO updateAccountInfo(Long id, AdminUpdateRegisterRequest req) {
         // 1. Tìm tài khoản cư dân theo ID
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
 
-        // 2. Ràng buộc: Chỉ cho phép sửa khi tài khoản chưa được kích hoạt (active = false)
-        if (user.isActive()) {
-            throw new IllegalArgumentException("Tài khoản này đã được kích hoạt từ trước, không thể sửa đổi thông tin đăng ký ban đầu!");
+        if (user.isDeleted()) {
+            throw new IllegalArgumentException("Tài khoản đã bị xóa, không thể cập nhật.");
         }
 
-        // 3. Cập nhật các trường thông tin khác nếu có truyền vào
+        if (req.username() != null && !req.username().isBlank()) {
+            String username = req.username().trim();
+            if (!username.equals(user.getUsername()) && userRepo.existsByUsername(username)) {
+                throw new IllegalArgumentException("Username đã được sử dụng");
+            }
+            user.setUsername(username);
+        }
+
         if (req.fullName() != null && !req.fullName().isBlank()) {
             user.setFullName(req.fullName().trim());
+        }
+
+        if (req.email() != null && !req.email().isBlank()) {
+            String email = req.email().trim();
+            if (!email.equalsIgnoreCase(user.getEmail() == null ? "" : user.getEmail())
+                    && userRepo.existsByEmail(email)) {
+                throw new IllegalArgumentException("Email đã được sử dụng");
+            }
+            user.setEmail(email);
         }
 
         if (req.phone() != null) {
             user.setPhone(req.phone().trim());
         }
 
-        if (req.requestedApartmentCode() != null && !req.requestedApartmentCode().isBlank()) {
-            user.setRequestedApartmentCode(req.requestedApartmentCode().trim());
+        if (req.role() != null && !req.role().isBlank()) {
+            Role role = roleRepo.findByName(req.role().trim())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vai trò: " + req.role()));
+            user.setRole(role);
         }
 
-        // 4. Lưu thay đổi vào cơ sở dữ liệu và chuyển đổi thành DTO trả về cho Frontend
+        if (req.requestedApartmentCode() != null) {
+            String apartmentCode = req.requestedApartmentCode().trim();
+            user.setRequestedApartmentCode(apartmentCode.isBlank() ? null : apartmentCode);
+            if (!apartmentCode.isBlank() && user.getRole() != null && "RESIDENT".equals(user.getRole().getName())) {
+                linkHouseholdByRequestedApartment(user);
+            }
+        }
+
         User updatedUser = userRepo.saveAndFlush(user);
         return userMapper.toDto(updatedUser);
     }
@@ -370,4 +396,5 @@ public class UserService {
         }
         return sb.toString();
     }
+
 }
