@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Trash2 } from "lucide-react";
-import { getAllUsersAPI, createInternalAccountAPI, deleteUserAPI } from "../api/authApi";
+import { Search, Plus, Trash2, Lock, Unlock } from "lucide-react";
+import { getAllUsersAPI, createInternalAccountAPI, deleteUserAPI, lockUserAPI, unlockUserAPI } from "../api/authApi";
 import { Badge, Button, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
@@ -47,6 +47,7 @@ export function Accounts() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (message, tone = "green") => {
@@ -129,6 +130,22 @@ export function Accounts() {
     setConfirmDelete(false);
     handleCancel();
     showToast("Đã xóa tài khoản thành công.", "green");
+    fetchUsers();
+  };
+
+  // Khóa / mở khóa tài khoản đang xem.
+  const handleToggleLock = async () => {
+    if (!selectedAccount?.id) return;
+    const isLocked = selectedAccount.active === "Khoá";
+    setToggling(true);
+    const res = isLocked ? await unlockUserAPI(selectedAccount.id) : await lockUserAPI(selectedAccount.id);
+    setToggling(false);
+    if (!res.success) {
+      showToast(res.message || "Đổi trạng thái khóa thất bại.", "red");
+      return;
+    }
+    handleCancel();
+    showToast(isLocked ? "Đã mở khóa tài khoản." : "Đã khóa tài khoản.", "green");
     fetchUsers();
   };
 
@@ -276,11 +293,22 @@ export function Accounts() {
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
 
               <div className="flex items-center justify-between gap-3 pt-2">
-                <div>
+                <div className="flex gap-2">
                   {mode === "view" && (
-                    <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                      <Trash2 className="h-4 w-4" /> Xóa tài khoản
-                    </Button>
+                    <>
+                      <Button
+                        variant="secondary"
+                        onClick={handleToggleLock}
+                        disabled={toggling}
+                      >
+                        {selectedAccount?.active === "Khoá"
+                          ? <><Unlock className="h-4 w-4" /> Mở khóa</>
+                          : <><Lock className="h-4 w-4" /> Khóa</>}
+                      </Button>
+                      <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                        <Trash2 className="h-4 w-4" /> Xóa tài khoản
+                      </Button>
+                    </>
                   )}
                 </div>
                 <div className="flex gap-3">

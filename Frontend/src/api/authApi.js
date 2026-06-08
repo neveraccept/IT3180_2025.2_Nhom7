@@ -54,3 +54,14 @@ export const rejectAccountAPI = (id) => callApi(axiosClient.delete(`/api/users/$
 
 // DELETE /api/users/{id} -> Admin xóa mềm tài khoản (đặt deleted = true ở backend)
 export const deleteUserAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}`));
+
+// POST /api/users/grant-access -> Admin cấp tài khoản đăng nhập cho 1 nhân khẩu
+// payload: { residentId } -> { userId, username, temporaryPassword, role, residentId, residentName }
+export const grantAccessAPI = (residentId) =>
+  callApi(axiosClient.post("/api/users/grant-access", { residentId }));
+
+// PUT /api/users/{id}/lock -> khóa tài khoản (active=false)
+export const lockUserAPI = (id) => callApi(axiosClient.put(`/api/users/${id}/lock`));
+
+// PUT /api/users/{id}/unlock -> mở khóa tài khoản (active=true)
+export const unlockUserAPI = (id) => callApi(axiosClient.put(`/api/users/${id}/unlock`));

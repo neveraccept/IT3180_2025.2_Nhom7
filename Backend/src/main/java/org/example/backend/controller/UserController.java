@@ -1,9 +1,11 @@
 package org.example.backend.controller;
 
 import jakarta.validation.Valid;
+import org.example.backend.dto.AccountCreatedDTO;
 import org.example.backend.dto.UserDTO;
 import org.example.backend.dto.request.AdminRegisterRequest;
 import org.example.backend.dto.request.AdminUpdateRegisterRequest;
+import org.example.backend.dto.request.GrantAccessRequest;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
 import org.example.backend.service.UserService;
@@ -125,6 +127,43 @@ public class UserController {
         return ResponseEntity.ok(
                 ApiResponse.ok(users, "Lấy danh sách tài khoản thành công!")
         );
+    }
+
+    // Action 3 – Cấp tài khoản đăng nhập cho một nhân khẩu sẵn có.
+    @PostMapping("/grant-access")
+    public ResponseEntity<?> grantAccess(@Valid @RequestBody GrantAccessRequest req) {
+        try {
+            AccountCreatedDTO created = userService.grantAccess(req.residentId());
+            return ResponseEntity.status(201).body(
+                    ApiResponse.ok(created, "Cấp tài khoản cho cư dân thành công"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("GRANT_ACCESS_FAILED", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(
+                    ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống khi cấp tài khoản"));
+        }
+    }
+
+    // Khóa tài khoản thủ công (Admin) — active = false.
+    @PutMapping("/{id}/lock")
+    public ResponseEntity<?> lockUser(@PathVariable Long id) {
+        try {
+            UserDTO updated = userService.setUserLocked(id, true);
+            return ResponseEntity.ok(ApiResponse.ok(updated, "Đã khóa tài khoản"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("LOCK_USER_FAILED", ex.getMessage()));
+        }
+    }
+
+    // Mở khóa tài khoản thủ công (Admin) — active = true.
+    @PutMapping("/{id}/unlock")
+    public ResponseEntity<?> unlockUser(@PathVariable Long id) {
+        try {
+            UserDTO updated = userService.setUserLocked(id, false);
+            return ResponseEntity.ok(ApiResponse.ok(updated, "Đã mở khóa tài khoản"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("UNLOCK_USER_FAILED", ex.getMessage()));
+        }
     }
 
     // API lấy các tài khoản cần duyệt

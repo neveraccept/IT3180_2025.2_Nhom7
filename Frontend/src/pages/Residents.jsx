@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, AlertCircle } from "lucide-react";
+import { Search, Info } from "lucide-react";
 import { Button, Input, Select, StatusBadge, Badge } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import {
   searchResidentsAPI,
   getResidentByIdAPI,
-  createResidentAPI,
   updateResidentAPI,
-  moveOutResidentAPI,
   registerTemporaryResidenceAPI,
   registerPermanentResidenceAPI,
 } from "../api/residentApi";
 
 const PAGE_SIZE = 20;
 const VISIBLE_RESIDENT_STATUS = "ACTIVE";
-const HEAD_MOVE_OUT_MESSAGE = "Nhân khẩu này là chủ hộ. Vui lòng thao tác ở phần Căn hộ để đổi chủ hộ hoặc chuyển cả hộ đi.";
 
 const GENDER_LABEL = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
 const yearOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 4) : "—");
@@ -26,14 +23,12 @@ function ResidentStateBadge({ status }) {
   return <Badge tone="green">Đang ở</Badge>;
 }
 
-const emptyForm = {
-  householdId: "",
+const emptyEditForm = {
   fullName: "",
   idCard: "",
   dateOfBirth: "",
   gender: "MALE",
   relationToHead: "",
-  residencyStatus: "PERMANENT",
 };
 
 export function Residents() {
@@ -47,10 +42,10 @@ export function Residents() {
   const [searchFilters, setSearchFilters] = useState({ name: "", idCard: "", residencyStatus: "" });
   const [appliedFilters, setAppliedFilters] = useState({});
 
-  // Form thêm/sửa
+  // Form sửa (chỉ sửa thông tin cá nhân — không gán hộ, không tạo mới)
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState(emptyEditForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -60,9 +55,6 @@ export function Residents() {
   const [detailError, setDetailError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
   const [actionError, setActionError] = useState("");
-
-  // Xác nhận chuyển khỏi hộ
-  const [moveOutConfirm, setMoveOutConfirm] = useState(null);
 
   const loadPage = async (targetPage = 0, applied = appliedFilters) => {
     setLoading(true);
@@ -107,30 +99,16 @@ export function Residents() {
     loadPage(0, {});
   };
 
-  const openCreateForm = () => {
-    setDetail(null);
-    setMoveOutConfirm(null);
-    setActionMsg("");
-    setActionError("");
-    setFormData(emptyForm);
-    setEditingId(null);
-    setFormError("");
-    setShowForm(true);
-  };
-
   const openEditForm = (resident) => {
     setDetail(null);
-    setMoveOutConfirm(null);
     setActionMsg("");
     setActionError("");
     setFormData({
-      householdId: resident.householdId ?? "",
       fullName: resident.fullName || "",
       idCard: resident.idCard || "",
       dateOfBirth: resident.dateOfBirth || "",
       gender: resident.gender || "MALE",
       relationToHead: resident.relationToHead || "",
-      residencyStatus: resident.residencyStatus || "PERMANENT",
     });
     setEditingId(resident.id);
     setFormError("");
@@ -143,52 +121,31 @@ export function Residents() {
       setFormError("Vui lòng nhập đầy đủ: họ tên, CCCD/CMND, ngày sinh, quan hệ với chủ hộ.");
       return;
     }
-
     setSaving(true);
-    let res;
-    if (editingId !== null) {
-      // F3.2 - UpdateResidentRequest: fullName, idCard, dateOfBirth, gender, relationToHead
-      res = await updateResidentAPI(editingId, {
-        fullName: formData.fullName.trim(),
-        idCard: formData.idCard.trim(),
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        relationToHead: formData.relationToHead.trim(),
-      });
-    } else {
-      // F3.1 - CreateResidentRequest: householdId (bắt buộc), ...
-      if (!formData.householdId) {
-        setFormError("Vui lòng nhập mã hộ khẩu (householdId) để thêm nhân khẩu vào hộ.");
-        setSaving(false);
-        return;
-      }
-      res = await createResidentAPI({
-        householdId: Number(formData.householdId),
-        fullName: formData.fullName.trim(),
-        idCard: formData.idCard.trim(),
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        relationToHead: formData.relationToHead.trim(),
-        residencyStatus: formData.residencyStatus || undefined,
-      });
-    }
+    // F3.2 - UpdateResidentRequest: fullName, idCard, dateOfBirth, gender, relationToHead
+    const res = await updateResidentAPI(editingId, {
+      fullName: formData.fullName.trim(),
+      idCard: formData.idCard.trim(),
+      dateOfBirth: formData.dateOfBirth,
+      gender: formData.gender,
+      relationToHead: formData.relationToHead.trim(),
+    });
     setSaving(false);
-
     if (res.success) {
       setShowForm(false);
       setEditingId(null);
-      setFormData(emptyForm);
-      setActionMsg(res.message || "Lưu nhân khẩu thành công.");
+      setFormData(emptyEditForm);
+      setActionMsg(res.message || "Đã cập nhật nhân khẩu.");
       loadPage(page);
     } else {
-      setFormError(res.message || "Lưu nhân khẩu thất bại.");
+      setFormError(res.message || "Cập nhật nhân khẩu thất bại.");
     }
   };
 
   const handleCancelForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData(emptyForm);
+    setFormData(emptyEditForm);
     setFormError("");
   };
 
@@ -221,7 +178,7 @@ export function Residents() {
       if (res.data) setDetail(res.data);
       loadPage(page);
     } else {
-      setDetailError(res.message || "Đăng ký tạm trú thất bại.");
+      setActionError(res.message || "Đăng ký tạm trú thất bại.");
     }
   };
 
@@ -234,131 +191,50 @@ export function Residents() {
       if (res.data) setDetail(res.data);
       loadPage(page);
     } else {
-      setDetailError(res.message || "Đăng ký thường trú thất bại.");
-    }
-  };
-
-  const openMoveOutConfirm = (resident) => {
-    if (resident?.headOfHousehold) {
-      setActionMsg("");
-      setActionError(HEAD_MOVE_OUT_MESSAGE);
-      return;
-    }
-    setDetail(null);
-    setShowForm(false);
-    setFormError("");
-    setActionError("");
-    setMoveOutConfirm({ id: resident.id, name: resident.fullName });
-  };
-
-  const handleConfirmMoveOut = async () => {
-    if (!moveOutConfirm) return;
-    const res = await moveOutResidentAPI(moveOutConfirm.id);
-    setMoveOutConfirm(null);
-    if (res.success) {
-      setActionMsg(res.message || "Đã chuyển nhân khẩu khỏi hộ.");
-      if (detail?.id === moveOutConfirm.id) closeDetail();
-      loadPage(page);
-    } else {
-      setError(res.message || "Chuyển nhân khẩu khỏi hộ thất bại.");
+      setActionError(res.message || "Đăng ký thường trú thất bại.");
     }
   };
 
   return (
     <>
       <SectionHeader
-        title="Quản lý nhân khẩu"
-        desc="Thêm/sửa nhân khẩu, đăng ký thường trú hoặc tạm trú."
-        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Thêm nhân khẩu</Button>}
+        title="Tra cứu nhân khẩu"
+        desc="Tra cứu và chỉnh sửa thông tin nhân khẩu. Việc thêm/chuyển nhân khẩu được thực hiện tại trang Căn hộ."
       />
+
+      <div className="mb-5 flex items-start gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800 ring-1 ring-sky-200">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>Thêm thành viên, chuyển nhân khẩu hay cả hộ đi đều thao tác trong <strong>Quản lý căn hộ</strong>. Trang này chỉ để tra cứu và sửa thông tin (chính tả, CCCD, cư trú).</span>
+      </div>
 
       {actionMsg && (
         <div className="mb-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">{actionMsg}</div>
       )}
 
-      {/* Form thêm/sửa */}
+      {/* Form sửa */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="rounded-3xl bg-white p-6 shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="mb-4 text-lg font-bold">{editingId !== null ? "Chỉnh sửa nhân khẩu" : "Thêm nhân khẩu mới"}</h3>
+            <h3 className="mb-4 text-lg font-bold">Chỉnh sửa nhân khẩu</h3>
             <div className="space-y-4">
-              {editingId === null && (
-                <Input
-                  label="Mã hộ khẩu (householdId)"
-                  placeholder="VD: 1"
-                  value={formData.householdId}
-                  onChange={(e) => setFormData({ ...formData, householdId: e.target.value })}
-                />
-              )}
-              <Input
-                label="Họ tên"
-                placeholder="Nguyễn Văn A"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              />
-              <Input
-                label="CCCD/CMND"
-                placeholder="9 hoặc 12 chữ số"
-                value={formData.idCard}
-                onChange={(e) => setFormData({ ...formData, idCard: e.target.value })}
-              />
-              <Input
-                label="Ngày sinh"
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-              />
-              <Select
-                label="Giới tính"
-                value={formData.gender}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-              >
+              <Input label="Họ tên" placeholder="Nguyễn Văn A" value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
+              <Input label="CCCD/CMND" placeholder="9 hoặc 12 chữ số" value={formData.idCard}
+                onChange={(e) => setFormData({ ...formData, idCard: e.target.value })} />
+              <Input label="Ngày sinh" type="date" value={formData.dateOfBirth}
+                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} />
+              <Select label="Giới tính" value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}>
                 <option value="MALE">Nam</option>
                 <option value="FEMALE">Nữ</option>
                 <option value="OTHER">Khác</option>
               </Select>
-              <Input
-                label="Quan hệ với chủ hộ"
-                placeholder="Chủ hộ, Vợ, Con, v.v."
-                value={formData.relationToHead}
-                onChange={(e) => setFormData({ ...formData, relationToHead: e.target.value })}
-              />
-              {editingId === null && (
-                <Select
-                  label="Cư trú"
-                  value={formData.residencyStatus}
-                  onChange={(e) => setFormData({ ...formData, residencyStatus: e.target.value })}
-                >
-                  <option value="PERMANENT">Thường trú</option>
-                  <option value="TEMPORARY">Tạm trú</option>
-                </Select>
-              )}
+              <Input label="Quan hệ với chủ hộ" placeholder="Chủ hộ, Vợ, Con, v.v." value={formData.relationToHead}
+                onChange={(e) => setFormData({ ...formData, relationToHead: e.target.value })} />
               {formError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{formError}</div>}
               <div className="flex justify-end gap-3 pt-4">
                 <Button variant="secondary" onClick={handleCancelForm} disabled={saving}>Hủy</Button>
-                <Button onClick={handleSave} disabled={saving}>{saving ? "Đang lưu…" : editingId !== null ? "Lưu" : "Thêm nhân khẩu"}</Button>
+                <Button onClick={handleSave} disabled={saving}>{saving ? "Đang lưu…" : "Lưu"}</Button>
               </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Xác nhận chuyển khỏi hộ */}
-      {moveOutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="rounded-3xl bg-white p-6 shadow-xl max-w-sm w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="rounded-full bg-rose-100 p-3">
-                <AlertCircle className="h-6 w-6 text-rose-600" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">Chuyển khỏi hộ</h3>
-            </div>
-            <p className="text-slate-600 mb-6">
-              Bạn có chắc muốn chuyển nhân khẩu <strong>{moveOutConfirm.name}</strong> ra khỏi hộ? Nhân khẩu sẽ chuyển sang trạng thái "Đã chuyển đi".
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button variant="secondary" onClick={() => setMoveOutConfirm(null)}>Hủy</Button>
-              <Button variant="danger" onClick={handleConfirmMoveOut}>Chuyển khỏi hộ</Button>
             </div>
           </motion.div>
         </div>
@@ -422,7 +298,6 @@ export function Residents() {
                       {detail.residencyStatus === "TEMPORARY" && (
                         <Button variant="soft" onClick={() => handleRegisterPermanent(detail.id)}>Đăng ký thường trú</Button>
                       )}
-                      <Button variant="danger" onClick={() => openMoveOutConfirm(detail)}>Chuyển khỏi hộ</Button>
                     </>
                   )}
                   <Button variant="secondary" onClick={closeDetail}>Đóng</Button>
@@ -435,25 +310,14 @@ export function Residents() {
 
       {/* Bộ lọc */}
       <div className="mb-5 grid gap-3 md:grid-cols-3">
-        <Input
-          label="Tìm theo họ tên"
-          placeholder="Nhập họ tên"
-          value={searchFilters.name}
+        <Input label="Tìm theo họ tên" placeholder="Nhập họ tên" value={searchFilters.name}
           onChange={(e) => setSearchFilters({ ...searchFilters, name: e.target.value })}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        />
-        <Input
-          label="Tìm theo CCCD/CMND"
-          placeholder="Nhập CCCD/CMND"
-          value={searchFilters.idCard}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+        <Input label="Tìm theo CCCD/CMND" placeholder="Nhập CCCD/CMND" value={searchFilters.idCard}
           onChange={(e) => setSearchFilters({ ...searchFilters, idCard: e.target.value })}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        />
-        <Select
-          label="Tình trạng cư trú"
-          value={searchFilters.residencyStatus}
-          onChange={(e) => setSearchFilters({ ...searchFilters, residencyStatus: e.target.value })}
-        >
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
+        <Select label="Tình trạng cư trú" value={searchFilters.residencyStatus}
+          onChange={(e) => setSearchFilters({ ...searchFilters, residencyStatus: e.target.value })}>
           <option value="">Tất cả</option>
           <option value="PERMANENT">Thường trú</option>
           <option value="TEMPORARY">Tạm trú</option>

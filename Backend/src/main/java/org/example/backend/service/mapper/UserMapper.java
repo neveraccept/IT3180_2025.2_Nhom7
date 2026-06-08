@@ -19,7 +19,9 @@ public class UserMapper {
                 user.isEmailVerified(),
                 user.getRequestedApartmentCode(),
                 user.getHousehold() != null ? user.getHousehold().getId() : null,
-                user.getRole() != null ? user.getRole().getName() : null
+                user.getRole() != null ? user.getRole().getName() : null,
+                user.getResident() != null ? user.getResident().getId() : null,
+                user.getResident() != null ? user.getResident().getFullName() : null
         );
     }
 }
