@@ -6,8 +6,10 @@ import org.example.backend.entity.Fee;
 import org.example.backend.entity.FeePeriod;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.Payment;
+import org.example.backend.entity.SystemConfig;
 import org.example.backend.entity.UtilityBill;
 import org.example.backend.entity.enums.UtilityBillStatus;
+import org.example.backend.entity.enums.UtilityType;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
@@ -42,15 +44,18 @@ public class UtilityFeeService {
     private final FeePeriodRepository feePeriodRepository;
     private final PaymentRepository paymentRepository;
     private final UtilityBillRepository billRepository;
+    private final SystemConfigService systemConfigService;
 
     public UtilityFeeService(FeeRepository feeRepository,
                              FeePeriodRepository feePeriodRepository,
                              PaymentRepository paymentRepository,
-                             UtilityBillRepository billRepository) {
+                             UtilityBillRepository billRepository,
+                             SystemConfigService systemConfigService) {
         this.feeRepository = feeRepository;
         this.feePeriodRepository = feePeriodRepository;
         this.paymentRepository = paymentRepository;
         this.billRepository = billRepository;
+        this.systemConfigService = systemConfigService;
     }
 
     @LogAdminAction(entity = "FeePeriod", action = "CREATE",
@@ -76,10 +81,11 @@ public class UtilityFeeService {
             if (h == null) {
                 continue;
             }
-            BigDecimal amount = b.getAmount() != null ? b.getAmount() : BigDecimal.ZERO;
+            BigDecimal amount = computeCurrentAmount(b);
             if (amount.signum() <= 0) {
                 continue;
             }
+            b.setAmount(amount);
             feeByHouseholdId.merge(h.getId(), amount, BigDecimal::add);
             householdById.putIfAbsent(h.getId(), h);
         }
@@ -129,5 +135,27 @@ public class UtilityFeeService {
             f.setActive(true);
             return feeRepository.save(f);
         });
+    }
+
+    private BigDecimal computeCurrentAmount(UtilityBill bill) {
+        UtilityType type = bill.getType();
+        if (type == UtilityType.ELECTRICITY || type == UtilityType.WATER) {
+            Integer oldIndex = bill.getOldIndex();
+            Integer newIndex = bill.getNewIndex();
+            if (oldIndex == null || newIndex == null) {
+                throw new BadRequestException("UTILITY_INDEX_REQUIRED",
+                        "Hoá đơn điện/nước cần nhập chỉ số cũ và chỉ số mới");
+            }
+            if (newIndex < oldIndex) {
+                throw new BadRequestException("UTILITY_INDEX_INVALID",
+                        "Chỉ số mới phải lớn hơn hoặc bằng chỉ số cũ");
+            }
+            String key = type == UtilityType.ELECTRICITY
+                    ? SystemConfig.ELECTRICITY_UNIT_PRICE
+                    : SystemConfig.WATER_UNIT_PRICE;
+            return systemConfigService.getValue(key)
+                    .multiply(BigDecimal.valueOf((long) newIndex - oldIndex));
+        }
+        return systemConfigService.getValue(SystemConfig.INTERNET_PRICE);
     }
 }

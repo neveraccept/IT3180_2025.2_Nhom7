@@ -7,7 +7,9 @@ import org.example.backend.entity.FeePeriod;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.ParkingRegistration;
 import org.example.backend.entity.Payment;
+import org.example.backend.entity.SystemConfig;
 import org.example.backend.entity.enums.ParkingRegistrationStatus;
+import org.example.backend.entity.enums.VehicleType;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
@@ -41,15 +43,18 @@ public class ParkingFeeService {
     private final FeePeriodRepository feePeriodRepository;
     private final PaymentRepository paymentRepository;
     private final ParkingRegistrationRepository registrationRepository;
+    private final SystemConfigService systemConfigService;
 
     public ParkingFeeService(FeeRepository feeRepository,
                              FeePeriodRepository feePeriodRepository,
                              PaymentRepository paymentRepository,
-                             ParkingRegistrationRepository registrationRepository) {
+                             ParkingRegistrationRepository registrationRepository,
+                             SystemConfigService systemConfigService) {
         this.feeRepository = feeRepository;
         this.feePeriodRepository = feePeriodRepository;
         this.paymentRepository = paymentRepository;
         this.registrationRepository = registrationRepository;
+        this.systemConfigService = systemConfigService;
     }
 
     @LogAdminAction(entity = "FeePeriod", action = "CREATE",
@@ -73,7 +78,7 @@ public class ParkingFeeService {
             if (r.getVehicle() == null || r.getVehicle().getHousehold() == null) {
                 continue;
             }
-            BigDecimal monthly = r.getMonthlyFee() != null ? r.getMonthlyFee() : BigDecimal.ZERO;
+            BigDecimal monthly = currentParkingFee(r);
             if (monthly.signum() <= 0) {
                 continue;
             }
@@ -126,5 +131,13 @@ public class ParkingFeeService {
             f.setActive(true);
             return feeRepository.save(f);
         });
+    }
+
+    private BigDecimal currentParkingFee(ParkingRegistration registration) {
+        VehicleType type = registration.getVehicle().getType();
+        String key = type == VehicleType.CAR
+                ? SystemConfig.CAR_PARKING_PRICE
+                : SystemConfig.MOTORBIKE_PARKING_PRICE;
+        return systemConfigService.getValue(key);
     }
 }
