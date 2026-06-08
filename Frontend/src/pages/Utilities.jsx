@@ -368,7 +368,9 @@ export function Utilities() {
       return;
     }
     setImportResult(res.data);
-    showToast(`Đã nhập ${res.data?.createdCount ?? 0} hoá đơn` + ((res.data?.failedCount ?? 0) > 0 ? `, ${res.data.failedCount} dòng lỗi` : ""));
+    showToast(`Đã nhập ${res.data?.createdCount ?? 0} hoá đơn`
+      + ((res.data?.skippedCount ?? 0) > 0 ? `, bỏ qua ${res.data.skippedCount} dòng (không có hộ)` : "")
+      + ((res.data?.failedCount ?? 0) > 0 ? `, ${res.data.failedCount} dòng lỗi` : ""));
     await loadBills(1);
   };
 
@@ -775,6 +777,7 @@ export function Utilities() {
               <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
                 <p className="font-semibold text-slate-800">
                   Tạo thành công <span className="text-emerald-700">{importResult.createdCount}</span> hoá đơn
+                  {importResult.skippedCount > 0 && <> — bỏ qua <span className="text-amber-600">{importResult.skippedCount}</span> dòng (không có hộ)</>}
                   {importResult.failedCount > 0 && <> — lỗi <span className="text-rose-700">{importResult.failedCount}</span> dòng</>}
                 </p>
                 {importResult.errors?.length > 0 && (

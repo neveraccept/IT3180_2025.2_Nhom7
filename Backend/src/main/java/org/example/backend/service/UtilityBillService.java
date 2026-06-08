@@ -248,7 +248,7 @@ public class UtilityBillService {
      * Chỉ những dòng hợp lệ mới được lưu (không vì 1 dòng lỗi mà huỷ cả file).
      */
     @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hoá đơn điện/nước/internet từ Excel",
-            detail = "'Đã tạo ' + #result.createdCount() + ' hoá đơn, lỗi ' + #result.failedCount() + ' dòng'")
+            detail = "'Đã tạo ' + #result.createdCount() + ' hoá đơn, bỏ qua ' + #result.skippedCount() + ' dòng (không có hộ), lỗi ' + #result.failedCount() + ' dòng'")
     @Transactional
     public UtilityBillImportResultDTO importFromExcel(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -256,6 +256,7 @@ public class UtilityBillService {
         }
         List<String> errors = new ArrayList<>();
         int created = 0;
+        int skipped = 0;
         DataFormatter fmt = new DataFormatter(Locale.US);
 
         try (InputStream in = file.getInputStream();
@@ -274,8 +275,9 @@ public class UtilityBillService {
                 }
                 int excelLine = r + 1; // số dòng người dùng thấy trong Excel (1-based)
                 try {
-                    if (importRow(row, fmt)) {
-                        created++;
+                    switch (importRow(row, fmt)) {
+                        case CREATED -> created++;
+                        case SKIPPED -> skipped++;
                     }
                 } catch (BadRequestException | NotFoundException ex) {
                     errors.add("Dòng " + excelLine + ": " + ex.getMessage());
@@ -290,17 +292,30 @@ public class UtilityBillService {
                     "Không đọc được file Excel. Hãy dùng đúng mẫu (.xlsx) tải từ hệ thống.");
         }
 
-        return new UtilityBillImportResultDTO(created, errors.size(), errors);
+        return new UtilityBillImportResultDTO(created, errors.size(), skipped, errors);
     }
 
-    /** Đọc & lưu một dòng hoá đơn. Trả về true nếu tạo thành công. */
-    private boolean importRow(Row row, DataFormatter fmt) {
+    /** Kết quả xử lý một dòng Excel: tạo thành công hay bỏ qua (hộ không tồn tại). */
+    private enum RowOutcome { CREATED, SKIPPED }
+
+    /**
+     * Đọc & lưu một dòng hoá đơn.
+     * Trả về {@link RowOutcome#CREATED} nếu tạo thành công, {@link RowOutcome#SKIPPED} nếu
+     * mã hộ không tồn tại trong hệ thống (dòng được bỏ qua, không tính là lỗi).
+     * Các trường hợp dữ liệu sai khác (trùng hoá đơn, thiếu chỉ số, loại sai...) vẫn ném lỗi.
+     */
+    private RowOutcome importRow(Row row, DataFormatter fmt) {
         String code = cellString(row, 0, fmt);
         if (code.isEmpty()) {
-            throw new BadRequestException("UTILITY_IMPORT_NO_CODE", "Thiếu mã hộ");
+            // Không có mã hộ -> coi như dòng không có thông tin hộ, bỏ qua.
+            return RowOutcome.SKIPPED;
         }
-        Household household = householdRepository.findByCode(code)
-                .orElseThrow(() -> new NotFoundException("HOUSEHOLD_NOT_FOUND", "Không tìm thấy hộ mã '" + code + "'"));
+        // Mã hộ không khớp hộ nào -> bỏ qua dòng này thay vì báo lỗi
+        // (cho phép dùng 1 file mẫu liệt kê mọi mã hộ dù hộ thực tế là ngẫu nhiên).
+        Household household = householdRepository.findByCode(code).orElse(null);
+        if (household == null) {
+            return RowOutcome.SKIPPED;
+        }
 
         UtilityType type = parseType(cellString(row, 1, fmt));
         Integer month = cellInt(row, 2, fmt);
@@ -331,7 +346,7 @@ public class UtilityBillService {
         b.setAmount(computeAmount(type, oldIndex, newIndex, amount));
         b.setStatus(UtilityBillStatus.UNPAID);
         billRepository.save(b);
-        return true;
+        return RowOutcome.CREATED;
     }
 
     /** Sinh file Excel mẫu (.xlsx) để admin điền dữ liệu nhập hàng loạt. */
@@ -356,7 +371,7 @@ public class UtilityBillService {
 
             // Dòng ví dụ minh hoạ cách điền (điện theo chỉ số, internet theo số tiền).
             Row ex1 = sheet.createRow(1);
-            ex1.createCell(0).setCellValue("HK001");
+            ex1.createCell(0).setCellValue("HK-A02-01");
             ex1.createCell(1).setCellValue("DIEN");
             ex1.createCell(2).setCellValue(6);
             ex1.createCell(3).setCellValue(2026);
@@ -364,7 +379,7 @@ public class UtilityBillService {
             ex1.createCell(5).setCellValue(1320);
 
             Row ex2 = sheet.createRow(2);
-            ex2.createCell(0).setCellValue("HK001");
+            ex2.createCell(0).setCellValue("HK-A02-01");
             ex2.createCell(1).setCellValue("INTERNET");
             ex2.createCell(2).setCellValue(6);
             ex2.createCell(3).setCellValue(2026);

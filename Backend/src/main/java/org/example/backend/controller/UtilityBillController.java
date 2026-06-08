@@ -61,6 +61,7 @@ public class UtilityBillController {
         UtilityBillImportResultDTO result = utilityBillService.importFromExcel(file);
         return ResponseEntity.ok(ApiResponse.ok(result,
                 "Đã nhập " + result.createdCount() + " hoá đơn" +
+                        (result.skippedCount() > 0 ? ", bỏ qua " + result.skippedCount() + " dòng (không có hộ)" : "") +
                         (result.failedCount() > 0 ? ", " + result.failedCount() + " dòng lỗi" : "")));
     }
 
