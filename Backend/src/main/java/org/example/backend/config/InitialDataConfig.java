@@ -31,9 +31,9 @@ import java.util.*;
 public class InitialDataConfig implements CommandLineRunner {
 
     // Thông số cơ bản
-    private static final int TYPICAL_FLOOR_START = 2;
-    private static final int TYPICAL_FLOOR_END = 25;
-    private static final int PENTHOUSE_FLOOR = 26;
+    private static final int TYPICAL_FLOOR_START = 6;
+    private static final int TYPICAL_FLOOR_END = 29;
+    private static final int PENTHOUSE_FLOOR = 30;
 
     // Diện tích 4 ki-ốt tầng 1 (m²): tổng 310, phần còn lại là sảnh chung.
     private static final int[] KIOSK_AREAS = {100, 80, 65, 65};
@@ -153,7 +153,7 @@ public class InitialDataConfig implements CommandLineRunner {
                     "Ki-ốt thương mại tầng 1 (Sảnh chờ)"));
         }
 
-        // Tầng 2-25
+        // Tầng 6-29
         for (int floor = TYPICAL_FLOOR_START; floor <= TYPICAL_FLOOR_END; floor++) {
             for (int i = 0; i < TYPICAL_AREAS.length; i++) {
                 String code = String.format("A%02d-%02d", floor, i + 1);
@@ -161,8 +161,8 @@ public class InitialDataConfig implements CommandLineRunner {
             }
         }
 
-        // Tầng 26: Penthouse
-        apartments.add(buildApartment("PH26-01", PENTHOUSE_FLOOR, PENTHOUSE_AREA,
+        // Tầng 30: Penthouse
+        apartments.add(buildApartment("PH30-01", PENTHOUSE_FLOOR, PENTHOUSE_AREA,
                 "Căn hộ Penthouse"));
 
         apartmentRepository.saveAll(apartments);
@@ -205,9 +205,9 @@ public class InitialDataConfig implements CommandLineRunner {
 
     // Cư dân & Hộ gia đình (kèm tài khoản RESIDENT để đăng nhập / nhận thông báo)
     private List<Household> seedHouseholdsAndResidents() {
-        // Chỉ gán hộ cho các căn ở (tầng >= 2), bỏ qua ki-ốt thương mại tầng 1.
+        // Chỉ gán hộ cho các căn ở (tầng >= 6), bỏ qua ki-ốt thương mại tầng 1.
         // Chọn NGẪU NHIÊN các căn được ở (xáo trộn). File Excel mẫu hoá đơn liệt kê TẤT CẢ
-        // mã hộ có thể có (HK-A02-01 ... HK-PH26-01); khi import, dòng nào trỏ tới hộ chưa
+        // mã hộ có thể có (HK-A06-01 ... HK-PH30-01); khi import, dòng nào trỏ tới hộ chưa
         // tồn tại sẽ tự động bị bỏ qua nên file vẫn dùng được dù hộ là ngẫu nhiên.
         List<Apartment> residential = new ArrayList<>(apartmentRepository.findAll().stream()
                 .filter(a -> a.getFloor() >= TYPICAL_FLOOR_START)

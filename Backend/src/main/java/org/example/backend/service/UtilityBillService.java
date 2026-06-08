@@ -371,7 +371,7 @@ public class UtilityBillService {
 
             // Dòng ví dụ minh hoạ cách điền (điện theo chỉ số, internet theo số tiền).
             Row ex1 = sheet.createRow(1);
-            ex1.createCell(0).setCellValue("HK-A02-01");
+            ex1.createCell(0).setCellValue("HK-A06-01");
             ex1.createCell(1).setCellValue("DIEN");
             ex1.createCell(2).setCellValue(6);
             ex1.createCell(3).setCellValue(2026);
@@ -379,7 +379,7 @@ public class UtilityBillService {
             ex1.createCell(5).setCellValue(1320);
 
             Row ex2 = sheet.createRow(2);
-            ex2.createCell(0).setCellValue("HK-A02-01");
+            ex2.createCell(0).setCellValue("HK-A06-01");
             ex2.createCell(1).setCellValue("INTERNET");
             ex2.createCell(2).setCellValue(6);
             ex2.createCell(3).setCellValue(2026);
