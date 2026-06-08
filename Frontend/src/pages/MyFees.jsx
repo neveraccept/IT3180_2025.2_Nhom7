@@ -93,7 +93,7 @@ export function MyFees() {
       listMyVnpayHistoryAPI(),
     ]);
     if (pRes.success) setPayments(pRes.data?.items || []);
-    else setPageError(pRes.message || "Không tải được khoản phí của hộ");
+    else setPageError(pRes.message || "Không tải được danh sách thanh toán của hộ");
     if (bRes.success) setBills(bRes.data?.items || []);
     if (hRes.success) setHistory(hRes.data?.items || []);
     setLoading(false);
@@ -115,7 +115,7 @@ export function MyFees() {
     key: `FEE-${p.id}`,
     targetType: VNPAY_TARGET.FEE_PAYMENT,
     targetId: p.id,
-    group: "Khoản phí",
+    group: p.feeType === "DONATION" ? "Đóng góp" : "Khoản phí",
     name: p.feeName || p.feePeriodName || "Khoản phí",
     period: p.feePeriodName || "__",
     amount: Number(p.amountDue || 0),
@@ -240,7 +240,7 @@ export function MyFees() {
 
   const paySelectedFees = async () => {
     if (selectedRows.length === 0) {
-      setPageError("Vui lòng chọn ít nhất một khoản phí chưa nộp.");
+      setPageError("Vui lòng chọn ít nhất một mục chưa thanh toán.");
       return;
     }
     if (selectedRows.length === 1) {
@@ -255,7 +255,7 @@ export function MyFees() {
       if (row.feeType === "DONATION") {
         const amount = Number(donationAmounts[row.key]);
         if (!(amount > 0)) {
-          setPageError("Vui lòng nhập số tiền đóng góp lớn hơn 0 cho các khoản tự nguyện đã chọn.");
+          setPageError("Vui lòng nhập số tiền đóng góp lớn hơn 0 cho các khoản đóng góp đã chọn.");
           return;
         }
         customAmounts[row.targetId] = amount;
@@ -370,8 +370,8 @@ export function MyFees() {
   return (
     <>
       <SectionHeader
-        title="Khoản phí của tôi"
-        desc="Các khoản phí và hoá đơn điện/nước/internet của hộ bạn. Có thể chọn nhiều khoản phí để thanh toán VNPay trong một lần."
+        title="Thanh toán của tôi"
+        desc="Các khoản phí bắt buộc, hoá đơn tiện ích và đóng góp tự nguyện của hộ bạn. Có thể chọn nhiều mục để thanh toán VNPay trong một lần."
       />
 
       {pageError && (
@@ -379,16 +379,16 @@ export function MyFees() {
       )}
 
       <div className="mb-5 grid gap-4 md:grid-cols-3">
-        <Card><p className="text-sm font-semibold text-slate-500">Tổng còn phải nộp</p><p className="mt-2 text-2xl font-black text-rose-700">{money(summary.totalDue)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Đã nộp</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Khoản chưa nộp</p><p className="mt-2 text-2xl font-black text-rose-700">{summary.unpaid}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Cần thanh toán</p><p className="mt-2 text-2xl font-black text-rose-700">{money(summary.totalDue)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Đã thanh toán</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Mục đang mở</p><p className="mt-2 text-2xl font-black text-slate-900">{summary.unpaid}</p></Card>
       </div>
 
       <Card className="mb-5">
         <div className="grid gap-3 lg:grid-cols-[minmax(180px,1.5fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] lg:items-end">
           <Input
             label="Tìm theo tên"
-            placeholder="Nhập tên khoản phí"
+            placeholder="Nhập tên phí, hóa đơn hoặc đóng góp"
             value={filters.keyword}
             onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
           />
@@ -403,10 +403,10 @@ export function MyFees() {
               <option key={key} value={key}>{monthLabel(key)}</option>
             ))}
           </Select>
-          <Select label="Loại phí" value={filters.feeType} onChange={(e) => setFilters({ ...filters, feeType: e.target.value })}>
+          <Select label="Nhóm thanh toán" value={filters.feeType} onChange={(e) => setFilters({ ...filters, feeType: e.target.value })}>
             <option value="ALL">Tất cả</option>
-            <option value="MANDATORY">Bắt buộc</option>
-            <option value="DONATION">Đóng góp</option>
+            <option value="MANDATORY">Phí bắt buộc</option>
+            <option value="DONATION">Đóng góp tự nguyện</option>
             <option value="UTILITY">Hoá đơn</option>
           </Select>
           <div className="flex flex-wrap items-center gap-3">
@@ -437,7 +437,7 @@ export function MyFees() {
                 </th>
                 <th className="px-5 py-4">Nhóm</th>
                 <th className="px-5 py-4">Nội dung</th>
-                <th className="px-5 py-4">Loại phí</th>
+                <th className="px-5 py-4">Loại khoản</th>
                 <th className="px-5 py-4">Kỳ</th>
                 <th className="px-5 py-4">Số tiền</th>
                 <th className="px-5 py-4">Trạng thái</th>
@@ -446,7 +446,7 @@ export function MyFees() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu...</td></tr>}
-              {!loading && allRows.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có khoản phí nào phù hợp với bộ lọc.</td></tr>}
+              {!loading && allRows.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có mục thanh toán nào phù hợp với bộ lọc.</td></tr>}
               {!loading && paginatedRows.map((r) => {
                 const canSelect = selectableRows.some((row) => row.key === r.key);
                 return (
