@@ -4,13 +4,13 @@
 // ============================================================
 import axiosClient, { callApi } from "./axiosClient";
 
-// POST /api/auth/register/send-otp -> gửi OTP đăng ký
+// POST /api/auth/send-otp -> gửi OTP đăng ký
 export const sendRegisterOtpAPI = (email) =>
-  callApi(axiosClient.post("/api/auth/register/send-otp", { email }));
+  callApi(axiosClient.post("/api/auth/send-otp", { email }));
 
-// POST /api/auth/register/verify-otp -> xác thực OTP đăng ký (đánh dấu email đã xác thực)
+// POST /api/auth/verify-otp -> xác thực OTP đăng ký (đánh dấu email đã xác thực)
 export const verifyRegisterOtpAPI = (email, otp) =>
-  callApi(axiosClient.post("/api/auth/register/verify-otp", { email, otp }));
+  callApi(axiosClient.post("/api/auth/verify-otp", { email, otp }));
 
 // POST /api/auth/forgot-password/send-otp -> gửi OTP quên mật khẩu (luôn 200, chống dò email)
 export const forgotPasswordSendOtpAPI = (email) =>

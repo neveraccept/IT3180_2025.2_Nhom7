@@ -36,6 +36,7 @@ public class ParkingMapper {
         }
         return new ParkingSlotDTO(
                 s.getId(), s.getCode(), s.getType(), s.getStatus(),
+                activeReg != null ? activeReg.getId() : null,
                 licensePlate, householdCode);
     }
 

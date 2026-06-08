@@ -2,8 +2,13 @@ package org.example.backend.service;
 
 import org.example.backend.aspect.AuditContext;
 import org.example.backend.aspect.LogAdminAction;
+import org.example.backend.dto.AccountCreatedDTO;
 import org.example.backend.dto.HouseholdSummaryDTO;
+import org.example.backend.dto.MoveInResultDTO;
+import org.example.backend.dto.ResidentDetailDTO;
+import org.example.backend.dto.request.AddMemberRequest;
 import org.example.backend.dto.request.AssignHouseholdRequest;
+import org.example.backend.dto.request.MoveInRequest;
 import org.example.backend.dto.request.UpdateHouseholdRequest;
 import org.example.backend.entity.Apartment;
 import org.example.backend.entity.Household;
@@ -29,15 +34,21 @@ public class HouseholdLifecycleService {
     private final HouseholdRepository householdRepository;
     private final ResidentRepository residentRepository;
     private final ApartmentMapper mapper;
+    private final UserService userService;
+    private final ResidentService residentService;
 
     public HouseholdLifecycleService(ApartmentRepository apartmentRepository,
                                      HouseholdRepository householdRepository,
                                      ResidentRepository residentRepository,
-                                     ApartmentMapper mapper) {
+                                     ApartmentMapper mapper,
+                                     UserService userService,
+                                     ResidentService residentService) {
         this.apartmentRepository = apartmentRepository;
         this.householdRepository = householdRepository;
         this.residentRepository = residentRepository;
         this.mapper = mapper;
+        this.userService = userService;
+        this.residentService = residentService;
     }
 
 
@@ -59,25 +70,58 @@ public class HouseholdLifecycleService {
             detail = "'Hộ ' + #result.code() + ' vào căn hộ ' + #result.apartmentCode()")
     @Transactional
     public HouseholdSummaryDTO assignHousehold(Long apartmentId, AssignHouseholdRequest req) {
-
         Apartment ap = requireApartment(apartmentId);
+        Household h = provisionHousehold(ap, req.code(), req.moveInDate(), req.headOfHousehold());
+        return mapper.toHouseholdSummary(h);
+    }
 
-        if (householdRepository.existsByApartmentIdAndStatus(apartmentId, HouseholdStatus.ACTIVE)) {
+    /**
+     * Action 1 – Bàn giao nhà (Move-in): tìm căn hộ theo MÃ, tạo hộ + chủ hộ,
+     * đổi căn hộ sang OCCUPIED và (tùy chọn) cấp tài khoản đăng nhập cho chủ hộ.
+     * Toàn bộ trong 1 giao dịch: lỗi ở bất kỳ bước nào -> rollback tất cả.
+     */
+    @LogAdminAction(entity = "Household", action = "CREATE", description = "Bàn giao nhà cho hộ mới",
+            detail = "'Bàn giao căn hộ ' + #req.apartmentCode() + ' cho hộ ' + #req.householdCode()")
+    @Transactional
+    public MoveInResultDTO moveIn(MoveInRequest req) {
+        Apartment ap = apartmentRepository.findByCode(req.apartmentCode().trim())
+                .orElseThrow(() -> new NotFoundException(
+                        "APARTMENT_NOT_FOUND",
+                        "Không tìm thấy căn hộ với mã '" + req.apartmentCode() + "'"));
+
+        Household h = provisionHousehold(ap, req.householdCode(), req.moveInDate(), req.headOfHousehold());
+
+        AccountCreatedDTO account = null;
+        if (req.createAccount()) {
+            // Chủ hộ vừa được tạo trong provisionHousehold -> cấp tài khoản ngay trong cùng giao dịch.
+            account = userService.createAccountForResident(h.getHeadOfHousehold());
+        }
+
+        return new MoveInResultDTO(mapper.toHouseholdSummary(h), account);
+    }
+
+    /**
+     * Tạo Household + chủ hộ (Resident) cho một căn hộ trống và đổi trạng thái căn hộ.
+     * Dùng chung cho cả "gán hộ" (assignHousehold) lẫn "bàn giao nhà" (moveIn).
+     */
+    private Household provisionHousehold(Apartment ap, String code, java.time.LocalDate moveInDate,
+                                         AssignHouseholdRequest.HeadOfHouseholdInput in) {
+        if (householdRepository.existsByApartmentIdAndStatus(ap.getId(), HouseholdStatus.ACTIVE)) {
             throw new BadRequestException(
                     "APARTMENT_ALREADY_OCCUPIED",
                     "Căn hộ đã có hộ dân đang cư trú. Hãy chuyển hộ hiện tại đi trước.");
         }
-        if (householdRepository.existsByCode(req.code())) {
+        if (householdRepository.existsByCode(code)) {
             throw new BadRequestException(
                     "HOUSEHOLD_CODE_DUPLICATED",
-                    "Mã hộ khẩu '" + req.code() + "' đã tồn tại");
+                    "Mã hộ khẩu '" + code + "' đã tồn tại");
         }
 
         //tạo Household trước, head_resident_id = NULL
         Household h = new Household();
-        h.setCode(req.code());
+        h.setCode(code);
         h.setApartment(ap);
-        h.setMoveInDate(req.moveInDate());
+        h.setMoveInDate(moveInDate);
         h.setStatus(HouseholdStatus.ACTIVE);
         try {
             h = householdRepository.saveAndFlush(h);
@@ -88,7 +132,6 @@ public class HouseholdLifecycleService {
         }
 
         //tạo Resident chủ hộ
-        AssignHouseholdRequest.HeadOfHouseholdInput in = req.headOfHousehold();
         Resident head = new Resident();
         head.setFullName(in.fullName());
         head.setIdCard(in.idCard());
@@ -111,7 +154,40 @@ public class HouseholdLifecycleService {
         ap.setStatus(ApartmentStatus.OCCUPIED);
         apartmentRepository.save(ap);
 
-        return mapper.toHouseholdSummary(h);
+        return h;
+    }
+
+    /**
+     * Action 2 – Thêm nhân khẩu vào hộ đã có: tái dùng ResidentService.createResident
+     * (đã có sẵn kiểm tra hộ ACTIVE + trùng CCCD). householdId lấy từ path.
+     */
+    @Transactional
+    public ResidentDetailDTO addMember(Long householdId, AddMemberRequest req) {
+        return residentService.createResident(req.toCreateResidentRequest(householdId));
+    }
+
+    /**
+     * Action 4 – Chuyển đi / Giải tán hộ theo householdId:
+     * Household -> MOVED_OUT, mọi nhân khẩu ACTIVE -> MOVED_OUT, căn hộ -> AVAILABLE,
+     * và KHÓA toàn bộ tài khoản cư dân gắn với hộ. Tất cả trong 1 giao dịch.
+     */
+    @LogAdminAction(entity = "Household", action = "UPDATE", description = "Chuyển cả hộ ra khỏi căn hộ")
+    @Transactional
+    public HouseholdSummaryDTO moveOutByHouseholdId(Long householdId) {
+        Household h = householdRepository.findById(householdId)
+                .orElseThrow(() -> new NotFoundException(
+                        "HOUSEHOLD_NOT_FOUND",
+                        "Không tìm thấy hộ khẩu id = " + householdId));
+
+        if (h.getStatus() != HouseholdStatus.ACTIVE) {
+            throw new BadRequestException(
+                    "HOUSEHOLD_NOT_ACTIVE",
+                    "Hộ này đã chuyển đi trước đó.");
+        }
+
+        Apartment ap = h.getApartment();
+        // doMoveOut đã bao gồm khóa tài khoản cư dân gắn với hộ.
+        return doMoveOut(ap, h);
     }
 
 
@@ -208,6 +284,10 @@ public class HouseholdLifecycleService {
         // Đồng thời đánh dấu toàn bộ nhân khẩu ACTIVE trong hộ là MOVED_OUT
         residentRepository.markAllResidentsMovedOut(h.getId(),
                 ResidentStatus.MOVED_OUT);
+
+        // Khóa toàn bộ tài khoản cư dân gắn với hộ (Action 4 - phần tài khoản).
+        // Đặt ở đây để cả 2 luồng move-out (qua căn hộ và qua householdId) đều khóa nhất quán.
+        userService.lockUsersByHousehold(h.getId());
 
         ap.setStatus(ApartmentStatus.AVAILABLE);
         apartmentRepository.save(ap);

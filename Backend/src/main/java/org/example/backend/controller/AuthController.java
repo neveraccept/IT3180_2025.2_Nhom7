@@ -37,7 +37,7 @@ public class AuthController {
 	}
 
 	// 1. API Gửi mã OTP
-	@PostMapping("/send-otp")
+	@PostMapping({"/send-otp", "/register/send-otp"})
 	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest request) {
 		try {
 			// Sinh mã OTP và băm lưu vào DB
@@ -53,7 +53,7 @@ public class AuthController {
 	}
 
 	// 2. API Xác thực mã OTP
-	@PostMapping("/verify-otp")
+	@PostMapping({"/verify-otp", "/register/verify-otp"})
 	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
 		try {
 			boolean isValid = otpService.verifyOtp(request, "REGISTER");

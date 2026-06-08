@@ -38,6 +38,15 @@ public class AuditAspect {
 
     @AfterReturning(pointcut = "@annotation(logAdminAction)", returning = "result")
     public void logAfter(JoinPoint joinPoint, LogAdminAction logAdminAction, Object result) {
+        // Chỉ ghi nhật ký cho thao tác do Admin (người dùng đã đăng nhập) thực hiện.
+        // Thao tác do hệ thống tự chạy (job nền, callback VNPay, seed dữ liệu...) không có
+        // người dùng trong SecurityContext -> bỏ qua, KHÔNG lưu bản ghi "SYSTEM".
+        String username = currentUsername();
+        if (username == null) {
+            AuditContext.clear();
+            return;
+        }
+
         // Mọi sự cố khi ghi log đều phải "nuốt" lại để không phá luồng nghiệp vụ chính.
         try {
             String description = logAdminAction.description();
@@ -53,7 +62,7 @@ public class AuditAspect {
             }
 
             auditLogService.record(
-                    currentUsername(),
+                    username,
                     logAdminAction.action(),
                     logAdminAction.entity(),
                     details
@@ -103,11 +112,20 @@ public class AuditAspect {
         }
     }
 
+    /**
+     * Trả về username của Admin đang đăng nhập, hoặc {@code null} nếu thao tác do hệ thống
+     * tự thực hiện (chưa xác thực / ẩn danh) — khi đó aspect sẽ không ghi nhật ký.
+     */
     private String currentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
-            return "SYSTEM";
+        if (auth == null || !auth.isAuthenticated()
+                || auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+            return null;
         }
-        return auth.getName();
+        String name = auth.getName();
+        if (name == null || name.isBlank() || "anonymousUser".equals(name)) {
+            return null;
+        }
+        return name;
     }
 }

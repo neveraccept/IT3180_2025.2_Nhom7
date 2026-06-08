@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Trash2 } from "lucide-react";
-import { getAllUsersAPI, createInternalAccountAPI, deleteUserAPI } from "../api/authApi";
+import { Search, Plus, Trash2, Lock, Unlock, Pencil, Save } from "lucide-react";
+import { getAllUsersAPI, createInternalAccountAPI, updateUserAPI, deleteUserAPI, lockUserAPI, unlockUserAPI } from "../api/authApi";
 import { Badge, Button, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 
@@ -12,8 +12,8 @@ const toRow = (dto) => ({
   fullName: dto.fullName || dto.username,
   email: dto.email || "",
   phone: dto.phone || "",
-  // Backend chưa trả mã căn hộ thực tế trong UserDTO -> dùng mã đã khai khi đăng ký.
-  apartment: dto.requestedApartmentCode || "",
+  // Ưu tiên căn hộ thực tế qua household; fallback về mã đã khai khi đăng ký.
+  apartment: dto.apartmentCode || dto.requestedApartmentCode || "",
   role: dto.role || "RESIDENT",
   active: dto.active ? "Hoạt động" : "Khoá",
 });
@@ -35,7 +35,7 @@ export function Accounts() {
   };
 
   const [showForm, setShowForm] = useState(false);
-  const [mode, setMode] = useState("create"); // "create" | "view"
+  const [mode, setMode] = useState("create"); // "create" | "view" | "edit"
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -47,6 +47,7 @@ export function Accounts() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (message, tone = "green") => {
@@ -132,10 +133,34 @@ export function Accounts() {
     fetchUsers();
   };
 
+  // Khóa / mở khóa tài khoản đang xem.
+  const handleToggleLock = async () => {
+    if (!selectedAccount?.id) return;
+    const isLocked = selectedAccount.active === "Khoá";
+    setToggling(true);
+    const res = isLocked ? await unlockUserAPI(selectedAccount.id) : await lockUserAPI(selectedAccount.id);
+    setToggling(false);
+    if (!res.success) {
+      showToast(res.message || "Đổi trạng thái khóa thất bại.", "red");
+      return;
+    }
+    handleCancel();
+    showToast(isLocked ? "Đã mở khóa tài khoản." : "Đã khóa tài khoản.", "green");
+    fetchUsers();
+  };
+
   const handleCancel = () => {
     setFormData(emptyForm);
     setError("");
     setShowForm(false);
+  };
+
+  const validateAccountInfo = () => {
+    if (!formData.fullName.trim() || !formData.username.trim() || !formData.email.trim()) {
+      setError("Vui lòng nhập đầy đủ họ tên, username và email");
+      return false;
+    }
+    return true;
   };
 
   const validateCreateForm = () => {
@@ -185,6 +210,33 @@ export function Accounts() {
     fetchUsers();
   };
 
+  const handleUpdate = async () => {
+    if (!selectedAccount?.id || !validateAccountInfo()) return;
+
+    setSaving(true);
+    setError("");
+    const res = await updateUserAPI(selectedAccount.id, {
+      username: formData.username.trim(),
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      requestedApartmentCode: formData.apartment.trim() || null,
+      role: formData.role,
+    });
+    setSaving(false);
+
+    if (!res.success) {
+      setError(res.message || "Cập nhật tài khoản thất bại.");
+      return;
+    }
+
+    const updated = toRow(res.data);
+    setSelectedAccount(updated);
+    setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+    setMode("view");
+    showToast("Đã cập nhật thông tin tài khoản.", "green");
+  };
+
   return (
     <>
       <SectionHeader
@@ -201,7 +253,7 @@ export function Accounts() {
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
           >
             <h3 className="mb-4 text-xl font-black text-slate-900">
-              {mode === "view" ? "Chi tiết tài khoản" : "Tạo tài khoản mới"}
+              {mode === "create" ? "Tạo tài khoản mới" : mode === "edit" ? "Chỉnh sửa tài khoản" : "Chi tiết tài khoản"}
             </h3>
 
             <div className="space-y-4">
@@ -247,7 +299,7 @@ export function Accounts() {
                 />
                 <Input
                   label="Căn hộ"
-                  placeholder="VD: 1201"
+                  placeholder="VD: A12-01"
                   value={formData.apartment}
                   disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
@@ -273,26 +325,45 @@ export function Accounts() {
                 </div>
               )}
 
-              {mode === "create" && (
-                <p className="text-xs text-slate-500">
-                  Lưu ý: email phải được xác thực OTP trước khi tạo tài khoản nội bộ (theo quy tắc của backend).
-                </p>
-              )}
-
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
 
               <div className="flex items-center justify-between gap-3 pt-2">
-                <div>
+                <div className="flex gap-2">
                   {mode === "view" && (
-                    <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                      <Trash2 className="h-4 w-4" /> Xóa tài khoản
-                    </Button>
+                    <>
+                      <Button
+                        variant="soft"
+                        onClick={() => {
+                          setError("");
+                          setMode("edit");
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" /> Chỉnh sửa
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={handleToggleLock}
+                        disabled={toggling}
+                      >
+                        {selectedAccount?.active === "Khoá"
+                          ? <><Unlock className="h-4 w-4" /> Mở khóa</>
+                          : <><Lock className="h-4 w-4" /> Khóa</>}
+                      </Button>
+                      <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                        <Trash2 className="h-4 w-4" /> Xóa tài khoản
+                      </Button>
+                    </>
                   )}
                 </div>
                 <div className="flex gap-3">
                   <Button variant="secondary" onClick={handleCancel}>Đóng</Button>
                   {mode === "create" && (
                     <Button onClick={handleCreate} disabled={saving}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</Button>
+                  )}
+                  {mode === "edit" && (
+                    <Button onClick={handleUpdate} disabled={saving}>
+                      <Save className="h-4 w-4" /> {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                    </Button>
                   )}
                 </div>
               </div>

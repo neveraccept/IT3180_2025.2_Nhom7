@@ -8,9 +8,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface FeeRepository extends JpaRepository<Fee, Long> {
     boolean existsByName(String name); // Kiểm tra nếu có khoản thu bị trùng tên
+
+    Optional<Fee> findByName(String name); // Tra khoản thu theo tên (vd: khoản "Phí gửi xe" hệ thống)
 
     @Query("SELECT f FROM Fee f WHERE " +
            "(:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +

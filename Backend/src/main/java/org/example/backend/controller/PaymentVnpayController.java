@@ -10,7 +10,6 @@ import org.example.backend.dto.VnpayPaymentUrlResponse;
 import org.example.backend.config.VnpayConfig;
 import org.example.backend.entity.Household;
 import org.example.backend.exception.BadRequestException;
-import org.example.backend.service.VnpayService;
 import org.example.backend.security.CurrentUserService;
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.PaymentService;
@@ -33,16 +32,13 @@ import java.util.Map;
 public class PaymentVnpayController {
 
     private final PaymentService paymentService;
-    private final VnpayService vnpayService;
     private final VnpayConfig vnpayConfig;
     private final CurrentUserService currentUserService;
 
     public PaymentVnpayController(PaymentService paymentService,
-                                  VnpayService vnpayService,
                                   VnpayConfig vnpayConfig,
                                   CurrentUserService currentUserService) {
         this.paymentService = paymentService;
-        this.vnpayService = vnpayService;
         this.vnpayConfig = vnpayConfig;
         this.currentUserService = currentUserService;
     }
@@ -75,9 +71,7 @@ public class PaymentVnpayController {
     @GetMapping("/api/payments/vnpay/return")
     public ResponseEntity<Void> vnpayReturn(@RequestParam Map<String, String> params) {
         String code = params.get("vnp_TxnRef");
-        String status = vnpayService.verifySignature(params)
-                ? paymentService.getTransactionStatusByCode(code)
-                : "INVALID";
+        String status = paymentService.processVnpayReturn(params);
 
         String redirect = UriComponentsBuilder
                 .fromUriString(vnpayConfig.getFrontendReturnUrl())

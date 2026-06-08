@@ -40,4 +40,16 @@ public interface ParkingRegistrationRepository extends JpaRepository<ParkingRegi
     List<ParkingRegistration> findBySlotIdsAndStatusWithDetails(
             @Param("slotIds") Collection<Long> slotIds,
             @Param("status") ParkingRegistrationStatus status);
+
+    /**
+     * Các lượt gửi xe của HỘ (vehicle != null) theo trạng thái, JOIN FETCH xe + hộ sở hữu.
+     * Dùng để sinh hoá đơn phí gửi xe: gom theo hộ và cộng dồn monthlyFee.
+     * Lượt cho người ngoài thuê (vehicle = null) không gắn với hộ nên bị loại.
+     */
+    @Query("SELECT r FROM ParkingRegistration r " +
+           "JOIN FETCH r.vehicle v " +
+           "JOIN FETCH v.household " +
+           "WHERE r.status = :status")
+    List<ParkingRegistration> findActiveHouseholdRegistrations(
+            @Param("status") ParkingRegistrationStatus status);
 }

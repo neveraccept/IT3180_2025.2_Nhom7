@@ -31,10 +31,14 @@ public class AuditLogService {
         auditLogRepository.save(log);
     }
 
-    /** Lấy danh sách nhật ký có phân trang (controller truyền Pageable sort timestamp desc). */
+    /**
+     * Lấy danh sách nhật ký có phân trang (controller truyền Pageable sort timestamp desc).
+     * Loại trừ bản ghi "SYSTEM" cũ: nhật ký chỉ phản ánh thao tác của Admin.
+     */
     @Transactional(readOnly = true)
     public PageResponse<AuditLogDTO> getLogs(Pageable pageable) {
-        return PageResponse.of(auditLogRepository.findAll(pageable).map(this::toDto));
+        return PageResponse.of(
+                auditLogRepository.findByAdminUsernameNot("SYSTEM", pageable).map(this::toDto));
     }
 
     private AuditLogDTO toDto(AuditLog log) {

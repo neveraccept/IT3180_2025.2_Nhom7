@@ -1,9 +1,12 @@
 package org.example.backend.service;
 
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.example.backend.aspect.AuditContext;
 import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.UtilityBillDTO;
+import org.example.backend.dto.UtilityBillImportResultDTO;
 import org.example.backend.dto.request.CreateUtilityBillRequest;
 import org.example.backend.dto.request.UpdateUtilityBillRequest;
 import org.example.backend.entity.Household;
@@ -22,10 +25,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * M7 - Quản lý hoá đơn điện/nước/internet.
@@ -224,6 +233,234 @@ public class UtilityBillService {
     @Transactional(readOnly = true)
     public UtilityBillDTO getDetail(Long id) {
         return mapper.toDto(requireBill(id));
+    }
+
+    // ====================== NHẬP HÀNG LOẠT TỪ EXCEL ======================
+
+    /** Cột file Excel nhập hoá đơn (khớp với template tải về). */
+    private static final String[] IMPORT_HEADERS = {
+            "Mã hộ", "Loại (DIEN/NUOC/INTERNET)", "Tháng", "Năm", "Chỉ số cũ", "Chỉ số mới", "Số tiền (Internet)"
+    };
+
+    /**
+     * F7.1 (mở rộng) — Nhập hoá đơn cho NHIỀU hộ cùng lúc từ file Excel.
+     * Mỗi dòng là một hoá đơn; dòng lỗi được bỏ qua và gom vào danh sách lỗi để admin sửa lại.
+     * Chỉ những dòng hợp lệ mới được lưu (không vì 1 dòng lỗi mà huỷ cả file).
+     */
+    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hoá đơn điện/nước/internet từ Excel",
+            detail = "'Đã tạo ' + #result.createdCount() + ' hoá đơn, bỏ qua ' + #result.skippedCount() + ' dòng (không có hộ), lỗi ' + #result.failedCount() + ' dòng'")
+    @Transactional
+    public UtilityBillImportResultDTO importFromExcel(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("UTILITY_IMPORT_EMPTY", "Chưa chọn file hoặc file rỗng");
+        }
+        List<String> errors = new ArrayList<>();
+        int created = 0;
+        int skipped = 0;
+        DataFormatter fmt = new DataFormatter(Locale.US);
+
+        try (InputStream in = file.getInputStream();
+             Workbook wb = WorkbookFactory.create(in)) {
+            Sheet sheet = wb.getSheetAt(0);
+            if (sheet == null) {
+                throw new BadRequestException("UTILITY_IMPORT_NO_SHEET", "File Excel không có sheet dữ liệu");
+            }
+
+            int lastRow = sheet.getLastRowNum();
+            // Bỏ qua dòng tiêu đề (dòng 0).
+            for (int r = 1; r <= lastRow; r++) {
+                Row row = sheet.getRow(r);
+                if (isRowEmpty(row, fmt)) {
+                    continue;
+                }
+                int excelLine = r + 1; // số dòng người dùng thấy trong Excel (1-based)
+                try {
+                    switch (importRow(row, fmt)) {
+                        case CREATED -> created++;
+                        case SKIPPED -> skipped++;
+                    }
+                } catch (BadRequestException | NotFoundException ex) {
+                    errors.add("Dòng " + excelLine + ": " + ex.getMessage());
+                } catch (RuntimeException ex) {
+                    errors.add("Dòng " + excelLine + ": dữ liệu không hợp lệ");
+                }
+            }
+        } catch (BadRequestException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BadRequestException("UTILITY_IMPORT_PARSE_ERROR",
+                    "Không đọc được file Excel. Hãy dùng đúng mẫu (.xlsx) tải từ hệ thống.");
+        }
+
+        return new UtilityBillImportResultDTO(created, errors.size(), skipped, errors);
+    }
+
+    /** Kết quả xử lý một dòng Excel: tạo thành công hay bỏ qua (hộ không tồn tại). */
+    private enum RowOutcome { CREATED, SKIPPED }
+
+    /**
+     * Đọc & lưu một dòng hoá đơn.
+     * Trả về {@link RowOutcome#CREATED} nếu tạo thành công, {@link RowOutcome#SKIPPED} nếu
+     * mã hộ không tồn tại trong hệ thống (dòng được bỏ qua, không tính là lỗi).
+     * Các trường hợp dữ liệu sai khác (trùng hoá đơn, thiếu chỉ số, loại sai...) vẫn ném lỗi.
+     */
+    private RowOutcome importRow(Row row, DataFormatter fmt) {
+        String code = cellString(row, 0, fmt);
+        if (code.isEmpty()) {
+            // Không có mã hộ -> coi như dòng không có thông tin hộ, bỏ qua.
+            return RowOutcome.SKIPPED;
+        }
+        // Mã hộ không khớp hộ nào -> bỏ qua dòng này thay vì báo lỗi
+        // (cho phép dùng 1 file mẫu liệt kê mọi mã hộ dù hộ thực tế là ngẫu nhiên).
+        Household household = householdRepository.findByCode(code).orElse(null);
+        if (household == null) {
+            return RowOutcome.SKIPPED;
+        }
+
+        UtilityType type = parseType(cellString(row, 1, fmt));
+        Integer month = cellInt(row, 2, fmt);
+        Integer year = cellInt(row, 3, fmt);
+        if (month == null || month < 1 || month > 12) {
+            throw new BadRequestException("UTILITY_IMPORT_MONTH", "Tháng không hợp lệ (1-12)");
+        }
+        if (year == null || year < 2000) {
+            throw new BadRequestException("UTILITY_IMPORT_YEAR", "Năm không hợp lệ");
+        }
+
+        if (billRepository.existsByHouseholdIdAndTypeAndMonthAndYear(household.getId(), type, month, year)) {
+            throw new BadRequestException("UTILITY_BILL_DUPLICATE",
+                    "Hộ đã có hoá đơn " + type + " tháng " + month + "/" + year);
+        }
+
+        Integer oldIndex = cellInt(row, 4, fmt);
+        Integer newIndex = cellInt(row, 5, fmt);
+        BigDecimal amount = cellDecimal(row, 6, fmt);
+
+        UtilityBill b = new UtilityBill();
+        b.setHousehold(household);
+        b.setType(type);
+        b.setMonth(month);
+        b.setYear(year);
+        b.setOldIndex(oldIndex);
+        b.setNewIndex(newIndex);
+        b.setAmount(computeAmount(type, oldIndex, newIndex, amount));
+        b.setStatus(UtilityBillStatus.UNPAID);
+        billRepository.save(b);
+        return RowOutcome.CREATED;
+    }
+
+    /** Sinh file Excel mẫu (.xlsx) để admin điền dữ liệu nhập hàng loạt. */
+    public byte[] buildImportTemplate() {
+        try (Workbook wb = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Hoá đơn điện nước");
+
+            CellStyle headerStyle = wb.createCellStyle();
+            Font headerFont = wb.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < IMPORT_HEADERS.length; i++) {
+                Cell c = header.createCell(i);
+                c.setCellValue(IMPORT_HEADERS[i]);
+                c.setCellStyle(headerStyle);
+            }
+
+            // Dòng ví dụ minh hoạ cách điền (điện theo chỉ số, internet theo số tiền).
+            Row ex1 = sheet.createRow(1);
+            ex1.createCell(0).setCellValue("HK-A02-01");
+            ex1.createCell(1).setCellValue("DIEN");
+            ex1.createCell(2).setCellValue(6);
+            ex1.createCell(3).setCellValue(2026);
+            ex1.createCell(4).setCellValue(1200);
+            ex1.createCell(5).setCellValue(1320);
+
+            Row ex2 = sheet.createRow(2);
+            ex2.createCell(0).setCellValue("HK-A02-01");
+            ex2.createCell(1).setCellValue("INTERNET");
+            ex2.createCell(2).setCellValue(6);
+            ex2.createCell(3).setCellValue(2026);
+            ex2.createCell(6).setCellValue(200000);
+
+            for (int i = 0; i < IMPORT_HEADERS.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (Exception ex) {
+            throw new BadRequestException("UTILITY_TEMPLATE_ERROR", "Không tạo được file mẫu");
+        }
+    }
+
+    private UtilityType parseType(String raw) {
+        String s = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        switch (s) {
+            case "ELECTRICITY":
+            case "DIEN":
+            case "ĐIỆN":
+            case "ĐIEN":
+            case "DIỆN":
+                return UtilityType.ELECTRICITY;
+            case "WATER":
+            case "NUOC":
+            case "NƯỚC":
+            case "NUƠC":
+                return UtilityType.WATER;
+            case "INTERNET":
+            case "NET":
+                return UtilityType.INTERNET;
+            default:
+                throw new BadRequestException("UTILITY_IMPORT_TYPE",
+                        "Loại hoá đơn không hợp lệ: '" + raw + "' (dùng DIEN/NUOC/INTERNET)");
+        }
+    }
+
+    private boolean isRowEmpty(Row row, DataFormatter fmt) {
+        if (row == null) {
+            return true;
+        }
+        for (int i = 0; i < IMPORT_HEADERS.length; i++) {
+            if (!cellString(row, i, fmt).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String cellString(Row row, int idx, DataFormatter fmt) {
+        if (row == null) {
+            return "";
+        }
+        Cell c = row.getCell(idx);
+        return c == null ? "" : fmt.formatCellValue(c).trim();
+    }
+
+    private Integer cellInt(Row row, int idx, DataFormatter fmt) {
+        String s = cellString(row, idx, fmt).replace(",", "").replace(".", "").replace(" ", "");
+        if (s.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(s);
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("UTILITY_IMPORT_NUMBER", "Giá trị '" + s + "' không phải số nguyên");
+        }
+    }
+
+    private BigDecimal cellDecimal(Row row, int idx, DataFormatter fmt) {
+        String s = cellString(row, idx, fmt).replace(",", "").replace(" ", "");
+        if (s.isEmpty()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(s);
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("UTILITY_IMPORT_NUMBER", "Số tiền '" + s + "' không hợp lệ");
+        }
     }
 
     // Helpers

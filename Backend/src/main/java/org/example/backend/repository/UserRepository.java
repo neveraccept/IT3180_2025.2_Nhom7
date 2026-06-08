@@ -52,6 +52,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
               AND u.household.id IN :householdIds
             """)
 	List<User> findActiveResidentsByHouseholdIds(@Param("householdIds") List<Long> householdIds);
+
+	// Kiểm tra một nhân khẩu đã được cấp tài khoản chưa (bỏ qua tài khoản đã xóa mềm).
+	boolean existsByResident_IdAndDeletedFalse(Long residentId);
+
+	// Liệt kê các tài khoản gắn với một hộ — qua nhân khẩu (resident.household) HOẶC qua household_id trực tiếp.
+	// Phục vụ tab "Tài khoản" trong trang Căn hộ và thao tác khóa tài khoản khi chuyển cả hộ đi.
+	@Query("""
+            SELECT DISTINCT u FROM User u
+            JOIN FETCH u.role
+            LEFT JOIN u.resident r
+            LEFT JOIN r.household rh
+            LEFT JOIN u.household uh
+            WHERE u.deleted = false
+              AND (rh.id = :householdId OR uh.id = :householdId)
+            ORDER BY u.id
+            """)
+	List<User> findAccountsByHousehold(@Param("householdId") Long householdId);
 }
 
 

@@ -7,7 +7,7 @@ import { SectionHeader } from "../components/layout/SectionHeader";
 import { getResidentStatisticsAPI } from "../api/reportApi";
 import { listFeePeriodsAPI } from "../api/feeApi";
 import { listAllComplaintsAPI, CATEGORY_LABEL } from "../api/complaintApi";
-import { listMyNotificationsAPI, listSentNotificationsAPI } from "../api/notificationApi";
+import { listMyNotificationsAPI, listSentNotificationsAPI, markNotificationReadAPI, markNotificationUnreadAPI } from "../api/notificationApi";
 import { listMyHouseholdPaymentsAPI } from "../api/paymentApi";
 import { listMyUtilityBillsAPI } from "../api/utilityApi";
 
@@ -17,6 +17,7 @@ export function Dashboard({ role }) {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [notificationActionLoading, setNotificationActionLoading] = useState(false);
 
   // Admin state
   const [stats, setStats] = useState(null);
@@ -66,17 +67,21 @@ export function Dashboard({ role }) {
           listMyUtilityBillsAPI(),
         ]);
         if (!cancelled) {
-          const fees = (paymentsRes.data?.items || []).filter((p) => p.status === "UNPAID");
+          const fees = (paymentsRes.data?.items || []).filter(
+            (p) => p.status === "UNPAID" && String(p.feePeriodStatus || "OPEN").toUpperCase() !== "CLOSED"
+          );
           const bills = (billsRes.data?.items || []).filter((b) => b.status === "UNPAID");
           setUnpaidItems([
             ...fees.map((p) => ({
               id: `FEE-${p.id}`,
+              sortId: Number(p.id || 0),
               name: p.feeName || p.feePeriodName || "Khoản phí",
               period: p.feePeriodName || "",
               amount: Number(p.amountDue || 0),
             })),
             ...bills.map((b) => ({
               id: `BILL-${b.id}`,
+              sortId: Number(b.id || 0),
               name: `Hóa đơn ${b.type === "ELECTRICITY" ? "Điện" : b.type === "WATER" ? "Nước" : "Internet"}`,
               period: `Tháng ${b.month}/${b.year}`,
               amount: Number(b.amount || 0),
@@ -94,6 +99,9 @@ export function Dashboard({ role }) {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const unpaidTotal = unpaidItems.reduce((s, r) => s + r.amount, 0);
+  const recentUnpaidItems = [...unpaidItems]
+    .sort((a, b) => b.sortId - a.sortId)
+    .slice(0, 5);
   // 5 thông báo gần nhất (mới nhất lên trước).
   const recentNotifications = [...notifications]
     .sort((a, b) => new Date(b.sentAt || 0) - new Date(a.sentAt || 0))
@@ -102,6 +110,40 @@ export function Dashboard({ role }) {
   const closeModals = () => {
     setSelectedComplaint(null);
     setSelectedNotification(null);
+  };
+
+  const openNotification = async (notification) => {
+    if (role === "ADMIN" || notification.isRead) {
+      setSelectedNotification(notification);
+      return;
+    }
+
+    const readNotification = { ...notification, isRead: true };
+    setSelectedNotification(readNotification);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+    );
+
+    const res = await markNotificationReadAPI(notification.id);
+    if (!res.success) {
+      setSelectedNotification(notification);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, isRead: false } : n))
+      );
+    }
+  };
+
+  const markSelectedNotificationUnread = async () => {
+    if (!selectedNotification || role === "ADMIN") return;
+    setNotificationActionLoading(true);
+    const res = await markNotificationUnreadAPI(selectedNotification.id);
+    if (res.success) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === selectedNotification.id ? { ...n, isRead: false, readAt: null } : n))
+      );
+      setSelectedNotification(null);
+    }
+    setNotificationActionLoading(false);
   };
 
   if (role !== "ADMIN") {
@@ -135,7 +177,7 @@ export function Dashboard({ role }) {
                 </div>
               )}
               {!loading &&
-                unpaidItems.map((item) => (
+                recentUnpaidItems.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4"
@@ -150,6 +192,11 @@ export function Dashboard({ role }) {
                     <Badge tone="red">Chưa nộp</Badge>
                   </div>
                 ))}
+              {!loading && unpaidItems.length > 5 && (
+                <p className="pt-1 text-center text-xs font-semibold text-slate-400">
+                  Đang hiển thị 5 khoản mới nhất / {unpaidItems.length} khoản chưa nộp.
+                </p>
+              )}
             </div>
           </Card>
 
@@ -164,7 +211,7 @@ export function Dashboard({ role }) {
                 recentNotifications.map((n) => (
                   <button
                     key={n.id}
-                    onClick={() => setSelectedNotification(n)}
+                    onClick={() => openNotification(n)}
                     className="flex w-full gap-3 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-slate-100"
                   >
                     {n.isRead ? (
@@ -198,8 +245,11 @@ export function Dashboard({ role }) {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
                 {selectedNotification.content}
               </div>
-              <div className="mt-5 flex justify-end">
+              <div className="mt-5 flex justify-end gap-3">
                 <Button variant="secondary" onClick={closeModals}>Đóng</Button>
+                <Button onClick={markSelectedNotificationUnread} disabled={notificationActionLoading}>
+                  {notificationActionLoading ? "Đang đánh dấu..." : "Đánh dấu chưa đọc"}
+                </Button>
               </div>
             </motion.div>
           </div>
@@ -320,7 +370,7 @@ export function Dashboard({ role }) {
               recentNotifications.map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => setSelectedNotification(n)}
+                  onClick={() => openNotification(n)}
                   className="flex w-full gap-3 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-slate-100"
                 >
                   <Bell className="mt-1 h-5 w-5 text-sky-600" />

@@ -13,6 +13,7 @@ public record ParkingSlotDTO(
         String code,
         VehicleType type,
         ParkingSlotStatus status,
+        Long activeRegistrationId,
         String licensePlate,
         String householdCode
 ) {}

@@ -108,12 +108,7 @@ public class NotificationService {
     public NotificationDTO markAsRead(Long notificationId) {
         User me = currentUserService.getCurrentUser();
 
-        // Chỉ tìm trong các bản ghi nhận của chính user → user khác không đánh dấu hộ được
-        NotificationRecipient nr = recipientRepository
-                .findByNotificationIdAndRecipientId(notificationId, me.getId())
-                .orElseThrow(() -> new NotFoundException(
-                        "NOTIFICATION_NOT_FOUND",
-                        "Không tìm thấy thông báo gửi cho bạn id=" + notificationId));
+        NotificationRecipient nr = findMyRecipient(notificationId, me.getId());
 
         if (Boolean.FALSE.equals(nr.getIsRead())) {
             nr.setIsRead(true);
@@ -123,7 +118,28 @@ public class NotificationService {
         return mapper.toRecipientDto(nr);
     }
 
+    @Transactional
+    public NotificationDTO markAsUnread(Long notificationId) {
+        User me = currentUserService.getCurrentUser();
+        NotificationRecipient nr = findMyRecipient(notificationId, me.getId());
+
+        if (Boolean.TRUE.equals(nr.getIsRead())) {
+            nr.setIsRead(false);
+            nr.setReadAt(null);
+            recipientRepository.save(nr);
+        }
+        return mapper.toRecipientDto(nr);
+    }
+
     // Helpers
+
+    private NotificationRecipient findMyRecipient(Long notificationId, Long userId) {
+        return recipientRepository
+                .findByNotificationIdAndRecipientId(notificationId, userId)
+                .orElseThrow(() -> new NotFoundException(
+                        "NOTIFICATION_NOT_FOUND",
+                        "Không tìm thấy thông báo gửi cho bạn id=" + notificationId));
+    }
 
     /** Quy đổi phạm vi (ALL / BY_FLOOR / BY_HOUSEHOLD) thành danh sách cư dân nhận. */
     private List<User> resolveRecipients(NotificationCreateRequest req) {

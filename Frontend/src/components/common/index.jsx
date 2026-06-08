@@ -100,7 +100,7 @@ export function Input({ label, className = "", ...props }) {
   );
 }
 
-export function Select({ label, children, value, onChange }) {
+export function Select({ label, children, value, onChange, ...props }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</span>
@@ -108,6 +108,7 @@ export function Select({ label, children, value, onChange }) {
         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
         value={value}
         onChange={onChange}
+        {...props}
       >
         {children}
       </select>

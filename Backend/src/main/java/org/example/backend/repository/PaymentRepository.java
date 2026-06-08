@@ -32,19 +32,26 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query(value = """
             SELECT p FROM Payment p
             LEFT JOIN FETCH p.feePeriod fp
-            LEFT JOIN FETCH fp.fee
+            LEFT JOIN FETCH fp.fee f
             LEFT JOIN FETCH p.household
             LEFT JOIN FETCH p.collectedBy
             WHERE (:householdId IS NULL OR p.household.id = :householdId)
               AND (:status IS NULL OR p.status = :status)
+              AND (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(fp.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """,
             countQuery = """
             SELECT COUNT(p) FROM Payment p
+            LEFT JOIN p.feePeriod fp
+            LEFT JOIN fp.fee f
             WHERE (:householdId IS NULL OR p.household.id = :householdId)
               AND (:status IS NULL OR p.status = :status)
+              AND (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(fp.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<Payment> search(@Param("householdId") Long householdId,
                          @Param("status") String status,
+                         @Param("keyword") String keyword,
                          Pageable pageable);
 }
 

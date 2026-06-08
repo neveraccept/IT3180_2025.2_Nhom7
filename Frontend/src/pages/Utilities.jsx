@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, AlertCircle } from "lucide-react";
+import { Search, Plus, AlertCircle, CheckCheck, X, Receipt, Upload, FileSpreadsheet, Download } from "lucide-react";
 import { money } from "../utils/helpers";
 import { Button, Card, Input, Select, StatusBadge, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
@@ -10,8 +10,14 @@ import {
   updateUtilityBillAPI,
   deleteUtilityBillAPI,
   confirmCashUtilityBillAPI,
+  confirmCashUtilityBillsBatchAPI,
+  importUtilityBillsExcelAPI,
+  downloadUtilityImportTemplateAPI,
+  generateUtilityFeesAPI,
 } from "../api/utilityApi";
+import { downloadBlob } from "../api/reportApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
+import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 7 — Quản lý hoá đơn điện/nước/internet (ADMIN).
@@ -44,9 +50,30 @@ export function Utilities() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // Thao tác hàng loạt: tập id hoá đơn (UNPAID) đang được tick chọn.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  // Sinh hoá đơn phí điện nước theo tháng (giống "Tạo hóa đơn phí gửi xe").
+  const [showFeeForm, setShowFeeForm] = useState(false);
+  const [feeForm, setFeeForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+  const [feeError, setFeeError] = useState("");
+  const [feeSaving, setFeeSaving] = useState(false);
+
+  // Nhập hàng loạt từ Excel.
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState(null);
+
   const [searchFilters, setSearchFilters] = useState({ householdId: "", type: "", month: "", year: "", status: "" });
-  const emptyForm = { householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
+  const emptyForm = { apartmentId: "", householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
   const [formData, setFormData] = useState(emptyForm);
+  const [apartmentOptions, setApartmentOptions] = useState([]);
+  const [loadingApartments, setLoadingApartments] = useState(false);
 
   // Đơn giá hệ thống (điện/nước/internet)
   const [configs, setConfigs] = useState([]);
@@ -79,6 +106,15 @@ export function Utilities() {
     }
   }, []);
 
+  const loadApartmentOptions = useCallback(async () => {
+    setLoadingApartments(true);
+    const res = await listApartmentsAPI({ page: 0, size: 1000, sort: "code,asc" });
+    setLoadingApartments(false);
+    if (res.success) {
+      setApartmentOptions((res.data?.items || []).filter((apartment) => apartment.currentHouseholdCode));
+    }
+  }, []);
+
   const handleSaveConfig = async (key) => {
     const value = Number(configDraft[key]);
     if (!(value >= 0)) {
@@ -97,9 +133,15 @@ export function Utilities() {
     await loadConfigs();
   };
 
+  const showToast = (message, tone = "green") => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const loadBills = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setPageError("");
+    setSelectedIds(new Set());
     const res = await searchUtilityBillsAPI({
       householdId: searchFilters.householdId || undefined,
       type: searchFilters.type || undefined,
@@ -122,6 +164,7 @@ export function Utilities() {
   useEffect(() => {
     loadBills(1);
     loadConfigs();
+    loadApartmentOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -140,6 +183,7 @@ export function Utilities() {
 
   const handleEdit = (bill) => {
     setFormData({
+      apartmentId: "",
       householdId: String(bill.householdId ?? ""),
       type: bill.type,
       month: bill.month,
@@ -153,9 +197,23 @@ export function Utilities() {
     setShowForm(true);
   };
 
+  const handleApartmentChange = async (apartmentId) => {
+    setFormData((prev) => ({ ...prev, apartmentId, householdId: "" }));
+    setError("");
+    if (!apartmentId) return;
+
+    const res = await getApartmentDetailAPI(apartmentId);
+    const householdId = res.data?.currentHousehold?.id;
+    if (!res.success || !householdId) {
+      setError(res.message || "Căn hộ này chưa có hộ dân đang ở");
+      return;
+    }
+    setFormData((prev) => ({ ...prev, apartmentId, householdId: String(householdId) }));
+  };
+
   const handleSave = async () => {
     if (!editingBill && !String(formData.householdId).trim()) {
-      setError("Vui lòng nhập mã hộ (householdId)");
+      setError("Vui lòng chọn căn hộ");
       return;
     }
 
@@ -216,6 +274,41 @@ export function Utilities() {
     await loadBills(page);
   };
 
+  // ----- Lựa chọn hàng loạt (chỉ hoá đơn chưa nộp) -----
+  const selectableIds = bills.filter((b) => b.status !== "PAID").map((b) => b.id);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+
+  const toggleRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedIds((prev) => {
+      if (selectableIds.every((id) => prev.has(id))) return new Set();
+      return new Set(selectableIds);
+    });
+  };
+
+  const handleBulkConfirm = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setConfirming(true);
+    const res = await confirmCashUtilityBillsBatchAPI(ids);
+    setConfirming(false);
+    setBulkConfirm(false);
+    if (res.failed > 0) {
+      showToast(`Đã xác nhận ${res.ok}/${ids.length} hoá đơn. ${res.failed} hoá đơn lỗi.`, res.ok > 0 ? "green" : "red");
+    } else {
+      showToast(`Đã xác nhận tiền mặt cho ${res.ok} hoá đơn`);
+    }
+    await loadBills(page);
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteConfirm) return;
     const res = await deleteUtilityBillAPI(deleteConfirm.id);
@@ -227,6 +320,58 @@ export function Utilities() {
     setShowForm(false);
     setEditingBill(null);
     await loadBills(page);
+  };
+
+  // ----- Sinh hoá đơn phí điện nước theo tháng (gắn vào hệ thống Thu phí) -----
+  const handleGenerateFees = async () => {
+    setFeeError("");
+    setFeeSaving(true);
+    const res = await generateUtilityFeesAPI({ month: feeForm.month, year: feeForm.year });
+    setFeeSaving(false);
+    if (!res.success) {
+      setFeeError(res.message || "Tạo hoá đơn phí điện nước thất bại");
+      return;
+    }
+    setShowFeeForm(false);
+    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hoá đơn phí điện nước (xem ở mục Thu phí)`);
+  };
+
+  // ----- Nhập hàng loạt từ Excel -----
+  const openImport = () => {
+    setImportFile(null);
+    setImportError("");
+    setImportResult(null);
+    setShowImport(true);
+  };
+
+  const handleDownloadTemplate = async () => {
+    const res = await downloadUtilityImportTemplateAPI();
+    if (!res.success || !res.data) {
+      showToast(res.message || "Không tải được file mẫu", "red");
+      return;
+    }
+    downloadBlob(res.data, "mau-hoa-don-dien-nuoc.xlsx");
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      setImportError("Vui lòng chọn file Excel (.xlsx)");
+      return;
+    }
+    setImporting(true);
+    setImportError("");
+    setImportResult(null);
+    const res = await importUtilityBillsExcelAPI(importFile);
+    setImporting(false);
+    if (!res.success) {
+      setImportError(res.message || "Nhập hoá đơn thất bại");
+      return;
+    }
+    setImportResult(res.data);
+    showToast(`Đã nhập ${res.data?.createdCount ?? 0} hoá đơn`
+      + ((res.data?.skippedCount ?? 0) > 0 ? `, bỏ qua ${res.data.skippedCount} dòng (không có hộ)` : "")
+      + ((res.data?.failedCount ?? 0) > 0 ? `, ${res.data.failedCount} dòng lỗi` : ""));
+    await loadBills(1);
   };
 
   // Tạm tính số tiền điện/nước = (chỉ số mới - chỉ số cũ) * đơn giá hiện hành.
@@ -244,8 +389,22 @@ export function Utilities() {
       <SectionHeader
         title="Quản lý phí điện, nước, internet"
         desc="Nhập hoá đơn theo từng hộ và từng tháng, ghi nhận đã nộp, tra cứu theo hộ."
-        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Nhập hóa đơn</Button>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => { setFeeError(""); setShowFeeForm(true); }}>
+              <Receipt className="h-4 w-4" /> Tạo hóa đơn điện nước
+            </Button>
+            <Button variant="secondary" onClick={openImport}>
+              <Upload className="h-4 w-4" /> Nhập từ Excel
+            </Button>
+            <Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Nhập hóa đơn</Button>
+          </div>
+        }
       />
+
+      {toast && (
+        <div className={`mb-5 rounded-2xl px-4 py-3 text-sm font-semibold ring-1 ${toast.tone === "red" ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>{toast.message}</div>
+      )}
 
       {pageError && (
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
@@ -323,13 +482,22 @@ export function Utilities() {
             <h3 className="mb-4 text-lg font-bold">{editingBill ? "Chi tiết hóa đơn" : "Nhập hóa đơn mới"}</h3>
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Mã hộ (householdId)"
-                  placeholder="VD: 1"
-                  value={formData.householdId}
-                  disabled={!!editingBill}
-                  onChange={(e) => setFormData({ ...formData, householdId: e.target.value })}
-                />
+                {editingBill ? (
+                  <Input
+                    label="Hộ"
+                    value={editingBill.householdCode || formData.householdId}
+                    disabled
+                  />
+                ) : (
+                  <Select label="Căn hộ" value={formData.apartmentId} onChange={(e) => handleApartmentChange(e.target.value)}>
+                    <option value="">{loadingApartments ? "Đang tải căn hộ..." : "Chọn căn hộ"}</option>
+                    {apartmentOptions.map((apartment) => (
+                      <option key={apartment.id} value={apartment.id}>
+                        {apartment.code}{apartment.headOfHouseholdName ? ` - ${apartment.headOfHouseholdName}` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                )}
                 <Select label="Loại hóa đơn" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
                   <option value="ELECTRICITY">Điện</option>
                   <option value="WATER">Nước</option>
@@ -441,11 +609,42 @@ export function Utilities() {
         </div>
       )}
 
+      {/* Thanh thao tác hàng loạt: hiện khi đang chọn ít nhất 1 hoá đơn chưa nộp. */}
+      {selectedIds.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 flex flex-col gap-3 rounded-2xl bg-sky-50 px-5 py-4 ring-1 ring-sky-200 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm font-semibold text-sky-800">
+            Đã chọn <strong>{selectedIds.size}</strong> hoá đơn chưa nộp
+          </p>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-4 w-4" /> Bỏ chọn
+            </Button>
+            <Button onClick={() => setBulkConfirm(true)}>
+              <CheckCheck className="h-4 w-4" /> Xác nhận tiền mặt hàng loạt
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="px-5 py-4">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-sky-600 focus:ring-sky-400"
+                    checked={allSelected}
+                    disabled={selectableIds.length === 0}
+                    onChange={toggleAll}
+                    title="Chọn tất cả hoá đơn chưa nộp trên trang"
+                  />
+                </th>
                 <th className="px-5 py-4">Hộ</th>
                 <th className="px-5 py-4">Loại hóa đơn</th>
                 <th className="px-5 py-4">Tháng/Năm</th>
@@ -457,13 +656,26 @@ export function Utilities() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
               )}
               {!loading && bills.length === 0 && (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
               )}
-              {!loading && bills.map((bill) => (
-                <tr key={bill.id} className="hover:bg-slate-50/80">
+              {!loading && bills.map((bill) => {
+                const unpaid = bill.status !== "PAID";
+                const checked = selectedIds.has(bill.id);
+                return (
+                <tr key={bill.id} className={`transition ${checked ? "bg-sky-50/70" : "hover:bg-slate-50/80"}`}>
+                  <td className="px-5 py-4">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 cursor-pointer rounded border-slate-300 text-sky-600 focus:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      checked={checked}
+                      disabled={!unpaid}
+                      onChange={() => toggleRow(bill.id)}
+                      title={unpaid ? "Chọn hoá đơn này" : "Hoá đơn đã nộp"}
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.householdCode || bill.householdId}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{getUtilityLabel(bill.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{bill.month}/{bill.year}</td>
@@ -476,7 +688,8 @@ export function Utilities() {
                     <button onClick={() => handleEdit(bill)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -486,6 +699,102 @@ export function Utilities() {
           </div>
         )}
       </div>
+
+      {bulkConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-3 text-lg font-black">Xác nhận tiền mặt hàng loạt</h3>
+            <p className="mb-5 text-sm text-slate-600">
+              Xác nhận <strong>{selectedIds.size}</strong> hoá đơn đã được thu bằng tiền mặt? Thao tác này không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setBulkConfirm(false)} disabled={confirming}>Hủy</Button>
+              <Button onClick={handleBulkConfirm} disabled={confirming}>{confirming ? "Đang xử lý…" : "Xác nhận tất cả"}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL: sinh hoá đơn phí điện nước theo tháng */}
+      {showFeeForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-bold">Tạo hóa đơn điện nước</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Hệ thống tạo phiếu thu cho mỗi hộ (= tổng các hoá đơn điện/nước/internet <strong>chưa nộp</strong> của hộ trong tháng).
+              Hóa đơn sẽ xuất hiện ở mục <strong>Thu phí / Công nợ</strong>; hộ dân có thể nộp tiền mặt hoặc thanh toán VNPay.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select label="Tháng" value={feeForm.month} onChange={(e) => setFeeForm({ ...feeForm, month: Number(e.target.value) })}>
+                {months.map((m) => <option key={m} value={m}>Tháng {m}</option>)}
+              </Select>
+              <Select label="Năm" value={feeForm.year} onChange={(e) => setFeeForm({ ...feeForm, year: Number(e.target.value) })}>
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+              </Select>
+            </div>
+            {feeError && <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{feeError}</div>}
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowFeeForm(false)} disabled={feeSaving}>Hủy</Button>
+              <Button onClick={handleGenerateFees} disabled={feeSaving}>{feeSaving ? "Đang tạo…" : "Tạo hóa đơn"}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL: nhập hoá đơn hàng loạt từ Excel */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="mb-2 text-lg font-bold">Nhập hóa đơn từ Excel</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Tải file mẫu, điền hoá đơn cho tất cả các hộ (mỗi dòng một hoá đơn), rồi tải file lên.
+              Cột: <strong>Mã hộ, Loại (DIEN/NUOC/INTERNET), Tháng, Năm, Chỉ số cũ, Chỉ số mới, Số tiền (Internet)</strong>.
+              Điện/nước cần chỉ số; internet để trống chỉ số (bỏ trống số tiền sẽ lấy giá gói cấu hình).
+            </p>
+
+            <Button variant="secondary" onClick={handleDownloadTemplate}>
+              <Download className="h-4 w-4" /> Tải file mẫu (.xlsx)
+            </Button>
+
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Chọn file Excel (.xlsx)</span>
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportError(""); setImportResult(null); }}
+                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-sky-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-sky-700"
+              />
+            </label>
+            {importFile && (
+              <p className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-600">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> {importFile.name}
+              </p>
+            )}
+
+            {importError && <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{importError}</div>}
+
+            {importResult && (
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
+                <p className="font-semibold text-slate-800">
+                  Tạo thành công <span className="text-emerald-700">{importResult.createdCount}</span> hoá đơn
+                  {importResult.skippedCount > 0 && <> — bỏ qua <span className="text-amber-600">{importResult.skippedCount}</span> dòng (không có hộ)</>}
+                  {importResult.failedCount > 0 && <> — lỗi <span className="text-rose-700">{importResult.failedCount}</span> dòng</>}
+                </p>
+                {importResult.errors?.length > 0 && (
+                  <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs text-rose-700">
+                    {importResult.errors.map((err, i) => <li key={i}>{err}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowImport(false)} disabled={importing}>Đóng</Button>
+              <Button onClick={handleImport} disabled={importing || !importFile}>{importing ? "Đang nhập…" : "Nhập hóa đơn"}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   );
 }

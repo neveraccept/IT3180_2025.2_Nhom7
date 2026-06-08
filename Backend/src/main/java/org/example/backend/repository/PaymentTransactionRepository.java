@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -29,6 +30,23 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     /** Tìm giao dịch PENDING đang treo cho cùng một khoản → tránh tạo song song. */
     Optional<PaymentTransaction> findFirstByTargetTypeAndTargetIdAndStatus(
             String targetType, Long targetId, String status);
+
+    @Modifying
+    @Query("""
+            UPDATE PaymentTransaction t
+            SET t.status = :newStatus
+            WHERE t.targetType = :targetType
+              AND t.targetId IN (
+                    SELECT p.id FROM Payment p
+                    WHERE p.feePeriod.id = :feePeriodId
+                      AND p.status = 'UNPAID'
+              )
+              AND t.status = :oldStatus
+            """)
+    int updatePendingFeeTransactionsByFeePeriod(@Param("feePeriodId") Long feePeriodId,
+                                                @Param("targetType") String targetType,
+                                                @Param("oldStatus") String oldStatus,
+                                                @Param("newStatus") String newStatus);
 
     // Fetch-join household + user mà PaymentTransactionDTO.from(...) sẽ đọc → tránh N+1.
     @EntityGraph(attributePaths = {"household", "user"})
