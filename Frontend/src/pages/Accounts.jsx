@@ -241,7 +241,6 @@ export function Accounts() {
     <>
       <SectionHeader
         title="Quản lý tài khoản"
-        desc="Admin xem danh sách và tạo tài khoản nội bộ."
         action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Tạo tài khoản</Button>}
       />
 

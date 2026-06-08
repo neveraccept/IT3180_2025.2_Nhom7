@@ -126,7 +126,7 @@ export function Profile({ user, setUser }) {
 
   return (
     <>
-      <SectionHeader title="Thông tin cá nhân" desc="Cập nhật số điện thoại và đổi mật khẩu tài khoản. Họ tên, email và căn hộ không được phép thay đổi." />
+      <SectionHeader title="Thông tin cá nhân" />
       <Card className="max-w-3xl">
         {loading ? (
           <div className="py-8 text-center text-slate-500">Đang tải thông tin...</div>

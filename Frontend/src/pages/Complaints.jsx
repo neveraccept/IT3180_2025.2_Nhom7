@@ -180,11 +180,6 @@ export function Complaints({
     <>
       <SectionHeader
         title={role === "ADMIN" ? "Xử lý khiếu nại" : "Khiếu nại của tôi"}
-        desc={
-          role === "ADMIN"
-            ? "Admin xem nội dung khiếu nại, nhập nội dung xử lý và cập nhật trạng thái."
-            : "Gửi khiếu nại mới hoặc xem tình trạng xử lý khiếu nại đã gửi."
-        }
         action={
           role !== "ADMIN" ? (
             <Button onClick={() => setShowCreateForm(true)}>

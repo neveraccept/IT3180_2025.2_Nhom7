@@ -413,7 +413,7 @@ export function Apartments() {
 
   return (
     <>
-      <SectionHeader title="Quản lý căn hộ" desc="Lấy căn hộ làm trung tâm: bàn giao, thêm thành viên, cấp tài khoản và chuyển hộ ngay tại đây." />
+      <SectionHeader title="Quản lý căn hộ" />
 
       <div className="mb-5 grid gap-3 md:grid-cols-4">
         <Input label="Số căn hộ" placeholder="VD: A12-01" value={filters.code}

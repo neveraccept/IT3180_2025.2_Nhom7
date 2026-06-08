@@ -199,7 +199,6 @@ export function Residents() {
     <>
       <SectionHeader
         title="Tra cứu nhân khẩu"
-        desc="Tra cứu và chỉnh sửa thông tin nhân khẩu. Việc thêm/chuyển nhân khẩu được thực hiện tại trang Căn hộ."
       />
 
       <div className="mb-5 flex items-start gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800 ring-1 ring-sky-200">

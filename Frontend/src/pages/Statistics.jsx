@@ -231,7 +231,6 @@ export function Statistics() {
 
       <SectionHeader
         title="Trình xuất báo cáo"
-        desc="Thiết lập bộ lọc, xem trước dữ liệu và xuất báo cáo Excel/PDF."
       />
 
       <Card className="mb-6">

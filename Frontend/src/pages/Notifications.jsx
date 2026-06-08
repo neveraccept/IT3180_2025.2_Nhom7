@@ -216,11 +216,6 @@ export function Notifications({
     <>
       <SectionHeader
         title="Gửi/Xem thông báo"
-        desc={
-          role === "ADMIN"
-            ? "Admin soạn thông báo cho cư dân và xem lại danh sách thông báo đã gửi."
-            : "Cư dân xem thông báo nhận được từ Ban quản trị."
-        }
         action={
           role === "ADMIN" ? (
             <Button onClick={() => setShowCompose(true)}>

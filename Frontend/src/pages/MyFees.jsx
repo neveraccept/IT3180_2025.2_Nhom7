@@ -371,7 +371,6 @@ export function MyFees() {
     <>
       <SectionHeader
         title="Thanh toán của tôi"
-        desc="Các khoản phí bắt buộc, hoá đơn tiện ích và đóng góp tự nguyện của hộ bạn. Có thể chọn nhiều mục để thanh toán VNPay trong một lần."
       />
 
       {pageError && (
@@ -511,7 +510,7 @@ export function MyFees() {
       </div>
 
       <div className="mt-8">
-        <SectionHeader title="Lịch sử thanh toán VNPay" desc="Các giao dịch online của hộ bạn." />
+        <SectionHeader title="Lịch sử thanh toán VNPay" />
         <Card className="mb-4">
           <div className="flex flex-wrap gap-2">
             {[

@@ -38,6 +38,13 @@ const slotStatusBadge = (status) => {
 const regStatusBadge = (status) => (
   <Badge tone={status === "ACTIVE" ? "green" : "gray"}>{status === "ACTIVE" ? "Đang hiệu lực" : "Đã kết thúc"}</Badge>
 );
+const getRegistrationMonthlyFee = (registration) =>
+  registration.monthlyFee ?? registration.parkingFee ?? registration.feePerMonth ?? registration.fee;
+const parkingPriceKeyByVehicleType = (type) => {
+  if (type === "CAR") return CONFIG_KEYS.CAR_PARKING_PRICE;
+  if (type === "MOTORBIKE") return CONFIG_KEYS.MOTORBIKE_PARKING_PRICE;
+  return null;
+};
 
 export function Vehicles({ role = "ADMIN" }) {
   const isAdmin = role === "ADMIN";
@@ -409,7 +416,6 @@ function AdminVehicles() {
     <>
       <SectionHeader
         title="Quản lý gửi xe"
-        desc="Đăng ký xe cho hộ, quản lý chỗ gửi và các lượt gửi/cho thuê. Tra cứu xe theo từng hộ."
         action={
           <div className="flex flex-wrap gap-3">
             <Button variant="secondary" onClick={() => { setFeeError(""); setShowFeeForm(true); }}>
@@ -503,7 +509,7 @@ function AdminVehicles() {
       </Card>
 
       {/* Chỗ gửi xe */}
-      <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe của hộ)." />
+      <SectionHeader title="Chỗ gửi xe" />
 
       {slotLookupTitle && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 ring-1 ring-sky-200">
@@ -712,23 +718,44 @@ function AdminVehicles() {
 function ResidentVehicles() {
   const [vehicles, setVehicles] = useState([]);
   const [regs, setRegs] = useState([]);
+  const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
+
+  const vehicleTypeByPlate = useMemo(
+    () => new Map(vehicles.map((v) => [String(v.licensePlate || "").trim().toLowerCase(), v.type])),
+    [vehicles]
+  );
+  const parkingPrices = useMemo(
+    () => new Map(configs.map((c) => [c.configKey, Number(c.configValue)])),
+    [configs]
+  );
+  const systemMonthlyFeeOf = (registration) => {
+    const plateKey = String(registration.licensePlate || "").trim().toLowerCase();
+    const vehicleType = vehicleTypeByPlate.get(plateKey);
+    const priceKey = parkingPriceKeyByVehicleType(vehicleType);
+    const systemFee = priceKey ? parkingPrices.get(priceKey) : undefined;
+    return Number.isFinite(systemFee) ? systemFee : getRegistrationMonthlyFee(registration);
+  };
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [vRes, rRes] = await Promise.all([listMyVehiclesAPI(), listMyParkingRegistrationsAPI()]);
+      const [vRes, rRes, cRes] = await Promise.all([
+        listMyVehiclesAPI(),
+        listMyParkingRegistrationsAPI(),
+        listSystemConfigsAPI(),
+      ]);
       if (vRes.success) setVehicles(vRes.data?.items || []);
       else setPageError(vRes.message || "Không tải được danh sách xe");
       if (rRes.success) setRegs(rRes.data?.items || []);
+      if (cRes.success) setConfigs(cRes.data || []);
       setLoading(false);
     })();
   }, []);
-
   return (
     <>
-      <SectionHeader title="Xe của tôi" desc="Danh sách xe và các lượt gửi xe đang hiệu lực của hộ bạn. Liên hệ Ban quản lý để đăng ký xe mới." />
+      <SectionHeader title="Xe của tôi" />
 
       {pageError && (
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
@@ -781,7 +808,9 @@ function ResidentVehicles() {
                 <tr key={r.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{r.slotCode}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.licensePlate || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(r.monthlyFee || 0)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">
+                    {systemMonthlyFeeOf(r) == null ? "—" : money(systemMonthlyFeeOf(r))}
+                  </td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.startDate || "__"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{regStatusBadge(r.status)}</td>
                 </tr>

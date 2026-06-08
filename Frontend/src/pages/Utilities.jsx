@@ -388,7 +388,6 @@ export function Utilities() {
     <>
       <SectionHeader
         title="Quản lý phí điện, nước, internet"
-        desc="Nhập hoá đơn theo từng hộ và từng tháng, ghi nhận đã nộp, tra cứu theo hộ."
         action={
           <div className="flex flex-wrap gap-3">
             <Button variant="secondary" onClick={() => { setFeeError(""); setShowFeeForm(true); }}>
