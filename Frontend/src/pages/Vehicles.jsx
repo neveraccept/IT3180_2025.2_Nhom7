@@ -18,6 +18,7 @@ import {
   generateParkingFeesAPI,
 } from "../api/vehicleApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
+import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 6 — Phương tiện (Vehicle) + chỗ gửi xe (Parking).
@@ -58,14 +59,24 @@ function AdminVehicles() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
-  const [form, setForm] = useState({ householdId: "", licensePlate: "", type: "MOTORBIKE", active: true });
+  const [form, setForm] = useState({
+    apartmentId: "",
+    householdId: "",
+    licensePlate: "",
+    type: "MOTORBIKE",
+    active: true,
+    parkingSlotId: "",
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: "",
+  });
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(null);
+  const [fixedParkingSlot, setFixedParkingSlot] = useState(null);
+  const [removeSlotConfirm, setRemoveSlotConfirm] = useState(null);
 
-  const [showParkForm, setShowParkForm] = useState(false);
-  const [parkForm, setParkForm] = useState({ slotId: "", vehicleId: "", monthlyFee: "", startDate: "", endDate: "" });
-  const [parkError, setParkError] = useState("");
+  const [apartmentOptions, setApartmentOptions] = useState([]);
+  const [loadingApartments, setLoadingApartments] = useState(false);
   const [configs, setConfigs] = useState([]);
   const [configDraft, setConfigDraft] = useState({});
   const [configSaving, setConfigSaving] = useState("");
@@ -103,8 +114,6 @@ function AdminVehicles() {
     });
   }, [lookupSlots, slots, slotFilter]);
 
-  const occupiedCount = slots.filter((s) => s.status !== "EMPTY").length;
-  const emptyCount = slots.length - occupiedCount;
   const filterSourceSlots = lookupSlots || slots;
   const filterOccupiedCount = filterSourceSlots.filter((s) => s.status !== "EMPTY").length;
   const filterEmptyCount = filterSourceSlots.length - filterOccupiedCount;
@@ -112,8 +121,14 @@ function AdminVehicles() {
   // Cắt trang cho danh sách chỗ gửi đã lọc/sắp xếp.
   const pagedSlots = displayedSlots.slice((slotPage - 1) * SLOT_PAGE_SIZE, slotPage * SLOT_PAGE_SIZE);
 
+  const emptySlotsForVehicleType = useMemo(
+    () => slots.filter((slot) => slot.status === "EMPTY" && slot.type === form.type),
+    [slots, form.type]
+  );
+
   // Đổi bộ lọc -> quay về trang 1 để không rơi vào trang rỗng.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSlotPage(1);
   }, [lookupSlots, slotFilter]);
 
@@ -138,7 +153,9 @@ function AdminVehicles() {
   }, []);
   const loadSlots = useCallback(async () => {
     const res = await listParkingSlotsAPI();
-    if (res.success) setSlots(res.data?.items || []);
+    const items = res.success ? (res.data?.items || []) : [];
+    if (res.success) setSlots(items);
+    return items;
   }, []);
   const loadConfigs = useCallback(async () => {
     const res = await listSystemConfigsAPI();
@@ -148,12 +165,22 @@ function AdminVehicles() {
       setConfigDraft(Object.fromEntries(list.map((c) => [c.configKey, String(c.configValue ?? "")])));
     }
   }, []);
+  const loadApartmentOptions = useCallback(async () => {
+    setLoadingApartments(true);
+    const res = await listApartmentsAPI({ page: 0, size: 1000, sort: "code,asc" });
+    setLoadingApartments(false);
+    if (res.success) {
+      setApartmentOptions((res.data?.items || []).filter((apartment) => apartment.currentHouseholdCode));
+    }
+  }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSummary();
     loadSlots();
     loadConfigs();
-  }, [loadSummary, loadSlots, loadConfigs]);
+    loadApartmentOptions();
+  }, [loadSummary, loadSlots, loadConfigs, loadApartmentOptions]);
 
   const handleSaveConfig = async (key) => {
     const value = Number(configDraft[key]);
@@ -233,17 +260,57 @@ function AdminVehicles() {
     setSlotFilter("ALL");
   };
 
+  const refreshLookupSlots = (freshSlots) => {
+    if (!lookupSlots || freshSlots.length === 0) return;
+    const freshById = new Map(freshSlots.map((slot) => [slot.id, slot]));
+    setLookupSlots((current) => current?.map((slot) => freshById.get(slot.id) || slot) || null);
+  };
+
   const openCreateForm = () => {
-    setForm({ householdId: searchHouseholdId || "", licensePlate: "", type: "MOTORBIKE", active: true });
+    setForm({
+      apartmentId: "",
+      householdId: "",
+      licensePlate: "",
+      type: "MOTORBIKE",
+      active: true,
+      parkingSlotId: "",
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: "",
+    });
     setEditingVehicle(null);
+    setFixedParkingSlot(null);
     setFormError("");
     setShowForm(true);
   };
-  const openEditForm = (v) => {
-    setForm({ householdId: String(v.householdId ?? ""), licensePlate: v.licensePlate || "", type: v.type || "MOTORBIKE", active: v.active !== false });
-    setEditingVehicle(v);
+  const openParkingForm = (slot) => {
+    setForm({
+      apartmentId: "",
+      householdId: "",
+      licensePlate: "",
+      type: slot.type,
+      active: true,
+      parkingSlotId: String(slot.id),
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: "",
+    });
+    setEditingVehicle(null);
+    setFixedParkingSlot(slot);
     setFormError("");
     setShowForm(true);
+  };
+
+  const handleApartmentChange = async (apartmentId) => {
+    setForm((prev) => ({ ...prev, apartmentId, householdId: "" }));
+    setFormError("");
+    if (!apartmentId) return;
+
+    const res = await getApartmentDetailAPI(apartmentId);
+    const householdId = res.data?.currentHousehold?.id;
+    if (!res.success || !householdId) {
+      setFormError(res.message || "Căn hộ này chưa có hộ dân đang ở");
+      return;
+    }
+    setForm((prev) => ({ ...prev, apartmentId, householdId: String(householdId) }));
   };
 
   const handleSaveVehicle = async () => {
@@ -260,20 +327,40 @@ function AdminVehicles() {
     } else {
       if (!String(form.householdId).trim()) {
         setSaving(false);
-        setFormError("Vui lòng nhập mã hộ (householdId)");
+        setFormError("Vui lòng chọn căn hộ sở hữu");
         return;
       }
       res = await registerVehicleAPI({ householdId: Number(form.householdId), licensePlate: plate, type: form.type });
     }
-    setSaving(false);
     if (!res.success) {
+      setSaving(false);
       setFormError(res.message || "Lưu xe thất bại");
       return;
     }
+    if (!editingVehicle && form.parkingSlotId) {
+      const payload = {
+        slotId: Number(form.parkingSlotId),
+        vehicleId: Number(res.data.id),
+      };
+      if (form.startDate) payload.startDate = form.startDate;
+      if (form.endDate) payload.endDate = form.endDate;
+
+      const parkingRes = await createParkingRegistrationAPI(payload);
+      if (!parkingRes.success) {
+        setSaving(false);
+        setFormError(`Đã đăng ký xe nhưng gán chỗ gửi thất bại: ${parkingRes.message || "Vui lòng thử lại ở form gán chỗ"}`);
+        await loadVehicles(String(form.householdId));
+        refreshLookupSlots(await loadSlots());
+        await loadSummary();
+        return;
+      }
+    }
+    setSaving(false);
     setShowForm(false);
-    showToast(editingVehicle ? "Đã cập nhật xe" : "Đã đăng ký xe");
+    showToast(editingVehicle ? "Đã cập nhật xe" : form.parkingSlotId ? "Đã đăng ký xe và gán chỗ gửi" : "Đã đăng ký xe");
     const hid = editingVehicle ? loadedHousehold : String(form.householdId);
     if (hid) await loadVehicles(hid);
+    refreshLookupSlots(await loadSlots());
     loadSummary();
   };
 
@@ -289,27 +376,19 @@ function AdminVehicles() {
     showToast("Đã huỷ đăng ký xe");
     if (loadedHousehold) await loadVehicles(loadedHousehold);
     loadSummary();
-    loadSlots();
+    refreshLookupSlots(await loadSlots());
   };
 
-  const handleCreateRegistration = async () => {
-    if (!parkForm.vehicleId) { setParkError("Nhập vehicleId của xe thuộc hộ"); return; }
-    const payload = {
-      slotId: Number(parkForm.slotId),
-      vehicleId: Number(parkForm.vehicleId),
-    };
-    if (parkForm.monthlyFee) payload.monthlyFee = Number(parkForm.monthlyFee);
-    if (parkForm.startDate) payload.startDate = parkForm.startDate;
-    if (parkForm.endDate) payload.endDate = parkForm.endDate;
-
-    const res = await createParkingRegistrationAPI(payload);
+  const handleRemoveParkingRegistration = async () => {
+    if (!removeSlotConfirm?.activeRegistrationId) return;
+    const res = await endParkingRegistrationAPI(removeSlotConfirm.activeRegistrationId);
+    setRemoveSlotConfirm(null);
     if (!res.success) {
-      setParkError(res.message || "Tạo lượt gửi xe thất bại");
+      showToast(res.message || "Gỡ xe khỏi chỗ gửi thất bại", "red");
       return;
     }
-    setShowParkForm(false);
-    showToast("Đã tạo lượt gửi xe");
-    loadSlots();
+    showToast("Đã gỡ xe khỏi chỗ gửi");
+    refreshLookupSlots(await loadSlots());
     loadSummary();
   };
 
@@ -466,11 +545,12 @@ function AdminVehicles() {
                 <th className="px-5 py-4">Biển số xe</th>
                 <th className="px-5 py-4">Căn hộ sở hữu</th>
                 <th className="px-5 py-4">Trạng thái</th>
+                <th className="px-5 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayedSlots.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
                   {slots.length === 0 ? "Chua co cho gui nao." : "Chua co cho gui nao phu hop."}
                 </td></tr>
               )}
@@ -481,6 +561,15 @@ function AdminVehicles() {
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.licensePlate ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.householdCode ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{slotStatusBadge(s.status)}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-right">
+                    {s.status === "EMPTY" ? (
+                      <Button variant="soft" onClick={() => openParkingForm(s)}>Gán xe</Button>
+                    ) : s.activeRegistrationId ? (
+                      <Button variant="danger" onClick={() => setRemoveSlotConfirm(s)}>Gỡ xe</Button>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-400">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -497,14 +586,46 @@ function AdminVehicles() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-bold">{editingVehicle ? "Chi tiết xe" : "Đăng ký xe mới"}</h3>
+            <h3 className="mb-4 text-lg font-bold">{editingVehicle ? "Chi tiết xe" : fixedParkingSlot ? `Gán xe vào chỗ ${fixedParkingSlot.code}` : "Đăng ký xe mới"}</h3>
             <div className="space-y-4">
-              <Input label="Mã hộ (householdId)" placeholder="VD: 1" value={form.householdId} disabled={!!editingVehicle} onChange={(e) => setForm({ ...form, householdId: e.target.value })} />
+              {!editingVehicle && (
+                <Select label="Căn hộ sở hữu" value={form.apartmentId} onChange={(e) => handleApartmentChange(e.target.value)}>
+                  <option value="">{loadingApartments ? "Đang tải căn hộ..." : "Chọn căn hộ"}</option>
+                  {apartmentOptions.map((apartment) => (
+                    <option key={apartment.id} value={apartment.id}>
+                      {apartment.code}{apartment.headOfHouseholdName ? ` - ${apartment.headOfHouseholdName}` : ""}
+                    </option>
+                  ))}
+                </Select>
+              )}
               <Input label="Biển số" placeholder="VD: 30A-12345" value={form.licensePlate} onChange={(e) => setForm({ ...form, licensePlate: e.target.value })} />
-              <Select label="Loại xe" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                <option value="MOTORBIKE">Xe máy</option>
-                <option value="CAR">Ô tô</option>
-              </Select>
+              {fixedParkingSlot ? (
+                <Input label="Loại xe" value={typeLabel(form.type)} disabled />
+              ) : (
+                <Select label="Loại xe" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, parkingSlotId: "" })}>
+                  <option value="MOTORBIKE">Xe máy</option>
+                  <option value="CAR">Ô tô</option>
+                </Select>
+              )}
+              {!editingVehicle && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="mb-3 text-sm font-black text-slate-900">Thông tin gửi xe</h4>
+                  <div className="space-y-4">
+                    {!fixedParkingSlot && (
+                      <Select label="Chỗ gửi trống" value={form.parkingSlotId} onChange={(e) => setForm({ ...form, parkingSlotId: e.target.value })}>
+                        <option value="">Chưa gán chỗ gửi</option>
+                        {emptySlotsForVehicleType.map((slot) => (
+                          <option key={slot.id} value={slot.id}>{slot.code} - {typeLabel(slot.type)}</option>
+                        ))}
+                      </Select>
+                    )}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Input label="Từ ngày" type="date" value={form.startDate} disabled={!form.parkingSlotId} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+                      <Input label="Đến ngày" type="date" value={form.endDate} disabled={!form.parkingSlotId} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+              )}
               {editingVehicle && (
                 <Select label="Trạng thái" value={form.active ? "ACTIVE" : "INACTIVE"} onChange={(e) => setForm({ ...form, active: e.target.value === "ACTIVE" })}>
                   <option value="ACTIVE">Đang gửi</option>
@@ -540,23 +661,19 @@ function AdminVehicles() {
         </div>
       )}
 
-      {/* MODAL: tạo lượt gửi xe (chỉ hỗ trợ gán xe của hộ) */}
-      {showParkForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 className="mb-4 text-lg font-bold">Gán xe hộ vào chỗ gửi</h3>
-            <div className="space-y-4">
-              <Input label="Mã xe (vehicleId)" placeholder="VD: 5" value={parkForm.vehicleId} onChange={(e) => setParkForm({ ...parkForm, vehicleId: e.target.value })} />
-              <Input label="Phí tháng (đ) — bỏ trống để dùng phí mặc định" type="number" value={parkForm.monthlyFee} onChange={(e) => setParkForm({ ...parkForm, monthlyFee: e.target.value })} />
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input label="Từ ngày" type="date" value={parkForm.startDate} onChange={(e) => setParkForm({ ...parkForm, startDate: e.target.value })} />
-                <Input label="Đến ngày" type="date" value={parkForm.endDate} onChange={(e) => setParkForm({ ...parkForm, endDate: e.target.value })} />
-              </div>
-              {parkError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{parkError}</div>}
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="secondary" onClick={() => setShowParkForm(false)}>Hủy</Button>
-                <Button onClick={handleCreateRegistration}>Tạo lượt gửi</Button>
-              </div>
+      {removeSlotConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-full bg-rose-100 p-3"><AlertCircle className="h-6 w-6 text-rose-600" /></div>
+              <h3 className="text-lg font-bold text-slate-900">Gỡ xe khỏi chỗ gửi</h3>
+            </div>
+            <p className="mb-6 text-slate-600">
+              Bạn có chắc muốn gỡ xe <strong>{removeSlotConfirm.licensePlate || "này"}</strong> khỏi chỗ <strong>{removeSlotConfirm.code}</strong>?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setRemoveSlotConfirm(null)}>Hủy</Button>
+              <Button variant="danger" onClick={handleRemoveParkingRegistration}>Gỡ xe</Button>
             </div>
           </motion.div>
         </div>
