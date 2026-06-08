@@ -56,22 +56,5 @@ public class DatabaseInitializerConfig implements CommandLineRunner {
             userRepository.save(admin);
             System.out.println("Đã tự động tạo tài khoản Admin (admin / admin123)");
         }
-
-        // 3. Tự động khởi tạo tài khoản Resident dùng chung để tiện test
-        if (!userRepository.existsByUsername("user")) {
-            Role residentRole = roleRepository.findByName("RESIDENT").get();
-
-            User resident = User.builder()
-                    .username("user")
-                    .passwordHash(passwordEncoder.encode("user123")) // Mật khẩu theo yêu cầu là user123
-                    .fullName("Cư dân Test")
-                    .role(residentRole) // Gán role RESIDENT
-                    .active(true) // Bật sẵn active = true để có thể đăng nhập ngay mà không cần Admin duyệt
-                    .emailVerified(true)
-                    .build();
-
-            userRepository.save(resident);
-            System.out.println("Đã tự động tạo tài khoản Resident (user / user123)");
-        }
     }
 }
