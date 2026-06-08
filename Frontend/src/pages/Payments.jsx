@@ -54,7 +54,8 @@ export function Payments() {
   const PAGE_SIZE = 20;
 
   // Thống kê tính trên TOÀN BỘ phiếu khớp bộ lọc (không phụ thuộc trang đang xem).
-  const [summary, setSummary] = useState({ totalDue: 0, totalPaid: 0, paid: 0, pending: 0 });
+  // pendingDonation: số phiếu tự nguyện (DONATION) chưa nộp — hiển thị riêng dưới "Phiếu chưa nộp".
+  const [summary, setSummary] = useState({ totalDue: 0, totalPaid: 0, paid: 0, pending: 0, pendingDonation: 0 });
 
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
@@ -98,10 +99,13 @@ export function Payments() {
           a.totalDue += Number(p.amountDue || 0);
           a.totalPaid += Number(p.amountPaid || 0);
           if (p.status === "PAID") a.paid += 1;
-          else a.pending += 1;
+          else {
+            a.pending += 1;
+            if (isDonation(p)) a.pendingDonation += 1;
+          }
           return a;
         },
-        { totalDue: 0, totalPaid: 0, paid: 0, pending: 0 }
+        { totalDue: 0, totalPaid: 0, paid: 0, pending: 0, pendingDonation: 0 }
       );
       setSummary(acc);
     }
@@ -203,7 +207,11 @@ export function Payments() {
         <Card><p className="text-sm font-semibold text-slate-500">Tổng phải thu</p><p className="mt-2 text-2xl font-black">{money(summary.totalDue)}</p></Card>
         <Card><p className="text-sm font-semibold text-slate-500">Đã thu</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
         <Card><p className="text-sm font-semibold text-slate-500">Phiếu đã nộp</p><p className="mt-2 text-2xl font-black text-emerald-700">{summary.paid}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Phiếu chưa nộp</p><p className="mt-2 text-2xl font-black text-rose-700">{summary.pending}</p></Card>
+        <Card>
+          <p className="text-sm font-semibold text-slate-500">Phiếu chưa nộp</p>
+          <p className="mt-2 text-2xl font-black text-rose-700">{summary.pending}</p>
+          <p className="mt-1 text-xs text-slate-500">{summary.pendingDonation} phiếu tự nguyện</p>
+        </Card>
       </div>
 
       {pageError && (

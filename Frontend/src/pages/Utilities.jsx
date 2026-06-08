@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, AlertCircle, CheckCheck, X } from "lucide-react";
+import { Search, Plus, AlertCircle, CheckCheck, X, Receipt, Upload, FileSpreadsheet, Download } from "lucide-react";
 import { money } from "../utils/helpers";
 import { Button, Card, Input, Select, StatusBadge, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
@@ -11,7 +11,11 @@ import {
   deleteUtilityBillAPI,
   confirmCashUtilityBillAPI,
   confirmCashUtilityBillsBatchAPI,
+  importUtilityBillsExcelAPI,
+  downloadUtilityImportTemplateAPI,
+  generateUtilityFeesAPI,
 } from "../api/utilityApi";
+import { downloadBlob } from "../api/reportApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
 
 // ============================================================
@@ -50,6 +54,19 @@ export function Utilities() {
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Sinh hoá đơn phí điện nước theo tháng (giống "Tạo hóa đơn phí gửi xe").
+  const [showFeeForm, setShowFeeForm] = useState(false);
+  const [feeForm, setFeeForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+  const [feeError, setFeeError] = useState("");
+  const [feeSaving, setFeeSaving] = useState(false);
+
+  // Nhập hàng loạt từ Excel.
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState(null);
 
   const [searchFilters, setSearchFilters] = useState({ householdId: "", type: "", month: "", year: "", status: "" });
   const emptyForm = { householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
@@ -277,6 +294,56 @@ export function Utilities() {
     await loadBills(page);
   };
 
+  // ----- Sinh hoá đơn phí điện nước theo tháng (gắn vào hệ thống Thu phí) -----
+  const handleGenerateFees = async () => {
+    setFeeError("");
+    setFeeSaving(true);
+    const res = await generateUtilityFeesAPI({ month: feeForm.month, year: feeForm.year });
+    setFeeSaving(false);
+    if (!res.success) {
+      setFeeError(res.message || "Tạo hoá đơn phí điện nước thất bại");
+      return;
+    }
+    setShowFeeForm(false);
+    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hoá đơn phí điện nước (xem ở mục Thu phí)`);
+  };
+
+  // ----- Nhập hàng loạt từ Excel -----
+  const openImport = () => {
+    setImportFile(null);
+    setImportError("");
+    setImportResult(null);
+    setShowImport(true);
+  };
+
+  const handleDownloadTemplate = async () => {
+    const res = await downloadUtilityImportTemplateAPI();
+    if (!res.success || !res.data) {
+      showToast(res.message || "Không tải được file mẫu", "red");
+      return;
+    }
+    downloadBlob(res.data, "mau-hoa-don-dien-nuoc.xlsx");
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      setImportError("Vui lòng chọn file Excel (.xlsx)");
+      return;
+    }
+    setImporting(true);
+    setImportError("");
+    setImportResult(null);
+    const res = await importUtilityBillsExcelAPI(importFile);
+    setImporting(false);
+    if (!res.success) {
+      setImportError(res.message || "Nhập hoá đơn thất bại");
+      return;
+    }
+    setImportResult(res.data);
+    showToast(`Đã nhập ${res.data?.createdCount ?? 0} hoá đơn` + ((res.data?.failedCount ?? 0) > 0 ? `, ${res.data.failedCount} dòng lỗi` : ""));
+    await loadBills(1);
+  };
+
   // Tạm tính số tiền điện/nước = (chỉ số mới - chỉ số cũ) * đơn giá hiện hành.
   const meteredPreview = (() => {
     if (!isMetered(formData.type)) return null;
@@ -292,7 +359,17 @@ export function Utilities() {
       <SectionHeader
         title="Quản lý phí điện, nước, internet"
         desc="Nhập hoá đơn theo từng hộ và từng tháng, ghi nhận đã nộp, tra cứu theo hộ."
-        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Nhập hóa đơn</Button>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => { setFeeError(""); setShowFeeForm(true); }}>
+              <Receipt className="h-4 w-4" /> Tạo hóa đơn điện nước
+            </Button>
+            <Button variant="secondary" onClick={openImport}>
+              <Upload className="h-4 w-4" /> Nhập từ Excel
+            </Button>
+            <Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Nhập hóa đơn</Button>
+          </div>
+        }
       />
 
       {toast && (
@@ -594,6 +671,86 @@ export function Utilities() {
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setBulkConfirm(false)} disabled={confirming}>Hủy</Button>
               <Button onClick={handleBulkConfirm} disabled={confirming}>{confirming ? "Đang xử lý…" : "Xác nhận tất cả"}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL: sinh hoá đơn phí điện nước theo tháng */}
+      {showFeeForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-bold">Tạo hóa đơn điện nước</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Hệ thống tạo phiếu thu cho mỗi hộ (= tổng các hoá đơn điện/nước/internet <strong>chưa nộp</strong> của hộ trong tháng).
+              Hóa đơn sẽ xuất hiện ở mục <strong>Thu phí / Công nợ</strong>; hộ dân có thể nộp tiền mặt hoặc thanh toán VNPay.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select label="Tháng" value={feeForm.month} onChange={(e) => setFeeForm({ ...feeForm, month: Number(e.target.value) })}>
+                {months.map((m) => <option key={m} value={m}>Tháng {m}</option>)}
+              </Select>
+              <Select label="Năm" value={feeForm.year} onChange={(e) => setFeeForm({ ...feeForm, year: Number(e.target.value) })}>
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+              </Select>
+            </div>
+            {feeError && <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{feeError}</div>}
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowFeeForm(false)} disabled={feeSaving}>Hủy</Button>
+              <Button onClick={handleGenerateFees} disabled={feeSaving}>{feeSaving ? "Đang tạo…" : "Tạo hóa đơn"}</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL: nhập hoá đơn hàng loạt từ Excel */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="mb-2 text-lg font-bold">Nhập hóa đơn từ Excel</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Tải file mẫu, điền hoá đơn cho tất cả các hộ (mỗi dòng một hoá đơn), rồi tải file lên.
+              Cột: <strong>Mã hộ, Loại (DIEN/NUOC/INTERNET), Tháng, Năm, Chỉ số cũ, Chỉ số mới, Số tiền (Internet)</strong>.
+              Điện/nước cần chỉ số; internet để trống chỉ số (bỏ trống số tiền sẽ lấy giá gói cấu hình).
+            </p>
+
+            <Button variant="secondary" onClick={handleDownloadTemplate}>
+              <Download className="h-4 w-4" /> Tải file mẫu (.xlsx)
+            </Button>
+
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Chọn file Excel (.xlsx)</span>
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportError(""); setImportResult(null); }}
+                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-sky-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-sky-700"
+              />
+            </label>
+            {importFile && (
+              <p className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-600">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> {importFile.name}
+              </p>
+            )}
+
+            {importError && <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{importError}</div>}
+
+            {importResult && (
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
+                <p className="font-semibold text-slate-800">
+                  Tạo thành công <span className="text-emerald-700">{importResult.createdCount}</span> hoá đơn
+                  {importResult.failedCount > 0 && <> — lỗi <span className="text-rose-700">{importResult.failedCount}</span> dòng</>}
+                </p>
+                {importResult.errors?.length > 0 && (
+                  <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs text-rose-700">
+                    {importResult.errors.map((err, i) => <li key={i}>{err}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setShowImport(false)} disabled={importing}>Đóng</Button>
+              <Button onClick={handleImport} disabled={importing || !importFile}>{importing ? "Đang nhập…" : "Nhập hóa đơn"}</Button>
             </div>
           </motion.div>
         </div>

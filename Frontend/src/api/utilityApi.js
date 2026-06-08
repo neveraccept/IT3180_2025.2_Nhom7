@@ -72,6 +72,26 @@ export const searchUtilityBillsAPI = ({
 // ADMIN: chi tiết hoá đơn.
 export const getUtilityBillDetailAPI = (id) => callApi(axiosClient.get(`/api/utility-bills/${id}`));
 
+// ADMIN: nhập hoá đơn hàng loạt từ file Excel (.xlsx). Trả về { createdCount, failedCount, errors }.
+export const importUtilityBillsExcelAPI = (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  return callApi(
+    axiosClient.post("/api/utility-bills/import", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  );
+};
+
+// ADMIN: tải file Excel mẫu để nhập hàng loạt (responseType: 'blob').
+export const downloadUtilityImportTemplateAPI = () =>
+  callApi(axiosClient.get("/api/utility-bills/import-template", { responseType: "blob" }));
+
+// ADMIN: sinh hoá đơn phí điện nước cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
+// payload = { month, year } -> { feePeriodId, feePeriodName, invoiceCount, totalAmount }
+export const generateUtilityFeesAPI = ({ month, year }) =>
+  callApi(axiosClient.post("/api/admin/utility-fees/generate", { month: Number(month), year: Number(year) }));
+
 // RESIDENT: hoá đơn của hộ mình (lọc tuỳ chọn).
 export const listMyUtilityBillsAPI = ({ type, month, year, status, page = 0, size = 100, sort = "year,desc" } = {}) => {
   const params = { page, size, sort };

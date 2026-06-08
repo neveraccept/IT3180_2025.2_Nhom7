@@ -15,6 +15,10 @@ public interface HouseholdRepository extends JpaRepository<Household, Long> {
 
     boolean existsByCode(String code);
 
+    // Tra hộ theo mã (phục vụ import hoá đơn điện/nước từ Excel — file tham chiếu hộ bằng mã hộ).
+    @EntityGraph(attributePaths = {"apartment"})
+    Optional<Household> findByCode(String code);
+
     // Lấy Household ACTIVE duy nhất của căn hộ (nếu có). Phục vụ F2.5.
     // Fetch sẵn chủ hộ + căn hộ để tránh truy vấn lazy khi map sang DTO.
     @EntityGraph(attributePaths = {"headOfHousehold", "apartment"})
