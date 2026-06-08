@@ -35,10 +35,9 @@ public class UserService {
     private final EmailService emailService;
     private final UserMapper userMapper;
 
-    // Sinh mật khẩu tạm thời an toàn khi Admin cấp tài khoản cho cư dân.
+    // Mật khẩu tạm thời mặc định khi Admin cấp tài khoản cho cư dân.
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final String PASSWORD_ALPHABET =
-            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    private static final String DEFAULT_RESIDENT_PASSWORD = "user123";
 
     @Autowired
     public UserService(UserRepository userRepo,
@@ -390,11 +389,7 @@ public class UserService {
     }
 
     private String generateTemporaryPassword() {
-        StringBuilder sb = new StringBuilder(10);
-        for (int i = 0; i < 10; i++) {
-            sb.append(PASSWORD_ALPHABET.charAt(RANDOM.nextInt(PASSWORD_ALPHABET.length())));
-        }
-        return sb.toString();
+        return DEFAULT_RESIDENT_PASSWORD;
     }
 
 }

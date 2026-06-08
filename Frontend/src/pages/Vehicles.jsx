@@ -349,8 +349,8 @@ function AdminVehicles() {
       if (!parkingRes.success) {
         setSaving(false);
         setFormError(`Đã đăng ký xe nhưng gán chỗ gửi thất bại: ${parkingRes.message || "Vui lòng thử lại ở form gán chỗ"}`);
-        await loadVehicles(String(form.householdId));
-        refreshLookupSlots(await loadSlots());
+        const freshSlots = await loadSlots();
+        refreshLookupSlots(freshSlots);
         await loadSummary();
         return;
       }
@@ -358,9 +358,9 @@ function AdminVehicles() {
     setSaving(false);
     setShowForm(false);
     showToast(editingVehicle ? "Đã cập nhật xe" : form.parkingSlotId ? "Đã đăng ký xe và gán chỗ gửi" : "Đã đăng ký xe");
-    const hid = editingVehicle ? loadedHousehold : String(form.householdId);
-    if (hid) await loadVehicles(hid);
-    refreshLookupSlots(await loadSlots());
+    if (editingVehicle && loadedHousehold) await loadVehicles(loadedHousehold);
+    const freshSlots = await loadSlots();
+    refreshLookupSlots(freshSlots);
     loadSummary();
   };
 
