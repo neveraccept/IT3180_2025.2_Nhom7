@@ -17,6 +17,7 @@ import {
 } from "../api/utilityApi";
 import { downloadBlob } from "../api/reportApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
+import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 7 — Quản lý hoá đơn điện/nước/internet (ADMIN).
@@ -69,8 +70,10 @@ export function Utilities() {
   const [importResult, setImportResult] = useState(null);
 
   const [searchFilters, setSearchFilters] = useState({ householdId: "", type: "", month: "", year: "", status: "" });
-  const emptyForm = { householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
+  const emptyForm = { apartmentId: "", householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
   const [formData, setFormData] = useState(emptyForm);
+  const [apartmentOptions, setApartmentOptions] = useState([]);
+  const [loadingApartments, setLoadingApartments] = useState(false);
 
   // Đơn giá hệ thống (điện/nước/internet)
   const [configs, setConfigs] = useState([]);
@@ -100,6 +103,15 @@ export function Utilities() {
       const list = res.data || [];
       setConfigs(list);
       setConfigDraft(Object.fromEntries(list.map((c) => [c.configKey, String(c.configValue ?? "")])));
+    }
+  }, []);
+
+  const loadApartmentOptions = useCallback(async () => {
+    setLoadingApartments(true);
+    const res = await listApartmentsAPI({ page: 0, size: 1000, sort: "code,asc" });
+    setLoadingApartments(false);
+    if (res.success) {
+      setApartmentOptions((res.data?.items || []).filter((apartment) => apartment.currentHouseholdCode));
     }
   }, []);
 
@@ -152,6 +164,7 @@ export function Utilities() {
   useEffect(() => {
     loadBills(1);
     loadConfigs();
+    loadApartmentOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -170,6 +183,7 @@ export function Utilities() {
 
   const handleEdit = (bill) => {
     setFormData({
+      apartmentId: "",
       householdId: String(bill.householdId ?? ""),
       type: bill.type,
       month: bill.month,
@@ -183,9 +197,23 @@ export function Utilities() {
     setShowForm(true);
   };
 
+  const handleApartmentChange = async (apartmentId) => {
+    setFormData((prev) => ({ ...prev, apartmentId, householdId: "" }));
+    setError("");
+    if (!apartmentId) return;
+
+    const res = await getApartmentDetailAPI(apartmentId);
+    const householdId = res.data?.currentHousehold?.id;
+    if (!res.success || !householdId) {
+      setError(res.message || "Căn hộ này chưa có hộ dân đang ở");
+      return;
+    }
+    setFormData((prev) => ({ ...prev, apartmentId, householdId: String(householdId) }));
+  };
+
   const handleSave = async () => {
     if (!editingBill && !String(formData.householdId).trim()) {
-      setError("Vui lòng nhập mã hộ (householdId)");
+      setError("Vui lòng chọn căn hộ");
       return;
     }
 
@@ -452,13 +480,22 @@ export function Utilities() {
             <h3 className="mb-4 text-lg font-bold">{editingBill ? "Chi tiết hóa đơn" : "Nhập hóa đơn mới"}</h3>
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Mã hộ (householdId)"
-                  placeholder="VD: 1"
-                  value={formData.householdId}
-                  disabled={!!editingBill}
-                  onChange={(e) => setFormData({ ...formData, householdId: e.target.value })}
-                />
+                {editingBill ? (
+                  <Input
+                    label="Hộ"
+                    value={editingBill.householdCode || formData.householdId}
+                    disabled
+                  />
+                ) : (
+                  <Select label="Căn hộ" value={formData.apartmentId} onChange={(e) => handleApartmentChange(e.target.value)}>
+                    <option value="">{loadingApartments ? "Đang tải căn hộ..." : "Chọn căn hộ"}</option>
+                    {apartmentOptions.map((apartment) => (
+                      <option key={apartment.id} value={apartment.id}>
+                        {apartment.code}{apartment.headOfHouseholdName ? ` - ${apartment.headOfHouseholdName}` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                )}
                 <Select label="Loại hóa đơn" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
                   <option value="ELECTRICITY">Điện</option>
                   <option value="WATER">Nước</option>
