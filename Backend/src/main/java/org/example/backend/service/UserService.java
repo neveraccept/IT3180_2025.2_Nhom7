@@ -34,6 +34,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
     // Mật khẩu tạm thời mặc định khi Admin cấp tài khoản cho cư dân.
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -47,7 +48,8 @@ public class UserService {
                        ResidentRepository residentRepo,
                        PasswordEncoder passwordEncoder,
                        EmailService emailService,
-                       UserMapper userMapper) {
+                       UserMapper userMapper,
+                       NotificationService notificationService) {
         this.userRepo = userRepo;
         this.roleRepo = roleRepo;
         this.apartmentRepo = apartmentRepo;
@@ -56,6 +58,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     //Admin tạo tài khoản nội bộ
@@ -102,7 +105,9 @@ public class UserService {
         newUser.setActive(true);
         newUser.setEmailVerified(true);
 
-        return userRepo.saveAndFlush(newUser);
+        User saved = userRepo.saveAndFlush(newUser);
+        notificationService.backfillRecipientsForNewResidentAccount(saved);
+        return saved;
     }
 
     // Duyệt tài khoản cư dân đã đăng ký
@@ -127,7 +132,9 @@ public class UserService {
         user.setActive(true);
 
         // 5. Lưu thay đổi
-        return userRepo.saveAndFlush(user);
+        User saved = userRepo.saveAndFlush(user);
+        notificationService.backfillRecipientsForNewResidentAccount(saved);
+        return saved;
     }
 
     /**
@@ -327,6 +334,7 @@ public class UserService {
         user.setDeleted(false);
 
         User saved = userRepo.saveAndFlush(user);
+        notificationService.backfillRecipientsForNewResidentAccount(saved);
         return new AccountCreatedDTO(
                 saved.getId(), saved.getUsername(), rawPassword,
                 residentRole.getName(), resident.getId(), resident.getFullName());
