@@ -42,6 +42,7 @@ export function Accounts() {
   const [formData, setFormData] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
+  const isAdminRole = formData.role === "ADMIN";
 
   // Tài khoản đang xem chi tiết (cần id để gọi API xóa).
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -183,6 +184,14 @@ export function Accounts() {
     return true;
   };
 
+  const handleRoleChange = (role) => {
+    setFormData((prev) => ({
+      ...prev,
+      role,
+      apartment: role === "ADMIN" ? "" : prev.apartment,
+    }));
+  };
+
   const handleCreate = async () => {
     if (!validateCreateForm()) return;
 
@@ -195,7 +204,7 @@ export function Accounts() {
       fullName: formData.fullName.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      requestedApartmentCode: formData.apartment.trim() || null,
+      requestedApartmentCode: isAdminRole ? null : formData.apartment.trim() || null,
       role: formData.role,
     });
     setSaving(false);
@@ -220,7 +229,7 @@ export function Accounts() {
       fullName: formData.fullName.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      requestedApartmentCode: formData.apartment.trim() || null,
+      requestedApartmentCode: isAdminRole ? "" : formData.apartment.trim() || null,
       role: formData.role,
     });
     setSaving(false);
@@ -264,7 +273,7 @@ export function Accounts() {
                   disabled={mode === "view"}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 />
-                <Select label="Vai trò" value={formData.role} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
+                <Select label="Vai trò" value={formData.role} disabled={mode === "view"} onChange={(e) => handleRoleChange(e.target.value)}>
                   <option value="ADMIN">Admin</option>
                   <option value="RESIDENT">Cư dân</option>
                 </Select>
@@ -298,9 +307,9 @@ export function Accounts() {
                 />
                 <Input
                   label="Căn hộ"
-                  placeholder="VD: A12-01"
+                  placeholder={isAdminRole ? "Không áp dụng cho Admin" : "VD: A12-01"}
                   value={formData.apartment}
-                  disabled={mode === "view"}
+                  disabled={mode === "view" || isAdminRole}
                   onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
                 />
               </div>
