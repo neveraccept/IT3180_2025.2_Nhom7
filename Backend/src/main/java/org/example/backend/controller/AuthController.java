@@ -5,14 +5,12 @@ import org.example.backend.dto.*;
 import org.example.backend.dto.request.*;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
-import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.AuthService;
 import org.example.backend.service.EmailService;
 import org.example.backend.service.OtpService;
 import org.example.backend.service.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -130,7 +128,7 @@ public class AuthController {
 
 	// API Yêu cầu gửi OTP Quên mật khẩu
 	@PostMapping("/forgot-password/send-otp")
-	public ResponseEntity<?> sendForgotPasswordOtp(@RequestBody OtpRequest request) {
+	public ResponseEntity<?> sendForgotPasswordOtp(@Valid @RequestBody OtpRequest request) {
 		try {
 			String email = request.email();
 			if (email == null || email.isBlank()) {

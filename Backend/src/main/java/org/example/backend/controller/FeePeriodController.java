@@ -1,5 +1,6 @@
 package org.example.backend.controller;
 
+import jakarta.validation.Valid;
 import org.example.backend.dto.FeePeriodDTO;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.response.PageResponse;
@@ -30,13 +31,13 @@ public class FeePeriodController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ApiResponse<FeePeriodDTO> createFeePeriod(@RequestBody FeePeriodDTO feePeriodDTO) {
+    public ApiResponse<FeePeriodDTO> createFeePeriod(@Valid @RequestBody FeePeriodDTO feePeriodDTO) {
         return ApiResponse.ok(feePeriodService.createFeePeriod(feePeriodDTO), "Tạo đợt thu thành công");
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ApiResponse<FeePeriodDTO> updateFeePeriod(@PathVariable Long id, @RequestBody FeePeriodDTO feePeriodDTO) {
+    public ApiResponse<FeePeriodDTO> updateFeePeriod(@PathVariable Long id, @Valid @RequestBody FeePeriodDTO feePeriodDTO) {
         return ApiResponse.ok(feePeriodService.updateFeePeriod(id, feePeriodDTO), "Cập nhật đợt thu thành công");
     }
 
