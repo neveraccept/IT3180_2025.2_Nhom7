@@ -71,7 +71,7 @@ public class ParkingController {
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đã kết thúc lượt gửi xe"));
     }
 
-    // Sinh hoá đơn phí gửi xe theo tháng cho từng hộ. POST /api/admin/parking-fees/generate
+    // Sinh hóa đơn phí gửi xe theo tháng cho từng hộ. POST /api/admin/parking-fees/generate
     // Tạo đợt thu "Phí gửi xe tháng M/YYYY" và sinh phiếu nộp cho mỗi hộ có lượt gửi xe hiệu lực.
     @PostMapping("/admin/parking-fees/generate")
     @PreAuthorize("hasRole('ADMIN')")
@@ -80,7 +80,7 @@ public class ParkingController {
         ParkingFeeGenerationResultDTO result =
                 parkingFeeService.generateInvoices(req.month(), req.year());
         return ResponseEntity.ok(ApiResponse.ok(result,
-                "Đã tạo " + result.invoiceCount() + " hoá đơn phí gửi xe"));
+                "Đã tạo " + result.invoiceCount() + " hóa đơn phí gửi xe"));
     }
 
     // Cư dân xem lượt gửi xe của hộ. GET /api/parking-registrations/my-household

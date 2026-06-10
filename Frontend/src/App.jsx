@@ -2,7 +2,6 @@ import React from "react";
 import { BrowserRouter } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { AuthProvider } from "./context/AuthContext";
-import { AppProvider } from "./context/AppContext";
 import { AppRoutes } from "./routes/AppRoutes";
 
 class AppErrorBoundary extends React.Component {
@@ -48,13 +47,11 @@ class AppErrorBoundary extends React.Component {
 export default function App() {
   return (
     <AuthProvider>
-      <AppProvider>
-        <AppErrorBoundary>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AppErrorBoundary>
-      </AppProvider>
+      <AppErrorBoundary>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AppErrorBoundary>
     </AuthProvider>
   );
 }

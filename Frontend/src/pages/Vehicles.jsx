@@ -91,7 +91,7 @@ function AdminVehicles() {
   // Bộ lọc chỗ gửi: ALL | OCCUPIED (đang có xe) | EMPTY (đang trống)
   const [slotFilter, setSlotFilter] = useState("ALL");
 
-  // Sinh hoá đơn phí gửi xe theo tháng.
+  // Sinh hóa đơn phí gửi xe theo tháng.
   const [showFeeForm, setShowFeeForm] = useState(false);
   const [feeForm, setFeeForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [feeError, setFeeError] = useState("");
@@ -405,11 +405,11 @@ function AdminVehicles() {
     const res = await generateParkingFeesAPI({ month: feeForm.month, year: feeForm.year });
     setFeeSaving(false);
     if (!res.success) {
-      setFeeError(res.message || "Tạo hoá đơn phí gửi xe thất bại");
+      setFeeError(res.message || "Tạo hóa đơn phí gửi xe thất bại");
       return;
     }
     setShowFeeForm(false);
-    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hoá đơn phí gửi xe (xem ở mục Thu phí)`);
+    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hóa đơn phí gửi xe (xem ở mục Thu phí)`);
   };
 
   return (
@@ -522,7 +522,7 @@ function AdminVehicles() {
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="flex flex-wrap gap-2">
           {[
-            { key: "ALL", label: `Tat ca (${filterSourceSlots.length})` },
+            { key: "ALL", label: `Tất cả (${filterSourceSlots.length})` },
             { key: "OCCUPIED", label: `Đang có xe (${filterOccupiedCount})` },
             { key: "EMPTY", label: `Đang trống (${filterEmptyCount})` },
           ].map((f) => (
@@ -557,7 +557,7 @@ function AdminVehicles() {
             <tbody className="divide-y divide-slate-100">
               {displayedSlots.length === 0 && (
                 <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
-                  {slots.length === 0 ? "Chua co cho gui nao." : "Chua co cho gui nao phu hop."}
+                  {slots.length === 0 ? "Chưa có chỗ gửi nào." : "Chưa có chỗ gửi nào phù hợp."}
                 </td></tr>
               )}
               {pagedSlots.map((s) => (
@@ -685,7 +685,7 @@ function AdminVehicles() {
         </div>
       )}
 
-      {/* MODAL: sinh hoá đơn phí gửi xe theo tháng */}
+      {/* MODAL: sinh hóa đơn phí gửi xe theo tháng */}
       {showFeeForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
@@ -780,7 +780,7 @@ function ResidentVehicles() {
                 <tr key={v.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{v.licensePlate}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(v.type)}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã huỷ"}</Badge></td>
                 </tr>
               ))}
@@ -807,11 +807,11 @@ function ResidentVehicles() {
               {regs.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{r.slotCode}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.licensePlate || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.licensePlate || "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">
                     {systemMonthlyFeeOf(r) == null ? "—" : money(systemMonthlyFeeOf(r))}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.startDate || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.startDate || "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{regStatusBadge(r.status)}</td>
                 </tr>
               ))}

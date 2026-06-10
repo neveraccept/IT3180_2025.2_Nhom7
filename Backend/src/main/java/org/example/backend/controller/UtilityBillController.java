@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * M7 - Quản lý hoá đơn điện/nước/internet.
+ * M7 - Quản lý hóa đơn điện/nước/internet.
  * Admin: nhập (F7.1), sửa/xoá (F7.2), xác nhận đã nộp tiền mặt (F7.3), tra cứu (F7.4).
- * Cư dân: chỉ tra cứu hoá đơn của hộ mình.
+ * Cư dân: chỉ tra cứu hóa đơn của hộ mình.
  *
  * Lưu ý route: endpoint xác nhận tiền mặt nằm dưới /api/admin/... theo SDD,
  * nên controller dùng /api làm prefix và chỉ định path tuyệt đối ở từng method.
@@ -44,23 +44,23 @@ public class UtilityBillController {
         this.utilityFeeService = utilityFeeService;
     }
 
-    // F7.1 - Nhập hoá đơn. POST /api/utility-bills
+    // F7.1 - Nhập hóa đơn. POST /api/utility-bills
     @PostMapping("/utility-bills")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> create(
             @Valid @RequestBody CreateUtilityBillRequest req) {
         UtilityBillDTO dto = utilityBillService.create(req);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "Tạo hoá đơn thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Tạo hóa đơn thành công"));
     }
 
-    // F7.1 (mở rộng) - Nhập hoá đơn hàng loạt cho nhiều hộ từ file Excel. POST /api/utility-bills/import
+    // F7.1 (mở rộng) - Nhập hóa đơn hàng loạt cho nhiều hộ từ file Excel. POST /api/utility-bills/import
     @PostMapping(value = "/utility-bills/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillImportResultDTO>> importExcel(
             @RequestParam("file") MultipartFile file) {
         UtilityBillImportResultDTO result = utilityBillService.importFromExcel(file);
         return ResponseEntity.ok(ApiResponse.ok(result,
-                "Đã nhập " + result.createdCount() + " hoá đơn" +
+                "Đã nhập " + result.createdCount() + " hóa đơn" +
                         (result.skippedCount() > 0 ? ", bỏ qua " + result.skippedCount() + " dòng (không có hộ)" : "") +
                         (result.failedCount() > 0 ? ", " + result.failedCount() + " dòng lỗi" : "")));
     }
@@ -77,8 +77,8 @@ public class UtilityBillController {
                 .body(body);
     }
 
-    // Sinh hoá đơn phí điện nước theo tháng cho từng hộ. POST /api/admin/utility-fees/generate
-    // Tạo đợt thu "Phí điện nước tháng M/YYYY" và sinh phiếu nộp cho mỗi hộ có hoá đơn chưa nộp.
+    // Sinh hóa đơn phí điện nước theo tháng cho từng hộ. POST /api/admin/utility-fees/generate
+    // Tạo đợt thu "Phí điện nước tháng M/YYYY" và sinh phiếu nộp cho mỗi hộ có hóa đơn chưa nộp.
     @PostMapping("/admin/utility-fees/generate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityFeeGenerationResultDTO>> generateUtilityFees(
@@ -86,25 +86,25 @@ public class UtilityBillController {
         UtilityFeeGenerationResultDTO result =
                 utilityFeeService.generateInvoices(req.month(), req.year());
         return ResponseEntity.ok(ApiResponse.ok(result,
-                "Đã tạo " + result.invoiceCount() + " hoá đơn phí điện nước"));
+                "Đã tạo " + result.invoiceCount() + " hóa đơn phí điện nước"));
     }
 
-    // F7.2 - Sửa hoá đơn. PUT /api/utility-bills/{id}
+    // F7.2 - Sửa hóa đơn. PUT /api/utility-bills/{id}
     @PutMapping("/utility-bills/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUtilityBillRequest req) {
         UtilityBillDTO dto = utilityBillService.update(id, req);
-        return ResponseEntity.ok(ApiResponse.ok(dto, "Cập nhật hoá đơn thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Cập nhật hóa đơn thành công"));
     }
 
-    // F7.2 - Xoá hoá đơn. DELETE /api/utility-bills/{id}
+    // F7.2 - Xoá hóa đơn. DELETE /api/utility-bills/{id}
     @DeleteMapping("/utility-bills/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         utilityBillService.delete(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Đã xoá hoá đơn"));
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã xoá hóa đơn"));
     }
 
     // F7.3 - Ghi nhận đã nộp tiền mặt. PUT /api/admin/utility-bills/{id}/confirm-cash
@@ -115,7 +115,7 @@ public class UtilityBillController {
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đã ghi nhận nộp tiền mặt"));
     }
 
-    // F7.4 - Admin tra cứu hoá đơn (lọc theo hộ/loại/tháng/năm/trạng thái).
+    // F7.4 - Admin tra cứu hóa đơn (lọc theo hộ/loại/tháng/năm/trạng thái).
     // GET /api/utility-bills?householdId=&type=&month=&year=&status=
     @GetMapping("/utility-bills")
     @PreAuthorize("hasRole('ADMIN')")
@@ -131,14 +131,14 @@ public class UtilityBillController {
                 utilityBillService.search(householdId, type, month, year, status, pageable)));
     }
 
-    // F7.4 - Admin xem chi tiết hoá đơn. GET /api/utility-bills/{id}
+    // F7.4 - Admin xem chi tiết hóa đơn. GET /api/utility-bills/{id}
     @GetMapping("/utility-bills/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UtilityBillDTO>> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(utilityBillService.getDetail(id)));
     }
 
-    // F7.4 - Cư dân xem hoá đơn của hộ mình. GET /api/utility-bills/my-household
+    // F7.4 - Cư dân xem hóa đơn của hộ mình. GET /api/utility-bills/my-household
     @GetMapping("/utility-bills/my-household")
     @PreAuthorize("hasRole('RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<UtilityBillDTO>>> myHousehold(

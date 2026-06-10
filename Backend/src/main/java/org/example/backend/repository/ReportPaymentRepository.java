@@ -19,42 +19,7 @@ import java.util.List;
 @Repository
 public interface ReportPaymentRepository extends JpaRepository<Payment, Long> {
 
-    // ---- F10.1: tình trạng đợt thu ----
-
-    long countByFeePeriodId(Long feePeriodId);
-
-    long countByFeePeriodIdAndStatus(Long feePeriodId, String status);
-
-    @Query("SELECT COALESCE(SUM(p.amountDue), 0) FROM Payment p WHERE p.feePeriod.id = :feePeriodId")
-    BigDecimal sumAmountDueByFeePeriod(@Param("feePeriodId") Long feePeriodId);
-
-    @Query("SELECT COALESCE(SUM(p.amountPaid), 0) FROM Payment p WHERE p.feePeriod.id = :feePeriodId")
-    BigDecimal sumAmountPaidByFeePeriod(@Param("feePeriodId") Long feePeriodId);
-
-    // Số hộ đã nộp trong khoảng thời gian thanh toán [from, to] (null = không giới hạn).
-    @Query("""
-            SELECT COUNT(p) FROM Payment p
-            WHERE p.feePeriod.id = :feePeriodId
-              AND p.status = 'PAID'
-              AND (:from IS NULL OR p.paidDate >= :from)
-              AND (:to IS NULL OR p.paidDate <= :to)
-            """)
-    long countPaidByFeePeriodInRange(@Param("feePeriodId") Long feePeriodId,
-                                     @Param("from") LocalDate from,
-                                     @Param("to") LocalDate to);
-
-    // Tổng tiền đã thu trong khoảng thời gian thanh toán [from, to] (null = không giới hạn).
-    @Query("""
-            SELECT COALESCE(SUM(p.amountPaid), 0) FROM Payment p
-            WHERE p.feePeriod.id = :feePeriodId
-              AND (:from IS NULL OR p.paidDate >= :from)
-              AND (:to IS NULL OR p.paidDate <= :to)
-            """)
-    BigDecimal sumAmountPaidByFeePeriodInRange(@Param("feePeriodId") Long feePeriodId,
-                                               @Param("from") LocalDate from,
-                                               @Param("to") LocalDate to);
-
-    // ---- F10.1 (nhiều đợt thu cùng lúc): tổng hợp theo danh sách feePeriodIds ----
+    // ---- F10.1: tổng hợp theo danh sách feePeriodIds (một hoặc nhiều đợt thu) ----
 
     @Query("SELECT COUNT(p) FROM Payment p WHERE p.feePeriod.id IN :feePeriodIds")
     long countByFeePeriodIdIn(@Param("feePeriodIds") List<Long> feePeriodIds);
@@ -102,27 +67,7 @@ public interface ReportPaymentRepository extends JpaRepository<Payment, Long> {
             """)
     List<DonationContributionProjection> findContributionsByFeePeriodIds(@Param("feePeriodIds") List<Long> feePeriodIds);
 
-    // ---- F10.3: gộp theo hộ gia đình (toàn bộ phiếu nộp) ----
-
-    @Query("""
-            SELECT h.id               AS householdId,
-                   h.code             AS householdCode,
-                   r.fullName         AS headName,
-                   a.code             AS apartmentCode,
-                   COALESCE(SUM(p.amountDue), 0)  AS totalDue,
-                   COALESCE(SUM(p.amountPaid), 0) AS totalPaid,
-                   SUM(CASE WHEN p.status = 'UNPAID' THEN 1 ELSE 0 END) AS unpaidCount,
-                   COUNT(p)           AS paymentCount
-            FROM Payment p
-            JOIN p.household h
-            JOIN h.apartment a
-            LEFT JOIN h.headOfHousehold r
-            GROUP BY h.id, h.code, r.fullName, a.code
-            ORDER BY h.code ASC
-            """)
-    List<HouseholdPaymentProjection> aggregateByHousehold();
-
-    // ---- F10.3 có lọc theo khoảng ngày thanh toán [from, to] (null = không giới hạn) ----
+    // ---- F10.3: gộp theo hộ gia đình, lọc theo khoảng ngày thanh toán [from, to] (null = không giới hạn) ----
     // Chỉ gộp các phiếu có paidDate nằm trong khoảng -> phản ánh số thu trong kỳ.
     @Query("""
             SELECT h.id               AS householdId,

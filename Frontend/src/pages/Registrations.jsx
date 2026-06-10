@@ -12,9 +12,9 @@ const toReg = (dto) => ({
   id: dto.id,
   fullName: dto.fullName || dto.username,
   username: dto.username,
-  apartment: dto.requestedApartmentCode || "__",
-  email: dto.email || "__",
-  phone: dto.phone || "__",
+  apartment: dto.requestedApartmentCode || "—",
+  email: dto.email || "—",
+  phone: dto.phone || "—",
 });
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -75,7 +75,7 @@ export function Registrations() {
   // Tra cứu căn hộ + hộ dân ACTIVE theo mã căn hộ đã yêu cầu khi đăng ký.
   const loadApartmentContext = async (code) => {
     setAptCtx({ loading: true, error: "", apartment: null, household: null });
-    if (!code || code === "__") {
+    if (!code || code === "—") {
       setAptCtx({ loading: false, error: "Tài khoản chưa khai báo mã căn hộ.", apartment: null, household: null });
       return;
     }

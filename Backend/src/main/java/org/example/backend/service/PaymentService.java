@@ -14,7 +14,6 @@ import org.example.backend.entity.enums.PaymentMethod;
 import org.example.backend.entity.enums.UtilityBillStatus;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.exception.NotFoundException;
-import org.example.backend.service.VnpayService;
 import org.example.backend.repository.*;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -147,7 +146,7 @@ public class PaymentService {
         List<BigDecimal> batchAmounts = List.of();
         if (isFee) {
             if (targetId == null) {
-                throw new BadRequestException("TARGET_ID_REQUIRED", "Vui long chon khoan phi can thanh toan");
+                throw new BadRequestException("TARGET_ID_REQUIRED", "Vui lòng chọn khoản phí cần thanh toán");
             }
             Payment p = paymentRepository.findById(targetId)
                     .orElseThrow(() -> new NotFoundException(
@@ -173,7 +172,7 @@ public class PaymentService {
             batchPaymentIds = normalizeTargetIds(req.targetIds());
             batchUtilityBillIds = isMixedBatch ? normalizeTargetIds(req.utilityBillIds()) : List.of();
             if (batchPaymentIds.isEmpty() && batchUtilityBillIds.isEmpty()) {
-                throw new BadRequestException("EMPTY_BATCH", "Vui long chon it nhat mot muc thanh toan");
+                throw new BadRequestException("EMPTY_BATCH", "Vui lòng chọn ít nhất một mục thanh toán");
             }
 
             BigDecimal total = BigDecimal.ZERO;
@@ -182,20 +181,20 @@ public class PaymentService {
             for (Long paymentId : batchPaymentIds) {
                 Payment p = paymentRepository.findById(paymentId)
                         .orElseThrow(() -> new NotFoundException(
-                                "PAYMENT_NOT_FOUND", "Khong tim thay phieu nop id=" + paymentId));
+                                "PAYMENT_NOT_FOUND", "Không tìm thấy phiếu nộp id=" + paymentId));
                 if (Payment.STATUS_PAID.equals(p.getStatus())) {
-                    throw new BadRequestException("TARGET_ALREADY_PAID", "Co khoan phi da duoc thanh toan");
+                    throw new BadRequestException("TARGET_ALREADY_PAID", "Có khoản phí đã được thanh toán");
                 }
                 if (p.getFeePeriod() == null || !"OPEN".equalsIgnoreCase(p.getFeePeriod().getStatus())) {
                     throw new BadRequestException("FEE_PERIOD_CLOSED",
-                            "Co dot thu phi da dong, khong the thanh toan online");
+                            "Có đợt thu phí đã đóng, không thể thanh toán online");
                 }
 
                 Long paymentHouseholdId = p.getHousehold().getId();
                 if (batchOwner == null) {
                     batchOwner = paymentHouseholdId;
                 } else if (!batchOwner.equals(paymentHouseholdId)) {
-                    throw new AccessDeniedException("Cac khoan phi khong cung ho dan");
+                    throw new AccessDeniedException("Các khoản phí không cùng hộ dân");
                 }
 
                 BigDecimal lineAmount = p.getAmountDue();
@@ -203,7 +202,7 @@ public class PaymentService {
                     lineAmount = req.customAmounts() == null ? null : req.customAmounts().get(paymentId);
                     if (lineAmount == null || lineAmount.compareTo(BigDecimal.ZERO) <= 0) {
                         throw new BadRequestException("INVALID_DONATION_AMOUNT",
-                                "Vui long nhap so tien dong gop lon hon 0");
+                                "Vui lòng nhập số tiền đóng góp lớn hơn 0");
                     }
                 }
                 lineAmounts.add(lineAmount);
@@ -212,16 +211,16 @@ public class PaymentService {
             for (Long billId : batchUtilityBillIds) {
                 UtilityBill b = utilityBillRepository.findById(billId)
                         .orElseThrow(() -> new NotFoundException(
-                                "UTILITY_BILL_NOT_FOUND", "Khong tim thay hoa don id=" + billId));
+                                "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hóa đơn id=" + billId));
                 if (b.getStatus() == UtilityBillStatus.PAID) {
-                    throw new BadRequestException("TARGET_ALREADY_PAID", "Co hoa don da duoc thanh toan");
+                    throw new BadRequestException("TARGET_ALREADY_PAID", "Có hóa đơn đã được thanh toán");
                 }
 
                 Long billHouseholdId = b.getHousehold().getId();
                 if (batchOwner == null) {
                     batchOwner = billHouseholdId;
                 } else if (!batchOwner.equals(billHouseholdId)) {
-                    throw new AccessDeniedException("Cac muc thanh toan khong cung ho dan");
+                    throw new AccessDeniedException("Các mục thanh toán không cùng hộ dân");
                 }
 
                 total = total.add(b.getAmount());
@@ -231,13 +230,13 @@ public class PaymentService {
             batchAmounts = lineAmounts;
         } else {
             if (targetId == null) {
-                throw new BadRequestException("TARGET_ID_REQUIRED", "Vui long chon hoa don can thanh toan");
+                throw new BadRequestException("TARGET_ID_REQUIRED", "Vui lòng chọn hóa đơn cần thanh toán");
             }
             UtilityBill b = utilityBillRepository.findById(targetId)
                     .orElseThrow(() -> new NotFoundException(
-                            "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hoá đơn id=" + targetId));
+                            "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hóa đơn id=" + targetId));
             if (b.getStatus() == UtilityBillStatus.PAID) {
-                throw new BadRequestException("TARGET_ALREADY_PAID", "Hoá đơn đã được thanh toán");
+                throw new BadRequestException("TARGET_ALREADY_PAID", "Hóa đơn đã được thanh toán");
             }
             amount = b.getAmount();
             ownerHouseholdId = b.getHousehold().getId();
@@ -333,7 +332,6 @@ public class PaymentService {
         }
 
         String txnRef = params.get("vnp_TxnRef");
-        String responseCode = params.get("vnp_ResponseCode");
         String vnpAmount = params.get("vnp_Amount");
 
         // 2) Tìm giao dịch (PESSIMISTIC_WRITE chống IPN gọi đồng thời)
@@ -414,7 +412,7 @@ public class PaymentService {
         }
     }
 
-    /** Cập nhật bản ghi khoản phí/hoá đơn tương ứng khi VNPay thành công. */
+    /** Cập nhật bản ghi khoản phí/hóa đơn tương ứng khi VNPay thành công. */
     private void markTargetPaid(PaymentTransaction tx) {
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = LocalDate.now();
@@ -441,7 +439,7 @@ public class PaymentService {
                 BigDecimal lineAmount = i < amounts.size() ? amounts.get(i) : null;
                 Payment p = paymentRepository.findById(paymentId)
                         .orElseThrow(() -> new NotFoundException(
-                                "PAYMENT_NOT_FOUND", "Phieu nop khong ton tai id=" + paymentId));
+                                "PAYMENT_NOT_FOUND", "Phiếu nộp không tồn tại id=" + paymentId));
                 BigDecimal paidAmount = lineAmount != null ? lineAmount : p.getAmountDue();
                 p.setStatus(Payment.STATUS_PAID);
                 p.setAmountPaid(paidAmount);
@@ -462,7 +460,7 @@ public class PaymentService {
                 BigDecimal lineAmount = i < amounts.size() ? amounts.get(i) : null;
                 Payment p = paymentRepository.findById(paymentId)
                         .orElseThrow(() -> new NotFoundException(
-                                "PAYMENT_NOT_FOUND", "Phieu nop khong ton tai id=" + paymentId));
+                                "PAYMENT_NOT_FOUND", "Phiếu nộp không tồn tại id=" + paymentId));
                 BigDecimal paidAmount = lineAmount != null ? lineAmount : p.getAmountDue();
                 p.setStatus(Payment.STATUS_PAID);
                 p.setAmountPaid(paidAmount);
@@ -478,7 +476,7 @@ public class PaymentService {
             for (Long billId : parseIds(tx.getUtilityBillIds())) {
                 UtilityBill b = utilityBillRepository.findById(billId)
                         .orElseThrow(() -> new NotFoundException(
-                                "UTILITY_BILL_NOT_FOUND", "Hoa don khong ton tai id=" + billId));
+                                "UTILITY_BILL_NOT_FOUND", "Hóa đơn không tồn tại id=" + billId));
                 b.setStatus(UtilityBillStatus.PAID);
                 b.setPaymentMethod(PaymentMethod.ONLINE);
                 b.setTransactionCode(tx.getTransactionCode());
@@ -489,7 +487,7 @@ public class PaymentService {
         } else if (PaymentTransaction.TARGET_UTILITY_BILL.equals(tx.getTargetType())) {
             UtilityBill b = utilityBillRepository.findById(tx.getTargetId())
                     .orElseThrow(() -> new NotFoundException(
-                            "UTILITY_BILL_NOT_FOUND", "Hoá đơn không tồn tại id=" + tx.getTargetId()));
+                            "UTILITY_BILL_NOT_FOUND", "Hóa đơn không tồn tại id=" + tx.getTargetId()));
             b.setStatus(UtilityBillStatus.PAID);
             b.setPaymentMethod(PaymentMethod.ONLINE);
             b.setTransactionCode(tx.getTransactionCode());

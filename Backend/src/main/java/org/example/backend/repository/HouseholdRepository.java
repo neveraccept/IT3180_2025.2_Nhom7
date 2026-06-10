@@ -15,7 +15,7 @@ public interface HouseholdRepository extends JpaRepository<Household, Long> {
 
     boolean existsByCode(String code);
 
-    // Tra hộ theo mã (phục vụ import hoá đơn điện/nước từ Excel — file tham chiếu hộ bằng mã hộ).
+    // Tra hộ theo mã (phục vụ import hóa đơn điện/nước từ Excel — file tham chiếu hộ bằng mã hộ).
     @EntityGraph(attributePaths = {"apartment"})
     Optional<Household> findByCode(String code);
 

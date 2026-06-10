@@ -1,5 +1,5 @@
 // ============================================================
-//  utilityApi — Module 7: Hoá đơn điện/nước/internet (UtilityBill)
+//  utilityApi — Module 7: Hóa đơn điện/nước/internet (UtilityBill)
 //  Map UtilityBillController (/api):
 //    ADMIN     POST   /api/utility-bills                 body CreateUtilityBillRequest
 //    ADMIN     PUT    /api/utility-bills/{id}            body UpdateUtilityBillRequest
@@ -19,23 +19,23 @@ import axiosClient, { callApi } from "./axiosClient";
 export const UTILITY_TYPE = { ELECTRICITY: "ELECTRICITY", WATER: "WATER", INTERNET: "INTERNET" };
 export const UTILITY_STATUS = { UNPAID: "UNPAID", PAID: "PAID" };
 
-// ADMIN: nhập hoá đơn. payload = { householdId, type, month, year, amount }
+// ADMIN: nhập hóa đơn. payload = { householdId, type, month, year, amount }
 export const createUtilityBillAPI = (payload) =>
   callApi(axiosClient.post("/api/utility-bills", payload));
 
-// ADMIN: sửa hoá đơn (chỉ khi UNPAID). payload = { type?, month?, year?, amount? } (null = giữ nguyên)
+// ADMIN: sửa hóa đơn (chỉ khi UNPAID). payload = { type?, month?, year?, amount? } (null = giữ nguyên)
 export const updateUtilityBillAPI = (id, payload) =>
   callApi(axiosClient.put(`/api/utility-bills/${id}`, payload));
 
-// ADMIN: xoá hoá đơn.
+// ADMIN: xoá hóa đơn.
 export const deleteUtilityBillAPI = (id) => callApi(axiosClient.delete(`/api/utility-bills/${id}`));
 
 // ADMIN: ghi nhận đã nộp tiền mặt.
 export const confirmCashUtilityBillAPI = (id) =>
   callApi(axiosClient.put(`/api/admin/utility-bills/${id}/confirm-cash`));
 
-// ADMIN: xác nhận tiền mặt hàng loạt cho nhiều hoá đơn cùng lúc.
-// Gọi tuần tự endpoint đơn lẻ cho từng hoá đơn (mỗi hoá đơn vẫn sinh một bản ghi nhật ký riêng).
+// ADMIN: xác nhận tiền mặt hàng loạt cho nhiều hóa đơn cùng lúc.
+// Gọi tuần tự endpoint đơn lẻ cho từng hóa đơn (mỗi hóa đơn vẫn sinh một bản ghi nhật ký riêng).
 // Trả về { ok, failed, errors }.
 export const confirmCashUtilityBillsBatchAPI = async (ids = []) => {
   let ok = 0;
@@ -48,7 +48,7 @@ export const confirmCashUtilityBillsBatchAPI = async (ids = []) => {
   return { ok, failed: errors.length, errors };
 };
 
-// ADMIN: tra cứu hoá đơn (lọc theo hộ/loại/tháng/năm/trạng thái). Bỏ qua tham số rỗng.
+// ADMIN: tra cứu hóa đơn (lọc theo hộ/loại/tháng/năm/trạng thái). Bỏ qua tham số rỗng.
 export const searchUtilityBillsAPI = ({
   householdId,
   type,
@@ -57,7 +57,7 @@ export const searchUtilityBillsAPI = ({
   status,
   page = 0,
   size = 100,
-  // Mặc định gom theo hộ (household.id) để Admin dễ tra cứu hoá đơn của từng hộ.
+  // Mặc định gom theo hộ (household.id) để Admin dễ tra cứu hóa đơn của từng hộ.
   sort = "household.id,asc",
 } = {}) => {
   const params = { page, size, sort };
@@ -69,10 +69,10 @@ export const searchUtilityBillsAPI = ({
   return callApi(axiosClient.get("/api/utility-bills", { params }));
 };
 
-// ADMIN: chi tiết hoá đơn.
+// ADMIN: chi tiết hóa đơn.
 export const getUtilityBillDetailAPI = (id) => callApi(axiosClient.get(`/api/utility-bills/${id}`));
 
-// ADMIN: nhập hoá đơn hàng loạt từ file Excel (.xlsx). Trả về { createdCount, failedCount, errors }.
+// ADMIN: nhập hóa đơn hàng loạt từ file Excel (.xlsx). Trả về { createdCount, failedCount, errors }.
 export const importUtilityBillsExcelAPI = (file) => {
   const form = new FormData();
   form.append("file", file);
@@ -87,12 +87,12 @@ export const importUtilityBillsExcelAPI = (file) => {
 export const downloadUtilityImportTemplateAPI = () =>
   callApi(axiosClient.get("/api/utility-bills/import-template", { responseType: "blob" }));
 
-// ADMIN: sinh hoá đơn phí điện nước cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
+// ADMIN: sinh hóa đơn phí điện nước cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
 // payload = { month, year } -> { feePeriodId, feePeriodName, invoiceCount, totalAmount }
 export const generateUtilityFeesAPI = ({ month, year }) =>
   callApi(axiosClient.post("/api/admin/utility-fees/generate", { month: Number(month), year: Number(year) }));
 
-// RESIDENT: hoá đơn của hộ mình (lọc tuỳ chọn).
+// RESIDENT: hóa đơn của hộ mình (lọc tuỳ chọn).
 export const listMyUtilityBillsAPI = ({ type, month, year, status, page = 0, size = 100, sort = "year,desc" } = {}) => {
   const params = { page, size, sort };
   if (type) params.type = type;

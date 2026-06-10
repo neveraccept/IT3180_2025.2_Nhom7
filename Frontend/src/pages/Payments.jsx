@@ -20,7 +20,7 @@ const statusBadge = (p) => {
   }
   return <Badge tone={isDonation(p) ? "violet" : "red"}>{isDonation(p) ? "Chưa đóng góp" : "Chưa nộp"}</Badge>;
 };
-const methodLabel = (m) => (m === "CASH" ? "Tiền mặt" : m === "ONLINE" ? "VNPay" : "__");
+const methodLabel = (m) => (m === "CASH" ? "Tiền mặt" : m === "ONLINE" ? "VNPay" : "—");
 
 // Khoản tự nguyện chưa chốt số tiền: không hiển thị "0 đ" mà để ký hiệu riêng cho dễ phân biệt.
 const isDonation = (p) => p.feeType === "DONATION";
@@ -313,8 +313,8 @@ export function Payments() {
                       />
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{p.householdCode || p.householdId}</td>
-                    <td className="px-5 py-4 text-slate-700">{p.feeName || "__"}</td>
-                    <td className="px-5 py-4 text-slate-700">{p.feePeriodName || "__"}</td>
+                    <td className="px-5 py-4 text-slate-700">{p.feeName || "—"}</td>
+                    <td className="px-5 py-4 text-slate-700">{p.feePeriodName || "—"}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{dueDisplay(p)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{paidDisplay(p)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{methodLabel(p.paymentMethod)}</td>

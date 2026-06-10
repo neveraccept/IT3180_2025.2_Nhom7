@@ -18,7 +18,6 @@ const PAGE_SIZE = 20;
 
 // Map nhãn tầng/trạng thái trên UI -> giá trị backend
 const STATUS_MAP = { "Đang ở": "OCCUPIED", "Đang trống": "AVAILABLE" };
-const GENDER_LABEL = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
 
 const yearOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 4) : "—");
 const buildHouseholdForm = (household) => ({

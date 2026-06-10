@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Building2, X, Menu, LogOut } from "lucide-react";
-import { adminNav, residentNav } from "../../data/mockData";
+import { adminNav, residentNav } from "../../data/navigation";
 import { Badge, Button } from "../common";
 import { Dashboard } from "../../pages/Dashboard";
 import { Registrations } from "../../pages/Registrations";

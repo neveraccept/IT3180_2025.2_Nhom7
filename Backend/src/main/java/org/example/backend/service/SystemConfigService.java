@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Quản lý cấu hình đơn giá gốc của hệ thống (đơn giá điện/nước/internet...).
- * Admin chỉnh sửa đơn giá ở đây; các hoá đơn sinh hoạt sẽ dùng đơn giá mới khi tạo về sau.
+ * Admin chỉnh sửa đơn giá ở đây; các hóa đơn sinh hoạt sẽ dùng đơn giá mới khi tạo về sau.
  */
 @Service
 public class SystemConfigService {

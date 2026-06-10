@@ -67,7 +67,7 @@ export const listMyParkingRegistrationsAPI = ({ page = 0, size = 100, sort = "st
 
 // ----------------------------- HOÁ ĐƠN PHÍ GỬI XE --------------------------
 
-// ADMIN: sinh hoá đơn phí gửi xe cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
+// ADMIN: sinh hóa đơn phí gửi xe cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
 // payload = { month, year } -> { feePeriodId, feePeriodName, invoiceCount, totalAmount }
 export const generateParkingFeesAPI = ({ month, year }) =>
   callApi(axiosClient.post("/api/admin/parking-fees/generate", { month: Number(month), year: Number(year) }));

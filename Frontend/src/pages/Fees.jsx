@@ -88,13 +88,13 @@ export function Fees() {
   const getStatusTone = (active) => (active ? "green" : "gray");
   const formatUnitPrice = (fee) => {
     if (fee.type === "DONATION") return "Tự nguyện (cư dân tự nhập)";
-    if (!fee.unitPrice || Number(fee.unitPrice) <= 0) return "__";
+    if (!fee.unitPrice || Number(fee.unitPrice) <= 0) return "—";
     return `${new Intl.NumberFormat("vi-VN").format(Number(fee.unitPrice))} ${unitSuffix(fee.unit)}`.trim();
   };
   const getPeriodStatusLabel = (status) => (status === "OPEN" ? "Đang mở" : "Đã đóng");
   const getPeriodStatusTone = (status) => (status === "OPEN" ? "green" : "gray");
   const formatDate = (value) => {
-    if (!value) return "__";
+    if (!value) return "—";
     try {
       return new Date(value).toLocaleDateString("vi-VN");
     } catch {
@@ -351,7 +351,7 @@ export function Fees() {
                   <td className="px-5 py-4 font-semibold text-slate-800">{fee.name}</td>
                   <td className="px-5 py-4"><Badge tone={getTypeTone(fee.type)}>{getTypeLabel(fee.type)}</Badge></td>
                   <td className="px-5 py-4 text-slate-700">{formatUnitPrice(fee)}</td>
-                  <td className="px-5 py-4 text-slate-600">{fee.description || "__"}</td>
+                  <td className="px-5 py-4 text-slate-600">{fee.description || "—"}</td>
                   <td className="px-5 py-4"><Badge tone={getStatusTone(fee.active)}>{getStatusLabel(fee.active)}</Badge></td>
                   <td className="px-5 py-4 text-right">
                     <button onClick={() => openDetail(fee)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>

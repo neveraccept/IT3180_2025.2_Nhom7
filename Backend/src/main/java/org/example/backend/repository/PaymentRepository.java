@@ -24,8 +24,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             countQuery = "SELECT COUNT(p) FROM Payment p WHERE p.household.id = :householdId")
     Page<Payment> findByHousehold_Id(@Param("householdId") Long householdId, Pageable pageable);
 
-    Page<Payment> findByFeePeriod_Id(Long feePeriodId, Pageable pageable);
-
     /** Số phiếu thu đã sinh cho một đợt thu — dùng để backfill những đợt chưa có phiếu. */
     long countByFeePeriod_Id(Long feePeriodId);
 

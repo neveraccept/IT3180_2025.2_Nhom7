@@ -1,6 +1,6 @@
 package org.example.backend.entity.enums;
 
-/** Trạng thái hoá đơn sinh hoạt. */
+/** Trạng thái hóa đơn sinh hoạt. */
 public enum UtilityBillStatus {
     UNPAID,
     PAID

@@ -19,10 +19,10 @@ import java.util.*;
 // Sinh toàn bộ dữ liệu mẫu (seed data) cho hệ thống quản lý chung cư khi khởi động.
 // Hạ tầng -> Cư dân/Hộ -> Phương tiện/Gửi xe -> Tài chính -> Tương tác.
 //
-// LƯU Ý (theo yêu cầu): KHÔNG seed hoá đơn điện/nước/internet trực tiếp vào DB.
+// LƯU Ý (theo yêu cầu): KHÔNG seed hóa đơn điện/nước/internet trực tiếp vào DB.
 // Thay vào đó dữ liệu điện/nước/internet được cung cấp dưới dạng file Excel mẫu
 // (Backend/sample-data/hoa-don-dien-nuoc.xlsx) để Admin tự nhập qua chức năng
-// "Nhập hoá đơn hàng loạt" (POST /api/utility-bills/import).
+// "Nhập hóa đơn hàng loạt" (POST /api/utility-bills/import).
 // Các hộ được chọn NGẪU NHIÊN trong số các căn ở. File Excel mẫu liệt kê tất cả mã hộ
 // có thể có; khi import, dòng nào trỏ tới hộ chưa tồn tại sẽ tự động bị bỏ qua.
 
@@ -111,7 +111,7 @@ public class InitialDataConfig implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         // Đơn giá hệ thống luôn được đảm bảo tồn tại (idempotent), kể cả khi DB đã có dữ liệu cũ
-        // -> khi Admin import hoá đơn điện/nước/internet luôn có đơn giá để tính tiền.
+        // -> khi Admin import hóa đơn điện/nước/internet luôn có đơn giá để tính tiền.
         seedSystemConfigs();
 
         // Chốt chặn idempotent: chỉ seed khi DB chưa có hạ tầng căn hộ.
@@ -127,9 +127,9 @@ public class InitialDataConfig implements CommandLineRunner {
             seedInteractions(households);
 
             System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
-            System.out.println("[InitialDataConfig] Hoá đơn điện/nước/internet KHÔNG seed vào DB. "
+            System.out.println("[InitialDataConfig] Hóa đơn điện/nước/internet KHÔNG seed vào DB. "
                     + "Hãy nhập từ file mẫu: Backend/sample-data/hoa-don-dien-nuoc.xlsx "
-                    + "qua chức năng 'Nhập hoá đơn hàng loạt'.");
+                    + "qua chức năng 'Nhập hóa đơn hàng loạt'.");
         }
 
         // Luôn đảm bảo mọi đợt thu đã có phiếu thu (Payment). Chạy cả với DB cũ:
@@ -206,7 +206,7 @@ public class InitialDataConfig implements CommandLineRunner {
     // Cư dân & Hộ gia đình (kèm tài khoản RESIDENT để đăng nhập / nhận thông báo)
     private List<Household> seedHouseholdsAndResidents() {
         // Chỉ gán hộ cho các căn ở (tầng >= 6), bỏ qua ki-ốt thương mại tầng 1.
-        // Chọn NGẪU NHIÊN các căn được ở (xáo trộn). File Excel mẫu hoá đơn liệt kê TẤT CẢ
+        // Chọn NGẪU NHIÊN các căn được ở (xáo trộn). File Excel mẫu hóa đơn liệt kê TẤT CẢ
         // mã hộ có thể có (HK-A06-01 ... HK-PH30-01); khi import, dòng nào trỏ tới hộ chưa
         // tồn tại sẽ tự động bị bỏ qua nên file vẫn dùng được dù hộ là ngẫu nhiên.
         List<Apartment> residential = new ArrayList<>(apartmentRepository.findAll().stream()
@@ -363,7 +363,7 @@ public class InitialDataConfig implements CommandLineRunner {
     }
 
     // BƯỚC 4: Tài chính – Phí & Kỳ thu phí
-    // (Hoá đơn điện/nước/internet KHÔNG seed ở đây — nhập từ file Excel mẫu.)
+    // (Hóa đơn điện/nước/internet KHÔNG seed ở đây — nhập từ file Excel mẫu.)
     private void seedFinance(List<Household> households) {
         // --- Các loại phí cơ bản ---
         Fee mgmtFee = buildFee("Phí quản lý", "MANDATORY", "PER_M2", BigDecimal.valueOf(7_000),
@@ -393,7 +393,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 fees.size(), fees.size());
     }
 
-    // Seed đơn giá gốc dùng chung cho hoá đơn điện/nước/internet (Admin import dùng để tính tiền).
+    // Seed đơn giá gốc dùng chung cho hóa đơn điện/nước/internet (Admin import dùng để tính tiền).
     private void seedSystemConfigs() {
         saveConfigIfAbsent(SystemConfig.ELECTRICITY_UNIT_PRICE, BigDecimal.valueOf(3_500),
                 "Đơn giá 1 số điện (đ/kWh)");
@@ -443,7 +443,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 {"SECURITY", "Cửa thoát hiểm không khoá", "Cửa thoát hiểm tầng hầm không được đóng kín, tiềm ẩn nguy cơ mất an ninh."},
                 {"CLEANING", "Mùi hôi từ ống xả rác", "Khu vực ống xả rác bốc mùi rất nặng vào buổi trưa."},
                 {"OTHER", "Wifi sảnh chung yếu", "Mạng wifi khu sảnh tầng 1 rất yếu, đề nghị nâng cấp."},
-                {"FEE", "Hoá đơn nước cao bất thường", "Hoá đơn tiền nước tháng này cao gấp đôi bình thường, nhờ kiểm tra lại đồng hồ."},
+                {"FEE", "Hóa đơn nước cao bất thường", "Hóa đơn tiền nước tháng này cao gấp đôi bình thường, nhờ kiểm tra lại đồng hồ."},
         };
 
         // Chỉ những hộ đã có tài khoản cư dân mới gửi được phản ánh (sender bắt buộc là User).

@@ -20,7 +20,7 @@ import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api
 import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
 
 // ============================================================
-//  Module 7 — Quản lý hoá đơn điện/nước/internet (ADMIN).
+//  Module 7 — Quản lý hóa đơn điện/nước/internet (ADMIN).
 //  Nguồn dữ liệu: backend UtilityBillController + SystemConfigController.
 //  - Điện/Nước: nhập chỉ số cũ/mới, backend tự tính tiền theo đơn giá trong SystemConfig.
 //  - Internet: lấy giá gói trong SystemConfig (có thể nhập tay để ghi đè).
@@ -39,7 +39,7 @@ export function Utilities() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
 
-  // Phân trang phía server: 20 hoá đơn/trang.
+  // Phân trang phía server: 20 hóa đơn/trang.
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 20;
@@ -50,13 +50,13 @@ export function Utilities() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  // Thao tác hàng loạt: tập id hoá đơn (UNPAID) đang được tick chọn.
+  // Thao tác hàng loạt: tập id hóa đơn (UNPAID) đang được tick chọn.
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Sinh hoá đơn phí điện nước theo tháng (giống "Tạo hóa đơn phí gửi xe").
+  // Sinh hóa đơn phí điện nước theo tháng (giống "Tạo hóa đơn phí gửi xe").
   const [showFeeForm, setShowFeeForm] = useState(false);
   const [feeForm, setFeeForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [feeError, setFeeError] = useState("");
@@ -129,7 +129,7 @@ export function Utilities() {
       setConfigMsg(res.message || "Cập nhật đơn giá thất bại");
       return;
     }
-    setConfigMsg("Đã cập nhật đơn giá. Áp dụng cho các hoá đơn tạo mới.");
+    setConfigMsg("Đã cập nhật đơn giá. Áp dụng cho các hóa đơn tạo mới.");
     await loadConfigs();
   };
 
@@ -156,7 +156,7 @@ export function Utilities() {
       setTotal(res.data?.totalElements || 0);
       setPage(targetPage);
     } else {
-      setPageError(res.message || "Không tải được danh sách hoá đơn");
+      setPageError(res.message || "Không tải được danh sách hóa đơn");
     }
     setLoading(false);
   }, [searchFilters]);
@@ -254,7 +254,7 @@ export function Utilities() {
     }
     setSaving(false);
     if (!res.success) {
-      setError(res.message || "Lưu hoá đơn thất bại");
+      setError(res.message || "Lưu hóa đơn thất bại");
       return;
     }
     setShowForm(false);
@@ -274,7 +274,7 @@ export function Utilities() {
     await loadBills(page);
   };
 
-  // ----- Lựa chọn hàng loạt (chỉ hoá đơn chưa nộp) -----
+  // ----- Lựa chọn hàng loạt (chỉ hóa đơn chưa nộp) -----
   const selectableIds = bills.filter((b) => b.status !== "PAID").map((b) => b.id);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
 
@@ -302,9 +302,9 @@ export function Utilities() {
     setConfirming(false);
     setBulkConfirm(false);
     if (res.failed > 0) {
-      showToast(`Đã xác nhận ${res.ok}/${ids.length} hoá đơn. ${res.failed} hoá đơn lỗi.`, res.ok > 0 ? "green" : "red");
+      showToast(`Đã xác nhận ${res.ok}/${ids.length} hóa đơn. ${res.failed} hóa đơn lỗi.`, res.ok > 0 ? "green" : "red");
     } else {
-      showToast(`Đã xác nhận tiền mặt cho ${res.ok} hoá đơn`);
+      showToast(`Đã xác nhận tiền mặt cho ${res.ok} hóa đơn`);
     }
     await loadBills(page);
   };
@@ -314,7 +314,7 @@ export function Utilities() {
     const res = await deleteUtilityBillAPI(deleteConfirm.id);
     setDeleteConfirm(null);
     if (!res.success) {
-      setPageError(res.message || "Xoá hoá đơn thất bại");
+      setPageError(res.message || "Xoá hóa đơn thất bại");
       return;
     }
     setShowForm(false);
@@ -322,18 +322,18 @@ export function Utilities() {
     await loadBills(page);
   };
 
-  // ----- Sinh hoá đơn phí điện nước theo tháng (gắn vào hệ thống Thu phí) -----
+  // ----- Sinh hóa đơn phí điện nước theo tháng (gắn vào hệ thống Thu phí) -----
   const handleGenerateFees = async () => {
     setFeeError("");
     setFeeSaving(true);
     const res = await generateUtilityFeesAPI({ month: feeForm.month, year: feeForm.year });
     setFeeSaving(false);
     if (!res.success) {
-      setFeeError(res.message || "Tạo hoá đơn phí điện nước thất bại");
+      setFeeError(res.message || "Tạo hóa đơn phí điện nước thất bại");
       return;
     }
     setShowFeeForm(false);
-    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hoá đơn phí điện nước (xem ở mục Thu phí)`);
+    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hóa đơn phí điện nước (xem ở mục Thu phí)`);
   };
 
   // ----- Nhập hàng loạt từ Excel -----
@@ -364,11 +364,11 @@ export function Utilities() {
     const res = await importUtilityBillsExcelAPI(importFile);
     setImporting(false);
     if (!res.success) {
-      setImportError(res.message || "Nhập hoá đơn thất bại");
+      setImportError(res.message || "Nhập hóa đơn thất bại");
       return;
     }
     setImportResult(res.data);
-    showToast(`Đã nhập ${res.data?.createdCount ?? 0} hoá đơn`
+    showToast(`Đã nhập ${res.data?.createdCount ?? 0} hóa đơn`
       + ((res.data?.skippedCount ?? 0) > 0 ? `, bỏ qua ${res.data.skippedCount} dòng (không có hộ)` : "")
       + ((res.data?.failedCount ?? 0) > 0 ? `, ${res.data.failedCount} dòng lỗi` : ""));
     await loadBills(1);
@@ -449,7 +449,7 @@ export function Utilities() {
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="text-base font-black text-slate-900">Đơn giá hệ thống</h3>
-            <p className="text-sm text-slate-500">Đơn giá gốc dùng để tính tiền điện/nước/internet khi tạo hoá đơn mới.</p>
+            <p className="text-sm text-slate-500">Đơn giá gốc dùng để tính tiền điện/nước/internet khi tạo hóa đơn mới.</p>
           </div>
         </div>
         {configMsg && (
@@ -563,7 +563,7 @@ export function Utilities() {
               {editingBill && (
                 <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                   Trạng thái hiện tại: <StatusBadge status={editingBill.status} />
-                  {editingBill.status === "PAID" && <span className="ml-2">— hoá đơn đã nộp, không thể sửa.</span>}
+                  {editingBill.status === "PAID" && <span className="ml-2">— hóa đơn đã nộp, không thể sửa.</span>}
                 </div>
               )}
 
@@ -608,7 +608,7 @@ export function Utilities() {
         </div>
       )}
 
-      {/* Thanh thao tác hàng loạt: hiện khi đang chọn ít nhất 1 hoá đơn chưa nộp. */}
+      {/* Thanh thao tác hàng loạt: hiện khi đang chọn ít nhất 1 hóa đơn chưa nộp. */}
       {selectedIds.size > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -616,7 +616,7 @@ export function Utilities() {
           className="mb-4 flex flex-col gap-3 rounded-2xl bg-sky-50 px-5 py-4 ring-1 ring-sky-200 sm:flex-row sm:items-center sm:justify-between"
         >
           <p className="text-sm font-semibold text-sky-800">
-            Đã chọn <strong>{selectedIds.size}</strong> hoá đơn chưa nộp
+            Đã chọn <strong>{selectedIds.size}</strong> hóa đơn chưa nộp
           </p>
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => setSelectedIds(new Set())}>
@@ -641,7 +641,7 @@ export function Utilities() {
                     checked={allSelected}
                     disabled={selectableIds.length === 0}
                     onChange={toggleAll}
-                    title="Chọn tất cả hoá đơn chưa nộp trên trang"
+                    title="Chọn tất cả hóa đơn chưa nộp trên trang"
                   />
                 </th>
                 <th className="px-5 py-4">Hộ</th>
@@ -658,7 +658,7 @@ export function Utilities() {
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
               )}
               {!loading && bills.length === 0 && (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hoá đơn nào.</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có hóa đơn nào.</td></tr>
               )}
               {!loading && bills.map((bill) => {
                 const unpaid = bill.status !== "PAID";
@@ -672,7 +672,7 @@ export function Utilities() {
                       checked={checked}
                       disabled={!unpaid}
                       onChange={() => toggleRow(bill.id)}
-                      title={unpaid ? "Chọn hoá đơn này" : "Hoá đơn đã nộp"}
+                      title={unpaid ? "Chọn hóa đơn này" : "Hóa đơn đã nộp"}
                     />
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.householdCode || bill.householdId}</td>
@@ -704,7 +704,7 @@ export function Utilities() {
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
             <h3 className="mb-3 text-lg font-black">Xác nhận tiền mặt hàng loạt</h3>
             <p className="mb-5 text-sm text-slate-600">
-              Xác nhận <strong>{selectedIds.size}</strong> hoá đơn đã được thu bằng tiền mặt? Thao tác này không thể hoàn tác.
+              Xác nhận <strong>{selectedIds.size}</strong> hóa đơn đã được thu bằng tiền mặt? Thao tác này không thể hoàn tác.
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setBulkConfirm(false)} disabled={confirming}>Hủy</Button>
@@ -714,13 +714,13 @@ export function Utilities() {
         </div>
       )}
 
-      {/* MODAL: sinh hoá đơn phí điện nước theo tháng */}
+      {/* MODAL: sinh hóa đơn phí điện nước theo tháng */}
       {showFeeForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <h3 className="mb-2 text-lg font-bold">Tạo hóa đơn điện nước</h3>
             <p className="mb-4 text-sm text-slate-600">
-              Hệ thống tạo phiếu thu cho mỗi hộ (= tổng các hoá đơn điện/nước/internet <strong>chưa nộp</strong> của hộ trong tháng).
+              Hệ thống tạo phiếu thu cho mỗi hộ (= tổng các hóa đơn điện/nước/internet <strong>chưa nộp</strong> của hộ trong tháng).
               Hóa đơn sẽ xuất hiện ở mục <strong>Thu phí / Công nợ</strong>; hộ dân có thể nộp tiền mặt hoặc thanh toán VNPay.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
@@ -740,13 +740,13 @@ export function Utilities() {
         </div>
       )}
 
-      {/* MODAL: nhập hoá đơn hàng loạt từ Excel */}
+      {/* MODAL: nhập hóa đơn hàng loạt từ Excel */}
       {showImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="mb-2 text-lg font-bold">Nhập hóa đơn từ Excel</h3>
             <p className="mb-4 text-sm text-slate-600">
-              Tải file mẫu, điền hoá đơn cho tất cả các hộ (mỗi dòng một hoá đơn), rồi tải file lên.
+              Tải file mẫu, điền hóa đơn cho tất cả các hộ (mỗi dòng một hóa đơn), rồi tải file lên.
               Cột: <strong>Mã hộ, Loại (DIEN/NUOC/INTERNET), Tháng, Năm, Chỉ số cũ, Chỉ số mới, Số tiền (Internet)</strong>.
               Điện/nước cần chỉ số; internet để trống chỉ số (bỏ trống số tiền sẽ lấy giá gói cấu hình).
             </p>
@@ -775,7 +775,7 @@ export function Utilities() {
             {importResult && (
               <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
                 <p className="font-semibold text-slate-800">
-                  Tạo thành công <span className="text-emerald-700">{importResult.createdCount}</span> hoá đơn
+                  Tạo thành công <span className="text-emerald-700">{importResult.createdCount}</span> hóa đơn
                   {importResult.skippedCount > 0 && <> — bỏ qua <span className="text-amber-600">{importResult.skippedCount}</span> dòng (không có hộ)</>}
                   {importResult.failedCount > 0 && <> — lỗi <span className="text-rose-700">{importResult.failedCount}</span> dòng</>}
                 </p>

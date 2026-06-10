@@ -30,7 +30,7 @@ const transactionTypeLabel = (type) => {
   if (type === VNPAY_TARGET.MIXED_PAYMENT_BATCH) return "Nhiều mục";
   if (type === VNPAY_TARGET.FEE_PAYMENT_BATCH) return "Nhiều khoản phí";
   if (type === VNPAY_TARGET.FEE_PAYMENT) return "Khoản phí";
-  return "Hoá đơn";
+  return "Hóa đơn";
 };
 
 const HISTORY_PAGE_SIZE = 10;
@@ -117,7 +117,7 @@ export function MyFees() {
     targetId: p.id,
     group: p.feeType === "DONATION" ? "Đóng góp" : "Khoản phí",
     name: p.feeName || p.feePeriodName || "Khoản phí",
-    period: p.feePeriodName || "__",
+    period: p.feePeriodName || "—",
     amount: Number(p.amountDue || 0),
     feeType: p.feeType || "MANDATORY",
     feePeriodStatus: p.feePeriodStatus || "OPEN",
@@ -130,7 +130,7 @@ export function MyFees() {
     targetType: VNPAY_TARGET.UTILITY_BILL,
     targetId: b.id,
     group: utilityLabel(b.type),
-    name: `Hoá đơn ${utilityLabel(b.type).toLowerCase()}`,
+    name: `Hóa đơn ${utilityLabel(b.type).toLowerCase()}`,
     period: `Tháng ${b.month}/${b.year}`,
     amount: Number(b.amount || 0),
     feeType: "UTILITY",
@@ -305,7 +305,7 @@ export function MyFees() {
         return baseRow({
           id,
           type: VNPAY_TARGET.UTILITY_BILL,
-          name: row ? `${row.name}${row.period ? ` - ${row.period}` : ""}` : `Hoá đơn #${id}`,
+          name: row ? `${row.name}${row.period ? ` - ${row.period}` : ""}` : `Hóa đơn #${id}`,
           amount: row?.amount ?? 0,
         }, feeIds.length + index);
       });
@@ -347,7 +347,7 @@ export function MyFees() {
     return {
       ...row,
       summaryType: row.lines.length > 1 ? `Thanh toán gộp (${row.lines.length} khoản)` : transactionTypeLabel(row.lines[0]?.type),
-      summaryName: row.lines.length > 1 ? row.lines.map((line) => line.name).join(", ") : row.lines[0]?.name || "__",
+      summaryName: row.lines.length > 1 ? row.lines.map((line) => line.name).join(", ") : row.lines[0]?.name || "—",
       summaryAmount: Number(row.amount || fallbackAmount || 0),
     };
   });
@@ -406,7 +406,7 @@ export function MyFees() {
             <option value="ALL">Tất cả</option>
             <option value="MANDATORY">Phí bắt buộc</option>
             <option value="DONATION">Đóng góp tự nguyện</option>
-            <option value="UTILITY">Hoá đơn</option>
+            <option value="UTILITY">Hóa đơn</option>
           </Select>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-slate-600">
@@ -574,7 +574,7 @@ export function MyFees() {
                         </td>
                         <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">{money(t.summaryAmount)}</td>
                         <td className="whitespace-nowrap px-5 py-4">{txStatusBadge(t.status)}</td>
-                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">{t.createdAt ? new Date(t.createdAt).toLocaleString("vi-VN") : "__"}</td>
+                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">{t.createdAt ? new Date(t.createdAt).toLocaleString("vi-VN") : "—"}</td>
                       </tr>
                       {expanded && t.lines.map((line) => (
                         <tr key={line.key} className="bg-slate-50/70">

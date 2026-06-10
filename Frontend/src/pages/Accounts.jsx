@@ -670,9 +670,9 @@ export function Accounts() {
                   <tr key={row.id ?? row.username} className="hover:bg-slate-50/80">
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.username}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.fullName}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.email || "__"}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.phone || "__"}</td>
-                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.apartment || "__"}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.email || "—"}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.phone || "—"}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-700">{row.apartment || "—"}</td>
                     <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.role === "ADMIN" ? "blue" : "green"}>{row.role}</Badge></td>
                     <td className="whitespace-nowrap px-5 py-4"><Badge tone={row.active === "Khoá" ? "red" : "green"}>{row.active}</Badge></td>
                     <td className="px-5 py-4 text-right">

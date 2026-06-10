@@ -43,7 +43,7 @@ public interface ParkingRegistrationRepository extends JpaRepository<ParkingRegi
 
     /**
      * Các lượt gửi xe của HỘ (vehicle != null) theo trạng thái, JOIN FETCH xe + hộ sở hữu.
-     * Dùng để sinh hoá đơn phí gửi xe: gom theo hộ và cộng dồn monthlyFee.
+     * Dùng để sinh hóa đơn phí gửi xe: gom theo hộ và cộng dồn monthlyFee.
      * Lượt cho người ngoài thuê (vehicle = null) không gắn với hộ nên bị loại.
      */
     @Query("SELECT r FROM ParkingRegistration r " +

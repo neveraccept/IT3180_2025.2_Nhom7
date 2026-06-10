@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
- * Hoá đơn điện/nước/internet của một hộ theo tháng. Bảng `utility_bills`.
- * Ràng buộc UNIQUE(household_id, type, month, year) – mỗi hộ chỉ một hoá đơn/loại/tháng.
+ * Hóa đơn điện/nước/internet của một hộ theo tháng. Bảng `utility_bills`.
+ * Ràng buộc UNIQUE(household_id, type, month, year) – mỗi hộ chỉ một hóa đơn/loại/tháng.
  */
 @Entity
 @Table(name = "utility_bills",
@@ -46,11 +46,11 @@ public class UtilityBill {
     @Column(name = "year", nullable = false)
     private Integer year;
 
-    /** Chỉ số đồng hồ kỳ trước (điện/nước). NULL với hoá đơn INTERNET. */
+    /** Chỉ số đồng hồ kỳ trước (điện/nước). NULL với hóa đơn INTERNET. */
     @Column(name = "old_index")
     private Integer oldIndex;
 
-    /** Chỉ số đồng hồ kỳ này (điện/nước). NULL với hoá đơn INTERNET. */
+    /** Chỉ số đồng hồ kỳ này (điện/nước). NULL với hóa đơn INTERNET. */
     @Column(name = "new_index")
     private Integer newIndex;
 

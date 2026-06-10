@@ -27,11 +27,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Sinh hoá đơn phí điện/nước/internet hàng tháng cho từng hộ dân.
+ * Sinh hóa đơn phí điện/nước/internet hàng tháng cho từng hộ dân.
  *
  * Cơ chế giống {@link ParkingFeeService}: tận dụng hệ thống Payment sẵn có — tạo một đợt thu
  * (FeePeriod) gắn với khoản "Phí điện nước", rồi sinh một phiếu nộp (Payment) cho mỗi hộ với
- * số tiền = tổng các hoá đơn điện/nước/internet CHƯA NỘP của hộ trong tháng đó. Nhờ vậy hoá
+ * số tiền = tổng các hóa đơn điện/nước/internet CHƯA NỘP của hộ trong tháng đó. Nhờ vậy hoá
  * đơn hiện ngay ở trang Thu phí / Công nợ và hộ dân thanh toán được qua VNPay hoặc tiền mặt.
  */
 @Service
@@ -59,7 +59,7 @@ public class UtilityFeeService {
     }
 
     @LogAdminAction(entity = "FeePeriod", action = "CREATE",
-            description = "Sinh hoá đơn phí điện nước theo tháng",
+            description = "Sinh hóa đơn phí điện nước theo tháng",
             detail = "'Đợt thu: ' + #result.feePeriodName() + ' — ' + #result.invoiceCount() + ' hộ'")
     @Transactional
     public UtilityFeeGenerationResultDTO generateInvoices(int month, int year) {
@@ -67,10 +67,10 @@ public class UtilityFeeService {
         String periodName = "Phí điện nước tháng " + month + "/" + year;
         if (feePeriodRepository.existsByFeeIdAndName(fee.getId(), periodName)) {
             throw new BadRequestException("UTILITY_FEE_PERIOD_EXISTS",
-                    "Đã tạo hoá đơn phí điện nước cho tháng " + month + "/" + year);
+                    "Đã tạo hóa đơn phí điện nước cho tháng " + month + "/" + year);
         }
 
-        // Gom tổng số tiền hoá đơn CHƯA NỘP theo hộ trong tháng/năm chỉ định.
+        // Gom tổng số tiền hóa đơn CHƯA NỘP theo hộ trong tháng/năm chỉ định.
         List<UtilityBill> bills = billRepository
                 .search(null, null, month, year, UtilityBillStatus.UNPAID, Pageable.unpaged())
                 .getContent();
@@ -92,8 +92,8 @@ public class UtilityFeeService {
 
         if (feeByHouseholdId.isEmpty()) {
             throw new BadRequestException("NO_UTILITY_FEE",
-                    "Không có hoá đơn điện/nước chưa nộp nào trong tháng " + month + "/" + year
-                            + " để tạo hoá đơn phí điện nước");
+                    "Không có hóa đơn điện/nước chưa nộp nào trong tháng " + month + "/" + year
+                            + " để tạo hóa đơn phí điện nước");
         }
 
         YearMonth ym = YearMonth.of(year, month);
@@ -131,7 +131,7 @@ public class UtilityFeeService {
             f.setType("MANDATORY");
             f.setUnit("PER_HOUSEHOLD");
             f.setUnitPrice(BigDecimal.ZERO);
-            f.setDescription("Khoản thu phí điện/nước/internet hàng tháng — tổng các hoá đơn chưa nộp của hộ.");
+            f.setDescription("Khoản thu phí điện/nước/internet hàng tháng — tổng các hóa đơn chưa nộp của hộ.");
             f.setActive(true);
             return feeRepository.save(f);
         });
@@ -144,7 +144,7 @@ public class UtilityFeeService {
             Integer newIndex = bill.getNewIndex();
             if (oldIndex == null || newIndex == null) {
                 throw new BadRequestException("UTILITY_INDEX_REQUIRED",
-                        "Hoá đơn điện/nước cần nhập chỉ số cũ và chỉ số mới");
+                        "Hóa đơn điện/nước cần nhập chỉ số cũ và chỉ số mới");
             }
             if (newIndex < oldIndex) {
                 throw new BadRequestException("UTILITY_INDEX_INVALID",
