@@ -24,11 +24,7 @@ const STATUS_SELECT_CLASS = {
   REJECTED: "bg-rose-50 text-rose-700 ring-rose-200",
 };
 
-export function Complaints({
-  role,
-  initialComplaintId,
-  onInitialComplaintHandled,
-}) {
+export function Complaints({ role }) {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageError, setPageError] = useState("");
@@ -99,7 +95,6 @@ export function Complaints({
         : complaint.status
     );
     setDetailError("");
-    onInitialComplaintHandled?.();
   };
 
   const closeDetail = () => {

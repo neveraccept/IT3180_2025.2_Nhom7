@@ -52,8 +52,9 @@ export const createInternalAccountAPI = (payload) =>
 export const approveAccountAPI = (id, payload) =>
   callApi(axiosClient.put(`/api/users/${id}/approve`, payload || {}));
 
-// DELETE /api/users/{id}/reject -> Admin từ chối & xóa tài khoản chờ duyệt
-export const rejectAccountAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}/reject`));
+// DELETE /api/users/{id}/reject?reason=... -> Admin từ chối & xóa tài khoản chờ duyệt (kèm lý do)
+export const rejectAccountAPI = (id, reason) =>
+  callApi(axiosClient.delete(`/api/users/${id}/reject`, { params: reason ? { reason } : undefined }));
 
 // PUT /api/users/{id} -> Admin cập nhật thông tin tài khoản
 export const updateUserAPI = (id, payload) => callApi(axiosClient.put(`/api/users/${id}`, payload));

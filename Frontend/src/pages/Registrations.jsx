@@ -224,8 +224,8 @@ export function Registrations() {
     setActing(true);
     setModalError("");
     try {
-      // Từ chối qua backend: DELETE /api/users/{id}/reject
-      const res = await rejectAccountAPI(selectedReg.id);
+      // Từ chối qua backend: DELETE /api/users/{id}/reject?reason=... (gửi kèm lý do để lưu audit & email)
+      const res = await rejectAccountAPI(selectedReg.id, rejectReason.trim());
       if (!res.success) {
         setModalError(res.message || "Từ chối tài khoản thất bại.");
         return;
@@ -495,7 +495,7 @@ export function Registrations() {
                     setModalError("");
                   }}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-                  placeholder="Nhập lý do từ chối để lưu vào lịch sử..."
+                  placeholder="Nhập lý do từ chối (sẽ gửi kèm email báo cho cư dân)..."
                 />
               </label>
             )}

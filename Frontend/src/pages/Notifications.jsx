@@ -28,20 +28,14 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString("vi-VN");
 };
 
-export function Notifications({
-  role,
-  initialNotificationId,
-  onInitialNotificationHandled,
-}) {
+export function Notifications({ role }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageError, setPageError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   // Detail modal
-  const [selectedNotificationId, setSelectedNotificationId] = useState(
-    initialNotificationId || null
-  );
+  const [selectedNotificationId, setSelectedNotificationId] = useState(null);
   const [markingRead, setMarkingRead] = useState(false);
 
   // Compose form (Admin)
@@ -84,7 +78,6 @@ export function Notifications({
 
   const openNotificationDetail = async (item) => {
     setSelectedNotificationId(item.id);
-    onInitialNotificationHandled?.();
     if (role === "ADMIN" || item.isRead) return;
 
     setNotifications((prev) =>
@@ -107,19 +100,12 @@ export function Notifications({
         prev.map((n) => (n.id === selectedNotification.id ? { ...n, isRead: false, readAt: null } : n))
       );
       setSelectedNotificationId(null);
-      onInitialNotificationHandled?.();
     }
     setMarkingRead(false);
   };
 
-  useEffect(() => {
-    if (!selectedNotification || role === "ADMIN" || selectedNotification.isRead) return;
-    openNotificationDetail(selectedNotification);
-  }, [selectedNotification?.id, role]);
-
   const closeDetail = () => {
     setSelectedNotificationId(null);
-    onInitialNotificationHandled?.();
   };
 
   // Tìm hộ theo mã căn hộ (BY_HOUSEHOLD)

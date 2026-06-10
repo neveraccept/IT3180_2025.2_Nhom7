@@ -18,6 +18,8 @@ import org.example.backend.entity.enums.ResidencyStatus;
 import org.example.backend.entity.enums.ResidentStatus;
 import org.example.backend.repository.*;
 import org.example.backend.service.mapper.UserMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+
     private final UserRepository userRepo;
     private final RoleRepository roleRepo;
     private final ApartmentRepository apartmentRepo;
@@ -152,7 +156,7 @@ public class UserService {
      */
     @LogAdminAction(entity = "User", action = "DELETE", description = "Từ chối & xóa tài khoản chờ duyệt")
     @Transactional
-    public void rejectPendingAccount(Long id) {
+    public void rejectPendingAccount(Long id, String reason) {
         // 1. Tìm tài khoản theo ID
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + id));
@@ -162,12 +166,21 @@ public class UserService {
             throw new IllegalArgumentException("Tài khoản này đã được duyệt và đang hoạt động, KHÔNG THỂ xóa bằng chức năng này!");
         }
 
-        // 3. (Tùy chọn) Nếu bạn muốn gửi email báo cho cư dân biết họ bị từ chối
-        emailService.sendRejectionEmail(user.getEmail());
+        // 3. Gửi email báo cho cư dân biết họ bị từ chối (kèm lý do nếu có).
+        //    Nuốt lỗi gửi mail để KHÔNG làm rollback việc từ chối chỉ vì SMTP gặp sự cố.
+        try {
+            emailService.sendRejectionEmail(user.getEmail(), reason);
+        } catch (Exception e) {
+            log.warn("Gửi email từ chối tài khoản '{}' thất bại: {}", user.getUsername(), e.getMessage());
+        }
 
         // 4. Xóa tài khoản khỏi Database
         userRepo.delete(user);
-        AuditContext.detail("Từ chối & xóa tài khoản chờ duyệt: " + user.getUsername());
+        String detail = "Từ chối & xóa tài khoản chờ duyệt: " + user.getUsername();
+        if (reason != null && !reason.isBlank()) {
+            detail += " | Lý do: " + reason.trim();
+        }
+        AuditContext.detail(detail);
     }
 
     /**

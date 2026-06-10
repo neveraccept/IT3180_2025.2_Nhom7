@@ -88,10 +88,12 @@ public class UserController {
 
     // API từ chối (xóa) tài khoản cư dân đang chờ duyệt
     @DeleteMapping("/{id}/reject")
-    public ResponseEntity<ApiResponse<Void>> rejectPendingAccount(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> rejectPendingAccount(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason) {
 
-        // Gọi Service để xử lý xóa
-        userService.rejectPendingAccount(id);
+        // Gọi Service để xử lý xóa (kèm lý do từ chối nếu Admin có nhập)
+        userService.rejectPendingAccount(id, reason);
 
         // Trả về thông báo thành công
         return ResponseEntity.ok(
