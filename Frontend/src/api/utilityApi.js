@@ -23,7 +23,7 @@ export const UTILITY_STATUS = { UNPAID: "UNPAID", PAID: "PAID" };
 export const createUtilityBillAPI = (payload) =>
   callApi(axiosClient.post("/api/utility-bills", payload));
 
-// ADMIN: sửa hóa đơn (chỉ khi UNPAID). payload = { type?, month?, year?, amount? } (null = giữ nguyên)
+// ADMIN: sửa hóa đơn (chỉ khi UNPAID).
 export const updateUtilityBillAPI = (id, payload) =>
   callApi(axiosClient.put(`/api/utility-bills/${id}`, payload));
 

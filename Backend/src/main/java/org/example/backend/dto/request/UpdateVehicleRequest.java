@@ -4,7 +4,7 @@ import org.example.backend.entity.enums.VehicleType;
 import jakarta.validation.constraints.Size;
 
 /**
- * F6.2 – Cập nhật thông tin xe. Các trường null = giữ nguyên.
+ * F6.2 – Cập nhật thông tin xe.
  * Không cho đổi hộ sở hữu xe ở phiên bản này.
  */
 public record UpdateVehicleRequest(

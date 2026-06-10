@@ -9,6 +9,7 @@ import { loginAPI } from "../api/authApi";
 import { useAuth } from "../context/AuthContext";
 import { Button, Input } from "../components/common";
 import { AuthShell, AuthError } from "../components/auth/AuthShell";
+import { logError } from "../utils/logger";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ export function LoginPage() {
       }
     } catch (err) {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
-      console.error("Login error:", err);
+      logError("Login error:", err);
     } finally {
       setLoading(false);
     }

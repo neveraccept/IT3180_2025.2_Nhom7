@@ -17,7 +17,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    // Bổ sung: Khai báo và tiêm (Inject) JwtAuthenticationFilter
     private final JwtFilter jwtAuthenticationFilter;
 
     public SecurityConfig(JwtFilter jwtAuthenticationFilter) {
@@ -72,7 +71,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 );
 
-        // Bổ sung QUAN TRỌNG NHẤT: Đặt "người gác cổng" của chúng ta lên trước bộ lọc đăng nhập mặc định của Spring Security
+        // Đặt bộ lọc JWT trước bộ lọc đăng nhập mặc định của Spring Security.
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

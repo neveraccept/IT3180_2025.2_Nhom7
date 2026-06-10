@@ -84,7 +84,6 @@ public class FeePeriodService {
 
     /**
      * Backfill: sinh phiếu thu cho các đợt thu đang tồn tại nhưng CHƯA có phiếu nào
-     * (vd: đợt thu được seed/khởi tạo trước khi có cơ chế tự sinh phiếu).
      * Idempotent — đợt nào đã có phiếu sẽ được bỏ qua. Trả về số đợt được backfill.
      */
     @LogAdminAction(entity = "FeePeriod", action = "UPDATE", description = "Backfill sinh phiếu thu còn thiếu cho các đợt thu",
@@ -167,14 +166,14 @@ public class FeePeriodService {
         feePeriod.setStatus("CLOSED");
         feePeriodRepository.save(feePeriod);
 
-        // 1) Huỷ các giao dịch đơn lẻ (FEE_PAYMENT) đang PENDING của đợt này.
+        // 1) Hủy các giao dịch đơn lẻ (FEE_PAYMENT) đang PENDING của đợt này.
         paymentTransactionRepository.updatePendingFeeTransactionsByFeePeriod(
                 id,
                 PaymentTransaction.TARGET_FEE_PAYMENT,
                 PaymentTransaction.STATUS_PENDING,
                 PaymentTransaction.STATUS_CANCELLED);
 
-        // 2) Huỷ thêm các giao dịch batch (FEE_PAYMENT_BATCH / MIXED_PAYMENT_BATCH) đang PENDING
+        // 2) Hủy thêm các giao dịch batch (FEE_PAYMENT_BATCH / MIXED_PAYMENT_BATCH) đang PENDING
         //    có chứa phiếu thu thuộc đợt vừa đóng — nếu không, cư dân vẫn có thể hoàn tất
         //    thanh toán VNPay cho một đợt đã CLOSED qua luồng batch.
         cancelPendingBatchTransactionsOfPeriod(id);
@@ -183,7 +182,7 @@ public class FeePeriodService {
     }
 
     /**
-     * Quét các giao dịch batch đang PENDING và huỷ những giao dịch có ít nhất một phiếu thu
+     * Quét các giao dịch batch đang PENDING và hủy những giao dịch có ít nhất một phiếu thu
      * UNPAID thuộc đợt thu vừa đóng. Danh sách phiếu của batch được lưu dạng chuỗi id
      * (cách nhau dấu phẩy) trong cột {@code targetIds}.
      */

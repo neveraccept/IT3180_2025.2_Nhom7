@@ -1,6 +1,5 @@
 // ============================================================
 //  AuthContext — lưu JWT + thông tin user, khôi phục phiên khi tải lại trang
-//  (theo SDD 5.4: context/ // AuthContext lưu JWT và thông tin user)
 // ============================================================
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getStoredAuth, setStoredAuth, clearStoredAuth } from "../api/axiosClient";
@@ -43,7 +42,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Cập nhật cục bộ thông tin hiển thị (vd: sau khi sửa hồ sơ).
-  // Hỗ trợ cả dạng object lẫn updater function để tương thích code cũ.
   const updateUser = useCallback((patch) => {
     setUser((prev) => {
       if (!prev) return prev;

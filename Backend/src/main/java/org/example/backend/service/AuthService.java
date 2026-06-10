@@ -2,13 +2,8 @@ package org.example.backend.service;
 
 import org.example.backend.dto.request.*;
 import org.example.backend.dto.LoginResponseDTO;
-import org.example.backend.entity.Apartment;
-import org.example.backend.entity.Household;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
-import org.example.backend.entity.enums.HouseholdStatus;
-import org.example.backend.repository.ApartmentRepository;
-import org.example.backend.repository.HouseholdRepository;
 import org.example.backend.repository.*;
 import org.example.backend.security.JwtUtil;
 import org.slf4j.Logger;
@@ -27,8 +22,6 @@ public class AuthService {
 	private final UserRepository userRepo;
 	private final RoleRepository roleRepo;
 	private final EmailOtpRepository emailOtpRepo;
-	private final ApartmentRepository apartmentRepo;
-	private final HouseholdRepository householdRepo;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtUtil jwtTokenProvider;
 	private final OtpService otpService;
@@ -37,8 +30,6 @@ public class AuthService {
 	@Autowired
 	public AuthService(UserRepository userRepo,
 	                   RoleRepository roleRepo,
-	                   ApartmentRepository apartmentRepo,
-	                   HouseholdRepository householdRepo,
 	                   PasswordEncoder passwordEncoder,
 	                   EmailOtpRepository emailOtpRepo,
 	                   JwtUtil jwtTokenProvider,
@@ -46,8 +37,6 @@ public class AuthService {
 	                   EmailService emailService) {
 		this.userRepo = userRepo;
 		this.roleRepo = roleRepo;
-		this.apartmentRepo = apartmentRepo;
-		this.householdRepo = householdRepo;
 		this.passwordEncoder = passwordEncoder;
 		this.emailOtpRepo = emailOtpRepo;
 		this.jwtTokenProvider = jwtTokenProvider;

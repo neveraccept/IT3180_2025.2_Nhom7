@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { changePasswordAPI, updateProfileAPI, getProfileAPI } from "../api/authApi";
 import { Button, Card, Input } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
+import { logError } from "../utils/logger";
 
 export function Profile({ user, setUser }) {
   const [formData, setFormData] = useState({
@@ -117,7 +118,7 @@ export function Profile({ user, setUser }) {
         text: wantChangePassword ? "Đã cập nhật thông tin và đổi mật khẩu thành công." : "Đã lưu thông tin cá nhân.",
       });
     } catch (err) {
-      console.error("Profile save error:", err);
+      logError("Profile save error:", err);
       setMessage({ tone: "red", text: "Lỗi kết nối server. Vui lòng thử lại." });
     } finally {
       setSaving(false);

@@ -23,7 +23,7 @@ import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
 // ============================================================
 //  Module 6 — Phương tiện (Vehicle) + chỗ gửi xe (Parking).
 //  Nguồn dữ liệu: backend VehicleController + ParkingController.
-//  - ADMIN: tổng quan chỗ gửi, đăng ký/sửa/huỷ xe theo hộ, xem chỗ gửi, tạo lượt gửi.
+//  - ADMIN: tổng quan chỗ gửi, đăng ký/sửa/hủy xe theo hộ, xem chỗ gửi, tạo lượt gửi.
 //  - RESIDENT: chỉ xem xe & lượt gửi của hộ mình (backend không có cư dân tự đăng ký).
 //  Backend chỉ có loại xe MOTORBIKE | CAR. Giữ ngôn ngữ UI/Tailwind sẵn có.
 //  Khoảng trống backend: không có API "liệt kê tất cả xe / tất cả lượt đăng ký" cho admin
@@ -376,11 +376,11 @@ function AdminVehicles() {
     const res = await cancelVehicleAPI(cancelConfirm.id);
     setCancelConfirm(null);
     if (!res.success) {
-      showToast(res.message || "Huỷ xe thất bại", "red");
+      showToast(res.message || "Hủy xe thất bại", "red");
       return;
     }
     setShowForm(false);
-    showToast("Đã huỷ đăng ký xe");
+    showToast("Đã hủy đăng ký xe");
     if (loadedHousehold) await loadVehicles(loadedHousehold);
     loadSummary();
     refreshLookupSlots(await loadSlots());
@@ -642,7 +642,7 @@ function AdminVehicles() {
               <div className="flex justify-between gap-3 pt-2">
                 <div className="flex gap-3">
                   <Button variant="secondary" onClick={() => setShowForm(false)}>Hủy</Button>
-                  {editingVehicle && <Button variant="danger" onClick={() => setCancelConfirm(editingVehicle)}>Huỷ đăng ký</Button>}
+                  {editingVehicle && <Button variant="danger" onClick={() => setCancelConfirm(editingVehicle)}>Hủy đăng ký</Button>}
                 </div>
                 <Button onClick={handleSaveVehicle} disabled={saving}>{saving ? "Đang lưu…" : editingVehicle ? "Lưu" : "Đăng ký"}</Button>
               </div>
@@ -656,12 +656,12 @@ function AdminVehicles() {
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center gap-3">
               <div className="rounded-full bg-rose-100 p-3"><AlertCircle className="h-6 w-6 text-rose-600" /></div>
-              <h3 className="text-lg font-bold text-slate-900">Huỷ đăng ký xe</h3>
+              <h3 className="text-lg font-bold text-slate-900">Hủy đăng ký xe</h3>
             </div>
-            <p className="mb-6 text-slate-600">Bạn có chắc muốn huỷ đăng ký xe biển số <strong>{cancelConfirm.licensePlate}</strong>?</p>
+            <p className="mb-6 text-slate-600">Bạn có chắc muốn hủy đăng ký xe biển số <strong>{cancelConfirm.licensePlate}</strong>?</p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setCancelConfirm(null)}>Hủy</Button>
-              <Button variant="danger" onClick={handleCancelVehicle}>Huỷ đăng ký</Button>
+              <Button variant="danger" onClick={handleCancelVehicle}>Hủy đăng ký</Button>
             </div>
           </motion.div>
         </div>
@@ -781,7 +781,7 @@ function ResidentVehicles() {
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{v.licensePlate}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(v.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "—"}</td>
-                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã huỷ"}</Badge></td>
+                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã hủy"}</Badge></td>
                 </tr>
               ))}
             </tbody>

@@ -6,6 +6,7 @@ import { searchApartmentsAPI } from "../api/apartmentApi";
 import { getActiveHouseholdAPI } from "../api/householdApi";
 import { Badge, Button, Card, DataTable, Input, Select } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
+import { logError } from "../utils/logger";
 
 // Map UserDTO (tài khoản chờ duyệt) -> dòng hiển thị.
 const toReg = (dto) => ({
@@ -207,7 +208,7 @@ export function Registrations() {
       closeConfirm();
       showToast("Duyệt thành công! Tài khoản đã được kích hoạt và gắn vào hộ.", "green");
     } catch (err) {
-      console.error("Approve error:", err);
+      logError("Approve error:", err);
       setModalError("Lỗi: " + err.message);
     } finally {
       setActing(false);
@@ -239,7 +240,7 @@ export function Registrations() {
       closeConfirm();
       showToast("Đã từ chối yêu cầu đăng ký.", "red");
     } catch (err) {
-      console.error("Reject error:", err);
+      logError("Reject error:", err);
       setModalError("Lỗi: " + err.message);
     } finally {
       setActing(false);

@@ -28,7 +28,7 @@ import java.time.LocalDate;
 /**
  * M6 - F6.1, F6.2, F6.3: quản lý phương tiện (xe) của hộ dân.
  * Việc gán/giải phóng chỗ gửi xe (ParkingRegistration) do {@link ParkingService} phụ trách;
- * khi huỷ xe, service này cũng đóng lượt đăng ký ACTIVE và trả chỗ về EMPTY.
+ * khi hủy xe, service này cũng đóng lượt đăng ký ACTIVE và trả chỗ về EMPTY.
  */
 @Service
 public class VehicleService {
@@ -99,14 +99,14 @@ public class VehicleService {
         return mapper.toDto(v);
     }
 
-    // F6.2 - Huỷ đăng ký xe (soft delete) + trả chỗ gửi về EMPTY.
-    @LogAdminAction(entity = "Vehicle", action = "DELETE", description = "Huỷ đăng ký xe & trả chỗ gửi")
+    // F6.2 - Hủy đăng ký xe (soft delete) + trả chỗ gửi về EMPTY.
+    @LogAdminAction(entity = "Vehicle", action = "DELETE", description = "Hủy đăng ký xe & trả chỗ gửi")
     @Transactional
     public void cancel(Long id) {
         Vehicle v = requireVehicle(id);
         v.setActive(false);
         vehicleRepository.save(v);
-        AuditContext.detail("Huỷ đăng ký xe biển số " + v.getLicensePlate());
+        AuditContext.detail("Hủy đăng ký xe biển số " + v.getLicensePlate());
 
         registrationRepository
                 .findByVehicleIdAndStatus(id, ParkingRegistrationStatus.ACTIVE)

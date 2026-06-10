@@ -11,6 +11,7 @@ import { registerAPI } from "../api/authApi";
 import { sendRegisterOtpAPI, forgotPasswordSendOtpAPI } from "../api/otpApi";
 import { Button, Input } from "../components/common";
 import { AuthShell, AuthError, AuthInfo } from "../components/auth/AuthShell";
+import { logError } from "../utils/logger";
 
 export function OtpVerifyPage() {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ export function OtpVerifyPage() {
       setTimeout(() => navigate("/login", { replace: true }), 2500);
     } catch (err) {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
-      console.error("Verify + register error:", err);
+      logError("Verify + register error:", err);
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export function OtpVerifyPage() {
       }
     } catch (err) {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
-      console.error("Reset password error:", err);
+      logError("Reset password error:", err);
     } finally {
       setLoading(false);
     }
@@ -115,7 +116,7 @@ export function OtpVerifyPage() {
       else setError(res.message);
     } catch (err) {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
-      console.error("Resend OTP error:", err);
+      logError("Resend OTP error:", err);
     }
   };
 

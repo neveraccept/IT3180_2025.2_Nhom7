@@ -19,7 +19,6 @@ import java.util.*;
 // Sinh toàn bộ dữ liệu mẫu (seed data) cho hệ thống quản lý chung cư khi khởi động.
 // Hạ tầng -> Cư dân/Hộ -> Phương tiện/Gửi xe -> Tài chính -> Tương tác.
 //
-// LƯU Ý (theo yêu cầu): KHÔNG seed hóa đơn điện/nước/internet trực tiếp vào DB.
 // Thay vào đó dữ liệu điện/nước/internet được cung cấp dưới dạng file Excel mẫu
 // (Backend/sample-data/hoa-don-dien-nuoc.xlsx) để Admin tự nhập qua chức năng
 // "Nhập hóa đơn hàng loạt" (POST /api/utility-bills/import).
@@ -132,9 +131,6 @@ public class InitialDataConfig implements CommandLineRunner {
                     + "qua chức năng 'Nhập hóa đơn hàng loạt'.");
         }
 
-        // Luôn đảm bảo mọi đợt thu đã có phiếu thu (Payment). Chạy cả với DB cũ:
-        // các đợt thu được seed/tạo trước khi có cơ chế tự sinh phiếu sẽ được backfill,
-        // nhờ vậy màn hình "Thu phí / Công nợ" mới có dữ liệu để hiển thị.
         int fixedPeriods = feePeriodService.backfillMissingPayments();
         if (fixedPeriods > 0) {
             System.out.printf("[InitialDataConfig] Đã backfill phiếu thu cho %d đợt thu chưa có phiếu.%n", fixedPeriods);

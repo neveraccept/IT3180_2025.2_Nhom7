@@ -123,8 +123,6 @@ public class ComplaintService {
         }
 
         User admin = currentUserService.getCurrentUser();
-        // Chỉ ghi đè nội dung phản hồi khi admin có nhập; nếu để trống thì giữ nguyên
-        // nội dung cũ (cho phép chuyển trạng thái nhanh mà không bắt buộc nhập phản hồi).
         if (req.response() != null && !req.response().isBlank()) {
             c.setResponse(req.response().trim());
         }

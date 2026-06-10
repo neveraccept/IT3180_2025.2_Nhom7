@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { sendRegisterOtpAPI } from "../api/otpApi";
 import { Button, Input } from "../components/common";
 import { AuthShell, AuthError } from "../components/auth/AuthShell";
+import { logError } from "../utils/logger";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ export function RegisterPage() {
       }
     } catch (err) {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
-      console.error("Send register OTP error:", err);
+      logError("Send register OTP error:", err);
     } finally {
       setLoading(false);
     }

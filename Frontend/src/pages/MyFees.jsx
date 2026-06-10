@@ -14,7 +14,7 @@ const txStatusBadge = (status) => {
     SUCCESS: ["Thành công", "green"],
     PENDING: ["Đang chờ", "yellow"],
     FAILED: ["Thất bại", "red"],
-    CANCELLED: ["Đã huỷ", "gray"],
+    CANCELLED: ["Đã hủy", "gray"],
   };
   const [label, tone] = map[status] || [status, "gray"];
   return <Badge tone={tone}>{label}</Badge>;
@@ -517,7 +517,7 @@ export function MyFees() {
               { key: "ALL", label: `Tất cả (${groupedAllHistoryRows.length})` },
               { key: "SUCCESS", label: `Thành công (${groupedAllHistoryRows.filter((t) => t.status === "SUCCESS").length})` },
               { key: "PENDING", label: `Đang chờ (${groupedAllHistoryRows.filter((t) => t.status === "PENDING").length})` },
-              { key: "FAILED", label: `Thất bại/Huỷ (${groupedAllHistoryRows.filter((t) => t.status === "FAILED" || t.status === "CANCELLED").length})` },
+              { key: "FAILED", label: `Thất bại/Hủy (${groupedAllHistoryRows.filter((t) => t.status === "FAILED" || t.status === "CANCELLED").length})` },
             ].map((f) => (
               <button
                 key={f.key}

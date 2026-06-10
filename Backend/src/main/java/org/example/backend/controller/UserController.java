@@ -43,7 +43,7 @@ public class UserController {
 
         } catch (IllegalArgumentException ex) {
             String errorMsg = ex.getMessage();
-            String errorCode = "CREATE_USER_FAILED"; // Mã mặc định
+            String errorCode = "CREATE_USER_FAILED";
 
             // Phân loại mã lỗi (ErrorCode) dựa trên thông điệp từ UserService
             if (errorMsg.contains("Username")) {

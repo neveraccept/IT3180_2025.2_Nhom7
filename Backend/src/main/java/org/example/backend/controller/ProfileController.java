@@ -5,7 +5,6 @@ import org.example.backend.dto.request.ChangePasswordRequest;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.request.UpdateProfileRequest;
 import org.example.backend.dto.UserProfileDTO;
-// Đảm bảo import đúng đường dẫn của CustomUserDetails dự án bạn
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.ProfileService;
 import org.springframework.context.annotation.Profile;

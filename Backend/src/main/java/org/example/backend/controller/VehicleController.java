@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * M6 - Quản lý phương tiện của hộ dân.
- * Admin: đăng ký / cập nhật / huỷ / tra cứu theo hộ.
+ * Admin: đăng ký / cập nhật / hủy / tra cứu theo hộ.
  * Cư dân: chỉ xem xe của hộ mình.
  */
 @RestController
@@ -48,12 +48,12 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.ok(v, "Cập nhật xe thành công"));
     }
 
-    // F6.2 - Huỷ đăng ký xe. DELETE /api/vehicles/{id}
+    // F6.2 - Hủy đăng ký xe. DELETE /api/vehicles/{id}
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> cancel(@PathVariable Long id) {
         vehicleService.cancel(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Đã huỷ đăng ký gửi xe"));
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã hủy đăng ký gửi xe"));
     }
 
     // F6.3 - Admin tra cứu xe theo hộ. GET /api/vehicles/household/{householdId}

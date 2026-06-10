@@ -12,7 +12,7 @@ import { CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
 const VIEW = {
   SUCCESS: { icon: CheckCircle2, color: "text-emerald-600", ring: "ring-emerald-200", bg: "bg-emerald-50", title: "Thanh toán thành công", desc: "Giao dịch của bạn đã được ghi nhận. Khoản phí sẽ được cập nhật trạng thái đã nộp." },
   PENDING: { icon: Clock, color: "text-amber-600", ring: "ring-amber-200", bg: "bg-amber-50", title: "Đang chờ xác nhận", desc: "Giao dịch đang được xử lý. Trạng thái sẽ được cập nhật sau ít phút, vui lòng kiểm tra lại lịch sử thanh toán." },
-  CANCELLED: { icon: XCircle, color: "text-slate-500", ring: "ring-slate-200", bg: "bg-slate-50", title: "Đã huỷ giao dịch", desc: "Bạn đã huỷ giao dịch trên cổng VNPay. Khoản phí chưa được thanh toán." },
+  CANCELLED: { icon: XCircle, color: "text-slate-500", ring: "ring-slate-200", bg: "bg-slate-50", title: "Đã hủy giao dịch", desc: "Bạn đã hủy giao dịch trên cổng VNPay. Khoản phí chưa được thanh toán." },
   FAILED: { icon: XCircle, color: "text-rose-600", ring: "ring-rose-200", bg: "bg-rose-50", title: "Thanh toán thất bại", desc: "Giao dịch không thành công. Vui lòng thử lại hoặc chọn phương thức khác." },
   INVALID: { icon: AlertTriangle, color: "text-rose-600", ring: "ring-rose-200", bg: "bg-rose-50", title: "Giao dịch không hợp lệ", desc: "Chữ ký giao dịch không hợp lệ. Vui lòng liên hệ Ban quản lý nếu bạn đã bị trừ tiền." },
   NOT_FOUND: { icon: AlertTriangle, color: "text-rose-600", ring: "ring-rose-200", bg: "bg-rose-50", title: "Không tìm thấy giao dịch", desc: "Không tìm thấy thông tin giao dịch tương ứng." },

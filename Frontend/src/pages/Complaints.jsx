@@ -108,8 +108,6 @@ export function Complaints({ role }) {
   const handleInlineStatusChange = async (complaint, newStatus) => {
     if (newStatus === complaint.status || updatingStatusId === complaint.id) return;
     setUpdatingStatusId(complaint.id);
-    // Chỉ gửi status; giữ nguyên nội dung phản hồi cũ (không gửi chuỗi rỗng để
-    // tránh ghi đè và tránh lỗi validate ở backend khi đổi nhanh trạng thái).
     const payload = { status: newStatus };
     if (complaint.response) payload.response = complaint.response;
     const res = await respondComplaintAPI(complaint.id, payload);

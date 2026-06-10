@@ -4,7 +4,7 @@
 //  Phương tiện:
 //    ADMIN     POST   /api/vehicles                         body RegisterVehicleRequest
 //    ADMIN     PUT    /api/vehicles/{id}                    body UpdateVehicleRequest
-//    ADMIN     DELETE /api/vehicles/{id}                    (huỷ đăng ký)
+//    ADMIN     DELETE /api/vehicles/{id}                    (hủy đăng ký)
 //    ADMIN     GET    /api/vehicles/household/{householdId}
 //    RESIDENT  GET    /api/vehicles/my-household
 //  Chỗ gửi xe:
@@ -28,11 +28,11 @@ export const VEHICLE_TYPE = { MOTORBIKE: "MOTORBIKE", CAR: "CAR" };
 export const registerVehicleAPI = (payload) =>
   callApi(axiosClient.post("/api/vehicles", payload));
 
-// ADMIN: cập nhật xe. payload = { licensePlate?, type?, active? } (null = giữ nguyên)
+// ADMIN: cập nhật xe.
 export const updateVehicleAPI = (id, payload) =>
   callApi(axiosClient.put(`/api/vehicles/${id}`, payload));
 
-// ADMIN: huỷ đăng ký xe.
+// ADMIN: hủy đăng ký xe.
 export const cancelVehicleAPI = (id) => callApi(axiosClient.delete(`/api/vehicles/${id}`));
 
 // ADMIN: tra cứu xe theo hộ.

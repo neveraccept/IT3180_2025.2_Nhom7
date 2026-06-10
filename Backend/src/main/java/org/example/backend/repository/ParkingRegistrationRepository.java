@@ -18,7 +18,7 @@ public interface ParkingRegistrationRepository extends JpaRepository<ParkingRegi
 
     boolean existsBySlotIdAndStatus(Long slotId, ParkingRegistrationStatus status);
 
-    // Lượt đăng ký đang ACTIVE của một xe (để huỷ khi xoá xe).
+    // Lượt đăng ký đang ACTIVE của một xe (để hủy khi xoá xe).
     Optional<ParkingRegistration> findByVehicleIdAndStatus(Long vehicleId,
                                                            ParkingRegistrationStatus status);
 

@@ -27,9 +27,6 @@ import org.springframework.web.multipart.MultipartFile;
  * M7 - Quản lý hóa đơn điện/nước/internet.
  * Admin: nhập (F7.1), sửa/xoá (F7.2), xác nhận đã nộp tiền mặt (F7.3), tra cứu (F7.4).
  * Cư dân: chỉ tra cứu hóa đơn của hộ mình.
- *
- * Lưu ý route: endpoint xác nhận tiền mặt nằm dưới /api/admin/... theo SDD,
- * nên controller dùng /api làm prefix và chỉ định path tuyệt đối ở từng method.
  */
 @RestController
 @RequestMapping("/api")

@@ -81,7 +81,7 @@ public class AuthController {
 
 		} catch (IllegalArgumentException ex) {
 			String errorMsg = ex.getMessage();
-			String errorCode = "CREATE_USER_FAILED"; // Mã mặc định
+			String errorCode = "CREATE_USER_FAILED";
 
 			// Phân loại mã lỗi (ErrorCode) dựa trên thông điệp thực tế từ AuthService
 			if (errorMsg.contains("Tên đăng nhập đã tồn tại")) {

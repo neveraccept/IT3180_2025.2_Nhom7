@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * Các API theo "hành động nghiệp vụ" lấy Hộ gia đình làm trung tâm.
- * Bổ sung bên cạnh các endpoint cũ lồng dưới /api/apartments/{id}/household (vẫn giữ nguyên).
+ * Các endpoint cấp hộ dân bên cạnh nhóm route lồng dưới /api/apartments/{id}/household.
  */
 @RestController
 @RequestMapping("/api/households")

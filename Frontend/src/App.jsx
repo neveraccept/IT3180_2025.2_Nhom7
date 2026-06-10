@@ -3,6 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { AuthProvider } from "./context/AuthContext";
 import { AppRoutes } from "./routes/AppRoutes";
+import { logError } from "./utils/logger";
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,7 +16,7 @@ class AppErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("BlueMoon render error:", error, info);
+    logError("BlueMoon render error:", error, info);
   }
 
   render() {

@@ -17,7 +17,6 @@ import {
 // ============================================================
 //  Module 4 — Quản lý khoản thu (Fee) + đợt thu (FeePeriod).
 //  Nguồn dữ liệu: backend FeeController/FeePeriodController (ADMIN).
-//  Giữ nguyên UI/Tailwind; thay toàn bộ logic mock bằng gọi API thật.
 //  Mapping FeeDTO: { name, type(MANDATORY|DONATION), unitPrice, unit, description, active }.
 //  (Backend không có "cách tính" hay "lịch sử chỉnh sửa" → đã lược bỏ.)
 // ============================================================

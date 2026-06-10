@@ -1,7 +1,6 @@
 // ============================================================
 //  AuthShell — khung giao diện dùng chung cho các trang xác thực
 //  (Login / Register / ForgotPassword / OtpVerify).
-//  Giữ nguyên bố cục & class Tailwind từ thiết kế gốc.
 // ============================================================
 import { motion } from "framer-motion";
 import { Building2, ShieldCheck, Users, Wallet, Bell, BarChart3, ArrowLeft } from "lucide-react";

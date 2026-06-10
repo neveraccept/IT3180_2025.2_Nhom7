@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 
 /**
  * F7.2 – Sửa hóa đơn (chỉ áp dụng khi hóa đơn còn UNPAID).
- * Trường null = giữ nguyên. Không cho đổi hộ sở hữu hóa đơn.
  */
 public record UpdateUtilityBillRequest(
         UtilityType type,

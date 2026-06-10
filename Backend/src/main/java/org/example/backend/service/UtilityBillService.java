@@ -148,14 +148,12 @@ public class UtilityBillService {
         b.setMonth(newMonth);
         b.setYear(newYear);
 
-        // Chỉ số cũ/mới: null = giữ nguyên.
         Integer newOldIndex = req.oldIndex() != null ? req.oldIndex() : b.getOldIndex();
         Integer newNewIndex = req.newIndex() != null ? req.newIndex() : b.getNewIndex();
         b.setOldIndex(newOldIndex);
         b.setNewIndex(newNewIndex);
 
         // Điện/nước: tính lại từ chỉ số & đơn giá hiện hành.
-        // Internet: dùng số tiền nhập tay nếu có, ngược lại giữ nguyên số tiền cũ.
         if (newType == UtilityType.ELECTRICITY || newType == UtilityType.WATER) {
             b.setAmount(computeAmount(newType, newOldIndex, newNewIndex, null));
         } else if (req.amount() != null) {
@@ -245,7 +243,7 @@ public class UtilityBillService {
     /**
      * F7.1 (mở rộng) — Nhập hóa đơn cho NHIỀU hộ cùng lúc từ file Excel.
      * Mỗi dòng là một hóa đơn; dòng lỗi được bỏ qua và gom vào danh sách lỗi để admin sửa lại.
-     * Chỉ những dòng hợp lệ mới được lưu (không vì 1 dòng lỗi mà huỷ cả file).
+     * Chỉ những dòng hợp lệ mới được lưu (không vì 1 dòng lỗi mà hủy cả file).
      */
     @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hóa đơn điện/nước/internet từ Excel",
             detail = "'Đã tạo ' + #result.createdCount() + ' hóa đơn, bỏ qua ' + #result.skippedCount() + ' dòng (không có hộ), lỗi ' + #result.failedCount() + ' dòng'")
