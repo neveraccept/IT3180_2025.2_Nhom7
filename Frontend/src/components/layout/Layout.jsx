@@ -46,7 +46,7 @@ export function Layout({ user, setUser, logout }) {
             </div>
             <div>
               <div className="font-black">BlueMoon</div>
-              <div className="text-xs text-slate-500">Thu phí chung cư</div>
+              <div className="text-xs text-slate-500">Phần mềm quản lý chung cư</div>
             </div>
           </div>
           <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
