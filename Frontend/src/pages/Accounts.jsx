@@ -2,8 +2,25 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, Trash2, Lock, Unlock, Pencil, Save } from "lucide-react";
 import { getAllUsersAPI, createInternalAccountAPI, updateUserAPI, deleteUserAPI, lockUserAPI, unlockUserAPI } from "../api/authApi";
+import { searchApartmentsAPI } from "../api/apartmentApi";
+import { getActiveHouseholdAPI } from "../api/householdApi";
 import { Badge, Button, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+// Form thông tin nhân khẩu gắn kèm khi tạo tài khoản RESIDENT có căn hộ.
+const emptyResForm = () => ({
+  linkMode: "link", // "link" = gắn nhân khẩu có sẵn | "new" = tạo nhân khẩu mới
+  linkResidentId: "",
+  idCard: "",
+  dateOfBirth: "",
+  gender: "MALE",
+  relationToHead: "",
+  residencyStatus: "PERMANENT",
+  newHouseholdCode: "",
+  moveInDate: today(),
+});
 
 // Map UserDTO (backend) -> dòng hiển thị trên bảng.
 const toRow = (dto) => ({
@@ -51,6 +68,50 @@ export function Accounts() {
   const [toggling, setToggling] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Bối cảnh căn hộ + form nhân khẩu khi tạo tài khoản RESIDENT có gắn căn hộ.
+  const [aptCtx, setAptCtx] = useState({ loading: false, error: "", apartment: null, household: null });
+  const [resForm, setResForm] = useState(emptyResForm);
+  const isResidentRole = formData.role === "RESIDENT";
+  const isOccupied = !!aptCtx.household;
+  const activeResidents = (aptCtx.household?.residents || []).filter((r) => r.status === "ACTIVE");
+  const setR = (patch) => setResForm((prev) => ({ ...prev, ...patch }));
+
+  const resetAptCtx = () => {
+    setAptCtx({ loading: false, error: "", apartment: null, household: null });
+    setResForm(emptyResForm());
+  };
+
+  // Tra cứu căn hộ + hộ ACTIVE theo mã, để biết nên gắn nhân khẩu sẵn có / tạo mới / lập hộ mới.
+  const loadApartmentContext = async (code) => {
+    const trimmed = (code || "").trim();
+    if (!trimmed) {
+      resetAptCtx();
+      return;
+    }
+    setAptCtx({ loading: true, error: "", apartment: null, household: null });
+    const res = await searchApartmentsAPI({ code: trimmed, size: 50 });
+    if (!res.success) {
+      setAptCtx({ loading: false, error: res.message || "Không tra cứu được căn hộ.", apartment: null, household: null });
+      return;
+    }
+    const items = res.data?.items || [];
+    const found = items.find((a) => String(a.code || "").toLowerCase() === trimmed.toLowerCase());
+    if (!found) {
+      setAptCtx({ loading: false, error: `Không tìm thấy căn hộ với mã '${trimmed}'.`, apartment: null, household: null });
+      return;
+    }
+    if (found.status === "OCCUPIED") {
+      const hhRes = await getActiveHouseholdAPI(found.id);
+      const household = hhRes.success ? hhRes.data : null;
+      const residents = (household?.residents || []).filter((r) => r.status === "ACTIVE");
+      setAptCtx({ loading: false, error: "", apartment: found, household });
+      setResForm({ ...emptyResForm(), linkMode: residents.length > 0 ? "link" : "new" });
+    } else {
+      setAptCtx({ loading: false, error: "", apartment: found, household: null });
+      setResForm({ ...emptyResForm(), newHouseholdCode: "", moveInDate: today() });
+    }
+  };
+
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
     setTimeout(() => setToast(null), 3000);
@@ -97,6 +158,7 @@ export function Accounts() {
     setFormData(emptyForm);
     setMode("create");
     setError("");
+    resetAptCtx();
     setShowForm(true);
   };
 
@@ -153,6 +215,7 @@ export function Accounts() {
   const handleCancel = () => {
     setFormData(emptyForm);
     setError("");
+    resetAptCtx();
     setShowForm(false);
   };
 
@@ -190,10 +253,77 @@ export function Accounts() {
       role,
       apartment: role === "ADMIN" ? "" : prev.apartment,
     }));
+    // Tài khoản nội bộ (ADMIN) không gắn căn hộ/nhân khẩu.
+    if (role === "ADMIN") resetAptCtx();
+  };
+
+  // Dựng phần thông tin nhân khẩu cho tài khoản RESIDENT có gắn căn hộ.
+  // Trả về object payload (có thể rỗng) hoặc null nếu dữ liệu chưa hợp lệ (kèm setError).
+  const buildResidentPart = () => {
+    const apartmentCode = formData.apartment.trim();
+    // Không phải cư dân, hoặc cư dân nhưng không gắn căn hộ -> tạo tài khoản trơn.
+    if (isAdminRole || !apartmentCode) return {};
+
+    if (aptCtx.loading) {
+      setError("Đang kiểm tra căn hộ, vui lòng đợi giây lát.");
+      return null;
+    }
+    if (!aptCtx.apartment) {
+      setError(aptCtx.error || "Vui lòng kiểm tra lại mã căn hộ trước khi tạo tài khoản.");
+      return null;
+    }
+
+    const needResidentInfo = () => {
+      if (!/^(\d{9}|\d{12})$/.test(String(resForm.idCard).trim())) {
+        setError("CCCD/CMND phải là 9 hoặc 12 chữ số.");
+        return false;
+      }
+      if (!resForm.dateOfBirth) {
+        setError("Vui lòng nhập ngày sinh của cư dân.");
+        return false;
+      }
+      return true;
+    };
+
+    if (isOccupied) {
+      if (resForm.linkMode === "link") {
+        if (!resForm.linkResidentId) {
+          setError("Vui lòng chọn nhân khẩu để gắn tài khoản.");
+          return null;
+        }
+        return { linkResidentId: Number(resForm.linkResidentId) };
+      }
+      if (!needResidentInfo()) return null;
+      return {
+        idCard: resForm.idCard.trim(),
+        dateOfBirth: resForm.dateOfBirth,
+        gender: resForm.gender,
+        relationToHead: resForm.relationToHead.trim() || "Thành viên",
+        residencyStatus: resForm.residencyStatus,
+      };
+    }
+
+    // Căn hộ trống -> lập hộ mới, cư dân làm chủ hộ.
+    if (!resForm.newHouseholdCode.trim()) {
+      setError("Vui lòng nhập mã hộ khẩu mới cho căn hộ trống.");
+      return null;
+    }
+    if (!needResidentInfo()) return null;
+    return {
+      newHouseholdCode: resForm.newHouseholdCode.trim(),
+      moveInDate: resForm.moveInDate || today(),
+      idCard: resForm.idCard.trim(),
+      dateOfBirth: resForm.dateOfBirth,
+      gender: resForm.gender,
+      residencyStatus: resForm.residencyStatus,
+    };
   };
 
   const handleCreate = async () => {
     if (!validateCreateForm()) return;
+
+    const residentPart = buildResidentPart();
+    if (residentPart === null) return; // dữ liệu nhân khẩu chưa hợp lệ
 
     setSaving(true);
     setError("");
@@ -206,6 +336,7 @@ export function Accounts() {
       phone: formData.phone.trim(),
       requestedApartmentCode: isAdminRole ? null : formData.apartment.trim() || null,
       role: formData.role,
+      ...residentPart,
     });
     setSaving(false);
 
@@ -310,9 +441,89 @@ export function Accounts() {
                   placeholder={isAdminRole ? "Không áp dụng cho Admin" : "VD: A12-01"}
                   value={formData.apartment}
                   disabled={mode === "view" || isAdminRole}
-                  onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, apartment: e.target.value });
+                    // Mã căn hộ đổi -> bối cảnh cũ không còn đúng, đợi blur tra cứu lại.
+                    if (mode === "create" && !isAdminRole) resetAptCtx();
+                  }}
+                  onBlur={() => {
+                    if (mode === "create" && isResidentRole) loadApartmentContext(formData.apartment);
+                  }}
                 />
               </div>
+
+              {/* ----- Gắn/tạo nhân khẩu cho tài khoản cư dân có căn hộ ----- */}
+              {mode === "create" && isResidentRole && formData.apartment.trim() && (
+                <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                  {aptCtx.loading ? (
+                    <div className="text-sm font-semibold text-slate-500">Đang kiểm tra căn hộ...</div>
+                  ) : aptCtx.error ? (
+                    <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+                      {aptCtx.error}
+                    </div>
+                  ) : isOccupied ? (
+                    <>
+                      <div className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-800 ring-1 ring-sky-200">
+                        Căn hộ <b>{aptCtx.apartment.code}</b> đã có hộ <b>{aptCtx.household.code}</b>.
+                      </div>
+                      <Select label="Cách gắn cư dân" value={resForm.linkMode} onChange={(e) => setR({ linkMode: e.target.value })}>
+                        <option value="link" disabled={activeResidents.length === 0}>
+                          Gắn vào nhân khẩu có sẵn{activeResidents.length === 0 ? " (hộ chưa có nhân khẩu)" : ""}
+                        </option>
+                        <option value="new">Tạo nhân khẩu mới (thành viên hộ)</option>
+                      </Select>
+                      {resForm.linkMode === "link" ? (
+                        <Select label="Nhân khẩu trong hộ" value={resForm.linkResidentId} onChange={(e) => setR({ linkResidentId: e.target.value })}>
+                          <option value="">-- Chọn nhân khẩu --</option>
+                          {activeResidents.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.fullName}{r.relationToHead ? ` (${r.relationToHead})` : ""}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <Input label="CCCD/CMND" placeholder="9 hoặc 12 chữ số" value={resForm.idCard} onChange={(e) => setR({ idCard: e.target.value })} />
+                          <Input label="Ngày sinh" type="date" value={resForm.dateOfBirth} onChange={(e) => setR({ dateOfBirth: e.target.value })} />
+                          <Select label="Giới tính" value={resForm.gender} onChange={(e) => setR({ gender: e.target.value })}>
+                            <option value="MALE">Nam</option>
+                            <option value="FEMALE">Nữ</option>
+                            <option value="OTHER">Khác</option>
+                          </Select>
+                          <Input label="Quan hệ với chủ hộ" placeholder="VD: Con, Vợ, Chồng..." value={resForm.relationToHead} onChange={(e) => setR({ relationToHead: e.target.value })} />
+                          <Select label="Diện cư trú" value={resForm.residencyStatus} onChange={(e) => setR({ residencyStatus: e.target.value })}>
+                            <option value="PERMANENT">Thường trú</option>
+                            <option value="TEMPORARY">Tạm trú</option>
+                          </Select>
+                        </div>
+                      )}
+                    </>
+                  ) : aptCtx.apartment ? (
+                    <>
+                      <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+                        Căn hộ <b>{aptCtx.apartment.code}</b> đang trống → sẽ lập <b>hộ mới</b>, cư dân làm <b>chủ hộ</b>.
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Input label="Mã hộ khẩu mới" placeholder="VD: HK001" value={resForm.newHouseholdCode} onChange={(e) => setR({ newHouseholdCode: e.target.value })} />
+                        <Input label="Ngày chuyển đến" type="date" value={resForm.moveInDate} onChange={(e) => setR({ moveInDate: e.target.value })} />
+                        <Input label="CCCD/CMND chủ hộ" placeholder="9 hoặc 12 chữ số" value={resForm.idCard} onChange={(e) => setR({ idCard: e.target.value })} />
+                        <Input label="Ngày sinh" type="date" value={resForm.dateOfBirth} onChange={(e) => setR({ dateOfBirth: e.target.value })} />
+                        <Select label="Giới tính" value={resForm.gender} onChange={(e) => setR({ gender: e.target.value })}>
+                          <option value="MALE">Nam</option>
+                          <option value="FEMALE">Nữ</option>
+                          <option value="OTHER">Khác</option>
+                        </Select>
+                        <Select label="Diện cư trú" value={resForm.residencyStatus} onChange={(e) => setR({ residencyStatus: e.target.value })}>
+                          <option value="PERMANENT">Thường trú</option>
+                          <option value="TEMPORARY">Tạm trú</option>
+                        </Select>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-slate-500">Rời khỏi ô “Căn hộ” để kiểm tra và gắn nhân khẩu.</div>
+                  )}
+                </div>
+              )}
 
               {mode === "create" && (
                 <div className="grid gap-4 md:grid-cols-2">

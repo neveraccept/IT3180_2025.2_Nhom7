@@ -5,6 +5,7 @@ import org.example.backend.dto.AccountCreatedDTO;
 import org.example.backend.dto.UserDTO;
 import org.example.backend.dto.request.AdminRegisterRequest;
 import org.example.backend.dto.request.AdminUpdateRegisterRequest;
+import org.example.backend.dto.request.ApproveAccountRequest;
 import org.example.backend.dto.request.GrantAccessRequest;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
@@ -66,12 +67,13 @@ public class UserController {
         }
     }
 
-    // API duyệt tài khoản
+    // API duyệt tài khoản. Body (tùy chọn) mang thông tin gắn/tạo nhân khẩu cho tài khoản cư dân.
     @PutMapping("/{id}/approve")
-    public ResponseEntity<?> approvePendingAccount(@PathVariable Long id) {
+    public ResponseEntity<?> approvePendingAccount(@PathVariable Long id,
+                                                   @RequestBody(required = false) ApproveAccountRequest req) {
         try {
             // Gọi logic từ UserService để duyệt tài khoản cư dân
-            User approvedUser = userService.approvePendingAccount(id);
+            User approvedUser = userService.approvePendingAccount(id, req);
 
             // Ép sang UserDTO trước khi trả về
             UserDTO responseDto = mapper.toDto(approvedUser);
