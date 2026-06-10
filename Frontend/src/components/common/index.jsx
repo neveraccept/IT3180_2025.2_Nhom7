@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { Search, Plus } from "lucide-react";
-import { money, getPeriodSummaryText, adminBankInfo } from "../../utils/helpers";
+import { AlertCircle } from "lucide-react";
+import { money, adminBankInfo, getPeriodSummaryText } from "../../utils/helpers";
 
 export function Badge({ children, tone = "gray" }) {
   const tones = {
@@ -50,7 +50,6 @@ export function StatusBadge({ status }) {
     NEW: ["Mới gửi", "red"],
     IN_PROGRESS: ["Đang xử lý", "yellow"],
     RESOLVED: ["Đã giải quyết", "green"],
-    REJECTED: ["Từ chối", "red"],
     ACTIVE: ["Đang dùng", "green"],
     ENDED: ["Kết thúc", "gray"],
   };
@@ -223,18 +222,6 @@ export function PaymentQRModal({ bill, onClose }) {
         </div>
         <div className="mt-5 flex justify-end"><Button variant="secondary" onClick={onClose}>Đóng</Button></div>
       </motion.div>
-    </div>
-  );
-}
-
-export function Toolbar({ placeholder = "Tìm kiếm...", button = "Thêm mới" }) {
-  return (
-    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div className="relative max-w-md flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input placeholder={placeholder} className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
-      </div>
-      <Button><Plus className="h-4 w-4" /> {button}</Button>
     </div>
   );
 }

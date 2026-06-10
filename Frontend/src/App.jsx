@@ -1,9 +1,21 @@
-import React from "react";
-import { BrowserRouter } from "react-router-dom";
+import React, { useState } from "react";
 import { AlertCircle } from "lucide-react";
-import { AuthProvider } from "./context/AuthContext";
 import { AppProvider } from "./context/AppContext";
-import { AppRoutes } from "./routes/AppRoutes";
+import { useDatabaseState } from "./hooks/useDatabaseState";
+import { initialRegistrations, initialFeeCatalog, complaints, notifications } from "./data/mockData";
+import {
+  normalizeNotifications,
+  buildInitialPaymentRecords,
+  buildPaymentRecordsForFee,
+  getHouseholds,
+  calculateMandatoryAmount,
+  calculatePaymentStatus,
+} from "./utils/helpers";
+import { Layout } from "./components/layout/Layout";
+import { IntroductionPage } from "./pages/IntroductionPage";
+import { Login } from "./pages/LoginPage";
+import "./App.css";
+
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -30,7 +42,7 @@ class AppErrorBoundary extends React.Component {
               </div>
               <div>
                 <h1 className="text-xl font-black">Có lỗi hiển thị giao diện</h1>
-                <p className="text-sm text-slate-500">Bạn có thể bấm tải lại trang. Nếu vẫn lỗi, gửi mình ảnh Console.</p>
+                <p className="text-sm text-slate-500">Mở F12 → Console để xem lỗi chi tiết.</p>
               </div>
             </div>
             <pre className="max-h-72 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-white">
@@ -45,16 +57,106 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
+
 export default function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <AppErrorBoundary>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AppErrorBoundary>
-      </AppProvider>
-    </AuthProvider>
+    <AppProvider>
+      <AppErrorBoundary>
+        <AppContent />
+      </AppErrorBoundary>
+    </AppProvider>
+  );
+}
+
+function AppContent() {
+  const [user, setUser] = useState(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
+  const [registrations, setRegistrations] = useDatabaseState("bluemoon_registrations", initialRegistrations);
+  const [feesList, setFeesList] = useDatabaseState("bluemoon_fees", initialFeeCatalog);
+  const [paymentRecords, setPaymentRecords] = useDatabaseState(
+    "bluemoon_payments",
+    buildInitialPaymentRecords(initialFeeCatalog)
+  );
+  const [complaintsList, setComplaintsList] = useDatabaseState("bluemoon_complaints", complaints);
+  const [notificationList, setNotificationList] = useDatabaseState(
+    "bluemoon_notifications",
+    normalizeNotifications(notifications)
+  );
+const syncPaymentsForMandatoryFee = (fee, month = new Date().getMonth() + 1, year = new Date().getFullYear()) => {
+    if (!fee || fee.type !== "MANDATORY" || fee.status !== "ACTIVE") return;
+
+    setPaymentRecords((prev) => {
+      const generated = buildPaymentRecordsForFee(fee, month, year, prev);
+      const updatedExisting = prev.map((record) => {
+        if (record.feeId !== fee.id || Number(record.month) !== Number(month) || Number(record.year) !== Number(year)) {
+          return record;
+        }
+
+        const household = getHouseholds().find((item) => item.room === record.room);
+        const amountDue = household ? calculateMandatoryAmount(fee, household) : record.amountDue;
+
+        return {
+          ...record,
+          feeName: fee.name,
+          chargeMethod: fee.chargeMethod,
+          unitPrice: Number(fee.unitPrice || 0),
+          amountDue,
+          status: calculatePaymentStatus(amountDue, record.amountPaid),
+        };
+      });
+
+      return [...updatedExisting, ...generated];
+    });
+  };
+
+  const removePaymentsForFee = (feeId) => {
+    setPaymentRecords((prev) => prev.filter((record) => record.feeId !== feeId));
+  };
+
+  if (user) {
+    return (
+      <Layout
+        user={user}
+        setUser={setUser}
+        registrations={registrations}
+        setRegistrations={setRegistrations}
+        feesList={feesList}
+        setFeesList={setFeesList}
+        paymentRecords={paymentRecords}
+        setPaymentRecords={setPaymentRecords}
+        syncPaymentsForMandatoryFee={syncPaymentsForMandatoryFee}
+        removePaymentsForFee={removePaymentsForFee}
+        complaintsList={complaintsList}
+        setComplaintsList={setComplaintsList}
+        notificationList={notificationList}
+        setNotificationList={setNotificationList}
+      />
+    );
+  }
+
+    if (showIntro) {
+    return (
+      <IntroductionPage
+        onStartLogin={() => {
+          setAuthMode("login");
+          setShowIntro(false);
+        }}
+        onStartRegister={() => {
+          setAuthMode("register");
+          setShowIntro(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <Login
+      setUser={setUser}
+      initialMode={authMode}
+      onBackIntro={() => setShowIntro(true)}
+      registrations={registrations}
+      setRegistrations={setRegistrations}
+    />
   );
 }

@@ -2,25 +2,24 @@ import { useState } from "react";
 import { Building2, X, Menu, LogOut } from "lucide-react";
 import { adminNav, residentNav } from "../../data/mockData";
 import { Badge, Button } from "../common";
-import { Dashboard } from "../../pages/Dashboard";
-import { Registrations } from "../../pages/Registrations";
-import { Accounts } from "../../pages/Accounts";
-import { Apartments } from "../../pages/Apartments";
-import { Residents } from "../../pages/Residents";
-import { Fees } from "../../pages/Fees";
-import { Payments } from "../../pages/Payments";
-import { Vehicles } from "../../pages/Vehicles";
-import { Utilities } from "../../pages/Utilities";
-import { Complaints } from "../../pages/Complaints";
-import { Notifications } from "../../pages/Notifications";
-import { Statistics } from "../../pages/Statistics";
+import { Dashboard } from "../../pages/DashboardPage";
+import { Registrations } from "../../pages/RegistrationPage";
+import { Accounts } from "../../pages/AccountPage";
+import { Apartments } from "../../pages/ApartmentPage";
+import { Residents } from "../../pages/ResidentPage";
+import { Fees } from "../../pages/FeePage";
+import { Payments } from "../../pages/PaymentPage";
+import { Vehicles } from "../../pages/VehiclePage";
+import { Utilities } from "../../pages/UtilityPage";
+import { Complaints } from "../../pages/ComplaintPage";
+import { Notifications } from "../../pages/NotificationPage";
+import { Statistics } from "../../pages/StatisticsPage";
 import { MyFees } from "../../pages/MyFees";
-import { Profile } from "../../pages/Profile";
+import { Profile } from "../../pages/ProfilePage";
 
 export function Layout({
   user,
   setUser,
-  logout,
   registrations,
   setRegistrations,
   feesList,
@@ -98,7 +97,7 @@ export function Layout({
             </div>
             <Badge tone={user.role === "ADMIN" ? "blue" : "green"}>{user.role}</Badge>
           </div>
-          <Button variant="secondary" onClick={() => logout?.()}><LogOut className="h-4 w-4" /> Đăng xuất</Button>
+          <Button variant="secondary" onClick={() => setUser(null)}><LogOut className="h-4 w-4" /> Đăng xuất</Button>
         </header>
         <div className="p-4 md:p-8">
           <Page
@@ -129,7 +128,7 @@ export function Layout({
   );
 }
 
-export function Page({
+function Page({
   active,
   user,
   setUser,

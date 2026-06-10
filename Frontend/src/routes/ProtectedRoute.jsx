@@ -1,14 +1,20 @@
-// ============================================================
-//  ProtectedRoute — bảo vệ route theo trạng thái đăng nhập + role (RBAC)
-// ============================================================
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+
+function LoadingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-700">
+      <div className="rounded-2xl bg-white px-6 py-4 text-sm font-semibold shadow-sm ring-1 ring-slate-200">
+        Đang kiểm tra đăng nhập...
+      </div>
+    </div>
+  );
+}
 
 export function ProtectedRoute({ allowedRoles, children }) {
   const { isAuthenticated, role, initializing } = useAuth();
 
-  // Chờ khôi phục phiên từ localStorage để tránh đá người dùng ra /login khi F5.
-  if (initializing) return null;
+  if (initializing) return <LoadingScreen />;
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 

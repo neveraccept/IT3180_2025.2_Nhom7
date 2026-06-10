@@ -1,16 +1,5 @@
 import {
-  Home,
-  CheckCircle2,
-  UserRoundCog,
-  Building2,
-  Users,
-  WalletCards,
-  ReceiptText,
-  Car,
-  MessageSquareWarning,
-  Bell,
-  BarChart3,
-  KeyRound,
+  Building2, Users, WalletCards, Car, Bike, ReceiptText, Bell, MessageSquareWarning, BarChart3, Home, ShieldCheck, Search, Plus, Download, LogOut, Menu, X, CheckCircle2, Clock3, AlertCircle, UserRoundCog, KeyRound, MapPin, Phone, Mail, CalendarDays, Sparkles, HeartHandshake, Dumbbell, Waves, Gamepad2, ShoppingCart, Trees
 } from "lucide-react";
 
 export const adminNav = [
@@ -138,7 +127,6 @@ export const notifications = [
   { title: "Nhắc lịch họp cư dân", scope: "Toàn chung cư", date: "20/05/2026", read: true },
 ];
 
-// Danh sách tài khoản hệ thống
 export const users = [
   { username: "admin", password: "admin123", name: "Admin BlueMoon", role: "ADMIN" },
   { username: "admin2", password: "12345", name: "Admin Phó", role: "ADMIN" },

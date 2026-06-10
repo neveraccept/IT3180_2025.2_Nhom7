@@ -1,9 +1,57 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus } from "lucide-react";
+import {
+  Building2, Users, WalletCards, Car, Bike, ReceiptText, Bell, MessageSquareWarning, BarChart3, Home, ShieldCheck, Search, Plus, Download, LogOut, Menu, X, CheckCircle2, Clock3, AlertCircle, UserRoundCog, KeyRound, MapPin, Phone, Mail, CalendarDays, Sparkles, HeartHandshake, Dumbbell, Waves, Gamepad2, ShoppingCart, Trees
+} from "lucide-react";
 import { useAppContext } from "../context/AppContext";
-import { Badge, Button, Input, Select } from "../components/common";
+import { useDatabaseState } from "../hooks/useDatabaseState";
+import {
+  adminNav,
+  residentNav,
+  apartments,
+  residents,
+  fees,
+  payments,
+  initialVehicles,
+  initialUtilities,
+  complaints,
+  notifications,
+  users,
+  initialRegistrations,
+  initialFeeCatalog,
+} from "../data/mockData";
+import {
+  money,
+  normalizeNotifications,
+  getHouseholds,
+  calculateMandatoryAmount,
+  calculatePaymentStatus,
+  makePaymentKey,
+  buildPaymentRecordsForFee,
+  buildInitialPaymentRecords,
+  adminBankInfo,
+  getResidentRoomByUser,
+  getResidentDisplayName,
+  parseNumberValue,
+  getUtilityName,
+  getUtilityUnitText,
+  buildHouseholdBillRows,
+  getPeriodSummaryText,
+} from "../utils/helpers";
+import {
+  Badge,
+  Button,
+  Card,
+  StatusBadge,
+  DataTable,
+  Input,
+  Select,
+  NotificationDetailModal,
+  ComplaintReadOnlyModal,
+  PaymentQRModal,
+} from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
+import { loginAPI, registerAPI, approveRegistrationAPI, rejectRegistrationAPI } from "../config/api";
 
 export function Accounts({ registrations = [] }) {
   const { users, setUsers } = useAppContext();
@@ -317,4 +365,3 @@ export function Accounts({ registrations = [] }) {
     </>
   );
 }
-
