@@ -36,6 +36,11 @@ public class User {
 	@Column
 	private boolean active = false;
 
+	// Cờ xóa mềm (Soft Delete): true = tài khoản đã bị Admin xóa, ẩn khỏi mọi danh sách.
+	// Dùng cột riêng thay vì tái sử dụng `active` vì active=false còn mang nghĩa "chờ duyệt".
+	@Column(nullable = false)
+	private boolean deleted = false;
+
 	@Column(name = "email_verified")
 	private boolean emailVerified = false;
 
@@ -49,6 +54,14 @@ public class User {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "household_id")
 	private Household household;
+
+	// Nhân khẩu (cư dân) mà tài khoản này đại diện. Có thể null với tài khoản nội bộ (ADMIN/Kế toán).
+	// Là "nguồn sự thật" cho luồng cấp tài khoản theo cư dân (grant-access) và khóa tài khoản khi cả hộ chuyển đi.
+	// Vẫn giữ household_id song song để các truy vấn thanh toán/thông báo theo hộ hiện có không phải đổi.
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "resident_id",
+			foreignKey = @ForeignKey(name = "fk_user_resident"))
+	private Resident resident;
 }
 
 

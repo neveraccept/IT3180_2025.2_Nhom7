@@ -34,6 +34,20 @@ export const deleteUtilityBillAPI = (id) => callApi(axiosClient.delete(`/api/uti
 export const confirmCashUtilityBillAPI = (id) =>
   callApi(axiosClient.put(`/api/admin/utility-bills/${id}/confirm-cash`));
 
+// ADMIN: xác nhận tiền mặt hàng loạt cho nhiều hoá đơn cùng lúc.
+// Gọi tuần tự endpoint đơn lẻ cho từng hoá đơn (mỗi hoá đơn vẫn sinh một bản ghi nhật ký riêng).
+// Trả về { ok, failed, errors }.
+export const confirmCashUtilityBillsBatchAPI = async (ids = []) => {
+  let ok = 0;
+  const errors = [];
+  for (const id of ids) {
+    const res = await confirmCashUtilityBillAPI(id);
+    if (res.success) ok += 1;
+    else errors.push({ id, message: res.message });
+  }
+  return { ok, failed: errors.length, errors };
+};
+
 // ADMIN: tra cứu hoá đơn (lọc theo hộ/loại/tháng/năm/trạng thái). Bỏ qua tham số rỗng.
 export const searchUtilityBillsAPI = ({
   householdId,
@@ -43,7 +57,8 @@ export const searchUtilityBillsAPI = ({
   status,
   page = 0,
   size = 100,
-  sort = "year,desc",
+  // Mặc định gom theo hộ (household.id) để Admin dễ tra cứu hoá đơn của từng hộ.
+  sort = "household.id,asc",
 } = {}) => {
   const params = { page, size, sort };
   if (householdId !== undefined && householdId !== null && householdId !== "") params.householdId = householdId;
@@ -56,6 +71,26 @@ export const searchUtilityBillsAPI = ({
 
 // ADMIN: chi tiết hoá đơn.
 export const getUtilityBillDetailAPI = (id) => callApi(axiosClient.get(`/api/utility-bills/${id}`));
+
+// ADMIN: nhập hoá đơn hàng loạt từ file Excel (.xlsx). Trả về { createdCount, failedCount, errors }.
+export const importUtilityBillsExcelAPI = (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  return callApi(
+    axiosClient.post("/api/utility-bills/import", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  );
+};
+
+// ADMIN: tải file Excel mẫu để nhập hàng loạt (responseType: 'blob').
+export const downloadUtilityImportTemplateAPI = () =>
+  callApi(axiosClient.get("/api/utility-bills/import-template", { responseType: "blob" }));
+
+// ADMIN: sinh hoá đơn phí điện nước cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
+// payload = { month, year } -> { feePeriodId, feePeriodName, invoiceCount, totalAmount }
+export const generateUtilityFeesAPI = ({ month, year }) =>
+  callApi(axiosClient.post("/api/admin/utility-fees/generate", { month: Number(month), year: Number(year) }));
 
 // RESIDENT: hoá đơn của hộ mình (lọc tuỳ chọn).
 export const listMyUtilityBillsAPI = ({ type, month, year, status, page = 0, size = 100, sort = "year,desc" } = {}) => {

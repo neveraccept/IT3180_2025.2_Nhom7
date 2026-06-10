@@ -29,6 +29,8 @@ public class PaymentTransaction {
 
     public static final String TARGET_FEE_PAYMENT  = "FEE_PAYMENT";
     public static final String TARGET_UTILITY_BILL = "UTILITY_BILL";
+    public static final String TARGET_FEE_PAYMENT_BATCH = "FEE_PAYMENT_BATCH";
+    public static final String TARGET_MIXED_PAYMENT_BATCH = "MIXED_PAYMENT_BATCH";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,6 +55,15 @@ public class PaymentTransaction {
 
     @Column(name = "target_id", nullable = false)
     private Long targetId;
+
+    @Column(name = "target_ids", columnDefinition = "TEXT")
+    private String targetIds;
+
+    @Column(name = "target_amounts", columnDefinition = "TEXT")
+    private String targetAmounts;
+
+    @Column(name = "utility_bill_ids", columnDefinition = "TEXT")
+    private String utilityBillIds;
 
     @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;

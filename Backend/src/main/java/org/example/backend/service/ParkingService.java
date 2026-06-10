@@ -1,5 +1,6 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.ParkingRegistrationDTO;
 import org.example.backend.dto.ParkingSlotDTO;
@@ -8,6 +9,7 @@ import org.example.backend.dto.request.CreateParkingRegistrationRequest;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.ParkingRegistration;
 import org.example.backend.entity.ParkingSlot;
+import org.example.backend.entity.SystemConfig;
 import org.example.backend.entity.Vehicle;
 import org.example.backend.entity.enums.ParkingRegistrationStatus;
 import org.example.backend.entity.enums.ParkingSlotStatus;
@@ -26,43 +28,64 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * M6 - F6.4 (quản lý chỗ gửi), F6.1 gán chỗ cho xe hộ và F6.5 cho thuê chỗ thừa.
  *
- * Quy tắc phí gửi xe (monthlyFee) theo SDD:
- *   - MOTORBIKE: 70.000đ/tháng (mặc định khi gán xe hộ).
- *   - CAR      : 1.200.000đ/tháng (mặc định khi gán xe hộ).
- *   - Cho thuê ngoài: phí nhập tay theo thoả thuận.
+ * Quy tắc phí gửi xe (monthlyFee): gán xe hộ lấy đơn giá mặc định từ SystemConfig,
+ * cho thuê ngoài dùng phí nhập tay theo thoả thuận.
  */
 @Service
 public class ParkingService {
-
-    private static final BigDecimal MOTORBIKE_FEE = new BigDecimal("70000");
-    private static final BigDecimal CAR_FEE = new BigDecimal("1200000");
 
     private final ParkingSlotRepository slotRepository;
     private final ParkingRegistrationRepository registrationRepository;
     private final VehicleRepository vehicleRepository;
     private final ParkingMapper mapper;
     private final CurrentUserService currentUserService;
+    private final SystemConfigService systemConfigService;
 
     public ParkingService(ParkingSlotRepository slotRepository,
                           ParkingRegistrationRepository registrationRepository,
                           VehicleRepository vehicleRepository,
                           ParkingMapper mapper,
-                          CurrentUserService currentUserService) {
+                          CurrentUserService currentUserService,
+                          SystemConfigService systemConfigService) {
         this.slotRepository = slotRepository;
         this.registrationRepository = registrationRepository;
         this.vehicleRepository = vehicleRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
+        this.systemConfigService = systemConfigService;
     }
 
-    // F6.4 - Danh sách chỗ gửi (có phân trang).
+    // F6.4 - Danh sách chỗ gửi (có phân trang), kèm biển số xe và mã căn hộ.
     @Transactional(readOnly = true)
     public PageResponse<ParkingSlotDTO> listSlots(Pageable pageable) {
-        Page<ParkingSlotDTO> page = slotRepository.findAll(pageable).map(mapper::toSlotDto);
+        Page<ParkingSlot> slotsPage = slotRepository.findAll(pageable);
+
+        // Thu thập slotId để batch-load lượt đăng ký ACTIVE trong 1 query (tránh N+1).
+        List<Long> slotIds = slotsPage.getContent().stream()
+                .map(ParkingSlot::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, ParkingRegistration> activeBySlotId = slotIds.isEmpty()
+                ? Collections.emptyMap()
+                : registrationRepository
+                        .findBySlotIdsAndStatusWithDetails(slotIds, ParkingRegistrationStatus.ACTIVE)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                r -> r.getSlot().getId(),
+                                r -> r,
+                                (a, b) -> a   // giữ bản ghi đầu nếu trùng (không nên xảy ra)
+                        ));
+
+        Page<ParkingSlotDTO> page = slotsPage.map(
+                s -> mapper.toSlotDto(s, activeBySlotId.get(s.getId())));
         return PageResponse.of(page);
     }
 
@@ -77,6 +100,8 @@ public class ParkingService {
     }
 
     // F6.1 (gán xe hộ) + F6.5 (cho thuê chỗ thừa).
+    @LogAdminAction(entity = "ParkingRegistration", action = "CREATE", description = "Gán/cho thuê chỗ gửi xe",
+            detail = "'Chỗ ' + #result.slotCode()")
     @Transactional
     public ParkingRegistrationDTO createRegistration(CreateParkingRegistrationRequest req) {
         ParkingSlot slot = slotRepository.findById(req.slotId())
@@ -146,6 +171,8 @@ public class ParkingService {
     }
 
     // F6.2 / F6.5 - Kết thúc một lượt đăng ký/cho thuê, trả chỗ về EMPTY.
+    @LogAdminAction(entity = "ParkingRegistration", action = "UPDATE", description = "Kết thúc lượt gửi xe, trả chỗ về trống",
+            detail = "'Chỗ ' + #result.slotCode()")
     @Transactional
     public ParkingRegistrationDTO endRegistration(Long id) {
         ParkingRegistration reg = registrationRepository.findById(id)
@@ -186,6 +213,8 @@ public class ParkingService {
     }
 
     private BigDecimal defaultFee(VehicleType type) {
-        return type == VehicleType.CAR ? CAR_FEE : MOTORBIKE_FEE;
+        return systemConfigService.getValue(type == VehicleType.CAR
+                ? SystemConfig.CAR_PARKING_PRICE
+                : SystemConfig.MOTORBIKE_PARKING_PRICE);
     }
 }

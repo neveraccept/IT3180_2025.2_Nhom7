@@ -64,3 +64,10 @@ export const endParkingRegistrationAPI = (id) =>
 // RESIDENT: lượt gửi xe đang hiệu lực của hộ mình.
 export const listMyParkingRegistrationsAPI = ({ page = 0, size = 100, sort = "startDate,desc" } = {}) =>
   callApi(axiosClient.get("/api/parking-registrations/my-household", { params: { page, size, sort } }));
+
+// ----------------------------- HOÁ ĐƠN PHÍ GỬI XE --------------------------
+
+// ADMIN: sinh hoá đơn phí gửi xe cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
+// payload = { month, year } -> { feePeriodId, feePeriodName, invoiceCount, totalAmount }
+export const generateParkingFeesAPI = ({ month, year }) =>
+  callApi(axiosClient.post("/api/admin/parking-fees/generate", { month: Number(month), year: Number(year) }));

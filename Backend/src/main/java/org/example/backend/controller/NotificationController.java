@@ -23,7 +23,7 @@ public class NotificationController {
         this.notificationService = notificationService;
     }
 
-    // F9.1 + F9.2 - Admin soạn và gửi thông báo
+    // Admin soạn và gửi thông báo
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<NotificationDTO>> create(
@@ -33,7 +33,7 @@ public class NotificationController {
                 "Đã gửi thông báo tới " + created.recipientCount() + " người nhận"));
     }
 
-    // F9.3 - Xem thông báo gửi cho user hiện tại
+    // Xem thông báo gửi cho user hiện tại
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
     public ResponseEntity<ApiResponse<PageResponse<NotificationDTO>>> myNotifications(
@@ -43,11 +43,28 @@ public class NotificationController {
                 notificationService.getMyNotifications(pageable)));
     }
 
+    // F9.1 - Admin xem lại danh sách thông báo mình đã gửi (kèm số người nhận)
+    @GetMapping("/sent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<NotificationDTO>>> sentNotifications(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                notificationService.getSentNotifications(pageable)));
+    }
+
     // F9.4 - Đánh dấu thông báo đã đọc
     @PutMapping("/{id}/read")
     @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
     public ResponseEntity<ApiResponse<NotificationDTO>> markAsRead(@PathVariable Long id) {
         NotificationDTO dto = notificationService.markAsRead(id);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đã đánh dấu đã đọc"));
+    }
+
+    @PutMapping("/{id}/unread")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
+    public ResponseEntity<ApiResponse<NotificationDTO>> markAsUnread(@PathVariable Long id) {
+        NotificationDTO dto = notificationService.markAsUnread(id);
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Đã đánh dấu chưa đọc"));
     }
 }

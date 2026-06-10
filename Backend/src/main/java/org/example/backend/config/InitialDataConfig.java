@@ -17,16 +17,23 @@ import java.util.*;
 
 
 // Sinh toàn bộ dữ liệu mẫu (seed data) cho hệ thống quản lý chung cư khi khởi động.
-// Hạ tầng → Cư dân/Hộ → Phương tiện/Gửi xe → Tài chính → Tương tác.</p>
+// Hạ tầng -> Cư dân/Hộ -> Phương tiện/Gửi xe -> Tài chính -> Tương tác.
+//
+// LƯU Ý (theo yêu cầu): KHÔNG seed hoá đơn điện/nước/internet trực tiếp vào DB.
+// Thay vào đó dữ liệu điện/nước/internet được cung cấp dưới dạng file Excel mẫu
+// (Backend/sample-data/hoa-don-dien-nuoc.xlsx) để Admin tự nhập qua chức năng
+// "Nhập hoá đơn hàng loạt" (POST /api/utility-bills/import).
+// Các hộ được chọn NGẪU NHIÊN trong số các căn ở. File Excel mẫu liệt kê tất cả mã hộ
+// có thể có; khi import, dòng nào trỏ tới hộ chưa tồn tại sẽ tự động bị bỏ qua.
 
 @Component
 @Order(2)
 public class InitialDataConfig implements CommandLineRunner {
 
     // Thông số cơ bản
-    private static final int TYPICAL_FLOOR_START = 2;
-    private static final int TYPICAL_FLOOR_END = 25;
-    private static final int PENTHOUSE_FLOOR = 26;
+    private static final int TYPICAL_FLOOR_START = 6;
+    private static final int TYPICAL_FLOOR_END = 29;
+    private static final int PENTHOUSE_FLOOR = 30;
 
     // Diện tích 4 ki-ốt tầng 1 (m²): tổng 310, phần còn lại là sảnh chung.
     private static final int[] KIOSK_AREAS = {100, 80, 65, 65};
@@ -51,13 +58,14 @@ public class InitialDataConfig implements CommandLineRunner {
     private final ParkingRegistrationRepository parkingRegistrationRepository;
     private final FeeRepository feeRepository;
     private final FeePeriodRepository feePeriodRepository;
-    private final UtilityBillRepository utilityBillRepository;
+    private final SystemConfigRepository systemConfigRepository;
     private final ComplaintRepository complaintRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationRecipientRepository notificationRecipientRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.example.backend.service.FeePeriodService feePeriodService;
 
     private final Faker faker = new Faker(Locale.of("vi"));
     private final Random random = new Random();
@@ -73,13 +81,14 @@ public class InitialDataConfig implements CommandLineRunner {
                              ParkingRegistrationRepository parkingRegistrationRepository,
                              FeeRepository feeRepository,
                              FeePeriodRepository feePeriodRepository,
-                             UtilityBillRepository utilityBillRepository,
+                             SystemConfigRepository systemConfigRepository,
                              ComplaintRepository complaintRepository,
                              NotificationRepository notificationRepository,
                              NotificationRecipientRepository notificationRecipientRepository,
                              UserRepository userRepository,
                              RoleRepository roleRepository,
-                             PasswordEncoder passwordEncoder) {
+                             PasswordEncoder passwordEncoder,
+                             org.example.backend.service.FeePeriodService feePeriodService) {
         this.apartmentRepository = apartmentRepository;
         this.parkingSlotRepository = parkingSlotRepository;
         this.householdRepository = householdRepository;
@@ -88,33 +97,48 @@ public class InitialDataConfig implements CommandLineRunner {
         this.parkingRegistrationRepository = parkingRegistrationRepository;
         this.feeRepository = feeRepository;
         this.feePeriodRepository = feePeriodRepository;
-        this.utilityBillRepository = utilityBillRepository;
+        this.systemConfigRepository = systemConfigRepository;
         this.complaintRepository = complaintRepository;
         this.notificationRepository = notificationRepository;
         this.notificationRecipientRepository = notificationRecipientRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.feePeriodService = feePeriodService;
     }
 
     @Override
     @Transactional
     public void run(String... args) {
+        // Đơn giá hệ thống luôn được đảm bảo tồn tại (idempotent), kể cả khi DB đã có dữ liệu cũ
+        // -> khi Admin import hoá đơn điện/nước/internet luôn có đơn giá để tính tiền.
+        seedSystemConfigs();
+
         // Chốt chặn idempotent: chỉ seed khi DB chưa có hạ tầng căn hộ.
         if (apartmentRepository.count() > 0) {
             System.out.println("[InitialDataConfig] Đã có dữ liệu căn hộ -> bỏ qua sinh dữ liệu mẫu.");
-            return;
+        } else {
+            System.out.println("[InitialDataConfig] Bắt đầu sinh dữ liệu mẫu...");
+
+            seedInfrastructure();
+            List<Household> households = seedHouseholdsAndResidents();
+            seedVehiclesAndParking(households);
+            seedFinance(households);
+            seedInteractions(households);
+
+            System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
+            System.out.println("[InitialDataConfig] Hoá đơn điện/nước/internet KHÔNG seed vào DB. "
+                    + "Hãy nhập từ file mẫu: Backend/sample-data/hoa-don-dien-nuoc.xlsx "
+                    + "qua chức năng 'Nhập hoá đơn hàng loạt'.");
         }
 
-        System.out.println("[InitialDataConfig] Bắt đầu sinh dữ liệu mẫu...");
-
-        seedInfrastructure();
-        List<Household> households = seedHouseholdsAndResidents();
-        seedVehiclesAndParking(households);
-        seedFinance(households);
-        seedInteractions(households);
-
-        System.out.println("[InitialDataConfig] Hoàn tất sinh dữ liệu mẫu.");
+        // Luôn đảm bảo mọi đợt thu đã có phiếu thu (Payment). Chạy cả với DB cũ:
+        // các đợt thu được seed/tạo trước khi có cơ chế tự sinh phiếu sẽ được backfill,
+        // nhờ vậy màn hình "Thu phí / Công nợ" mới có dữ liệu để hiển thị.
+        int fixedPeriods = feePeriodService.backfillMissingPayments();
+        if (fixedPeriods > 0) {
+            System.out.printf("[InitialDataConfig] Đã backfill phiếu thu cho %d đợt thu chưa có phiếu.%n", fixedPeriods);
+        }
     }
 
 
@@ -129,7 +153,7 @@ public class InitialDataConfig implements CommandLineRunner {
                     "Ki-ốt thương mại tầng 1 (Sảnh chờ)"));
         }
 
-        // Tầng 2-25
+        // Tầng 6-29
         for (int floor = TYPICAL_FLOOR_START; floor <= TYPICAL_FLOOR_END; floor++) {
             for (int i = 0; i < TYPICAL_AREAS.length; i++) {
                 String code = String.format("A%02d-%02d", floor, i + 1);
@@ -137,8 +161,8 @@ public class InitialDataConfig implements CommandLineRunner {
             }
         }
 
-        // Tầng 26: Penthouse
-        apartments.add(buildApartment("PH26-01", PENTHOUSE_FLOOR, PENTHOUSE_AREA,
+        // Tầng 30: Penthouse
+        apartments.add(buildApartment("PH30-01", PENTHOUSE_FLOOR, PENTHOUSE_AREA,
                 "Căn hộ Penthouse"));
 
         apartmentRepository.saveAll(apartments);
@@ -181,7 +205,10 @@ public class InitialDataConfig implements CommandLineRunner {
 
     // Cư dân & Hộ gia đình (kèm tài khoản RESIDENT để đăng nhập / nhận thông báo)
     private List<Household> seedHouseholdsAndResidents() {
-        // Chỉ gán hộ cho các căn ở (tầng >= 2), bỏ qua ki-ốt thương mại tầng 1.
+        // Chỉ gán hộ cho các căn ở (tầng >= 6), bỏ qua ki-ốt thương mại tầng 1.
+        // Chọn NGẪU NHIÊN các căn được ở (xáo trộn). File Excel mẫu hoá đơn liệt kê TẤT CẢ
+        // mã hộ có thể có (HK-A06-01 ... HK-PH30-01); khi import, dòng nào trỏ tới hộ chưa
+        // tồn tại sẽ tự động bị bỏ qua nên file vẫn dùng được dù hộ là ngẫu nhiên.
         List<Apartment> residential = new ArrayList<>(apartmentRepository.findAll().stream()
                 .filter(a -> a.getFloor() >= TYPICAL_FLOOR_START)
                 .toList());
@@ -268,6 +295,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 .emailVerified(true)
                 .role(residentRole)
                 .household(household)
+                .resident(head) // gắn nhân khẩu đại diện (chủ hộ) cho tài khoản cư dân
                 .build();
         userRepository.save(u);
     }
@@ -291,6 +319,8 @@ public class InitialDataConfig implements CommandLineRunner {
 
         int vehicleCount = 0;
         int parkedCount = 0;
+        BigDecimal carParkingPrice = getSystemConfigValue(SystemConfig.CAR_PARKING_PRICE);
+        BigDecimal motorbikeParkingPrice = getSystemConfigValue(SystemConfig.MOTORBIKE_PARKING_PRICE);
 
         for (Household household : households) {
             int numVehicles = 1 + random.nextInt(2); // 1 hoặc 2 xe
@@ -313,7 +343,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 vehicle.setActive(true);
                 vehicle = vehicleRepository.save(vehicle);
                 vehicleCount++;
-                
+
                 slot.setStatus(ParkingSlotStatus.USED);
                 parkingSlotRepository.save(slot);
 
@@ -321,9 +351,7 @@ public class InitialDataConfig implements CommandLineRunner {
                 reg.setSlot(slot);
                 reg.setVehicle(vehicle);
                 reg.setStartDate(vehicle.getRegisteredDate());
-                reg.setMonthlyFee(type == VehicleType.CAR
-                        ? BigDecimal.valueOf(1_200_000)
-                        : BigDecimal.valueOf(120_000));
+                reg.setMonthlyFee(type == VehicleType.CAR ? carParkingPrice : motorbikeParkingPrice);
                 reg.setStatus(ParkingRegistrationStatus.ACTIVE);
                 parkingRegistrationRepository.save(reg);
                 parkedCount++;
@@ -334,7 +362,8 @@ public class InitialDataConfig implements CommandLineRunner {
                 vehicleCount, parkedCount);
     }
 
-    // BƯỚC 4: Tài chính – Phí, Kỳ thu phí, Hoá đơn sinh hoạt
+    // BƯỚC 4: Tài chính – Phí & Kỳ thu phí
+    // (Hoá đơn điện/nước/internet KHÔNG seed ở đây — nhập từ file Excel mẫu.)
     private void seedFinance(List<Household> households) {
         // --- Các loại phí cơ bản ---
         Fee mgmtFee = buildFee("Phí quản lý", "MANDATORY", "PER_M2", BigDecimal.valueOf(7_000),
@@ -360,22 +389,34 @@ public class InitialDataConfig implements CommandLineRunner {
             feePeriodRepository.save(period);
         }
 
-        // --- Hoá đơn sinh hoạt (Điện, Nước, Internet) cho từng hộ trong tháng hiện tại ---
-        int month = now.getMonthValue();
-        int year = now.getYear();
-        List<UtilityBill> bills = new ArrayList<>(households.size() * 3);
-        for (Household household : households) {
-            bills.add(buildUtilityBill(household, UtilityType.ELECTRICITY, month, year,
-                    randomAmount(200_000, 1_500_000)));
-            bills.add(buildUtilityBill(household, UtilityType.WATER, month, year,
-                    randomAmount(50_000, 400_000)));
-            bills.add(buildUtilityBill(household, UtilityType.INTERNET, month, year,
-                    randomAmount(200_000, 350_000)));
-        }
-        utilityBillRepository.saveAll(bills);
+        System.out.printf("[InitialDataConfig] Đã tạo %d loại phí, %d kỳ thu phí.%n",
+                fees.size(), fees.size());
+    }
 
-        System.out.printf("[InitialDataConfig] Đã tạo %d loại phí, %d kỳ thu phí, %d hoá đơn sinh hoạt.%n",
-                fees.size(), fees.size(), bills.size());
+    // Seed đơn giá gốc dùng chung cho hoá đơn điện/nước/internet (Admin import dùng để tính tiền).
+    private void seedSystemConfigs() {
+        saveConfigIfAbsent(SystemConfig.ELECTRICITY_UNIT_PRICE, BigDecimal.valueOf(3_500),
+                "Đơn giá 1 số điện (đ/kWh)");
+        saveConfigIfAbsent(SystemConfig.WATER_UNIT_PRICE, BigDecimal.valueOf(15_000),
+                "Đơn giá 1 khối nước (đ/m³)");
+        saveConfigIfAbsent(SystemConfig.INTERNET_PRICE, BigDecimal.valueOf(250_000),
+                "Giá gói internet/tháng (đ)");
+        saveConfigIfAbsent(SystemConfig.MOTORBIKE_PARKING_PRICE, BigDecimal.valueOf(70_000),
+                "Phí gửi xe máy/tháng (đ)");
+        saveConfigIfAbsent(SystemConfig.CAR_PARKING_PRICE, BigDecimal.valueOf(1_200_000),
+                "Phí gửi ô tô/tháng (đ)");
+    }
+
+    private void saveConfigIfAbsent(String key, BigDecimal value, String description) {
+        if (!systemConfigRepository.existsByConfigKey(key)) {
+            systemConfigRepository.save(new SystemConfig(null, key, value, description));
+        }
+    }
+
+    private BigDecimal getSystemConfigValue(String key) {
+        return systemConfigRepository.findByConfigKey(key)
+                .map(SystemConfig::getConfigValue)
+                .orElseThrow(() -> new IllegalStateException("Missing system config: " + key));
     }
 
     private Fee buildFee(String name, String type, String unit, BigDecimal unitPrice, String description) {
@@ -387,18 +428,6 @@ public class InitialDataConfig implements CommandLineRunner {
         fee.setDescription(description);
         fee.setActive(true);
         return fee;
-    }
-
-    private UtilityBill buildUtilityBill(Household household, UtilityType type,
-                                         int month, int year, BigDecimal amount) {
-        UtilityBill bill = new UtilityBill();
-        bill.setHousehold(household);
-        bill.setType(type);
-        bill.setMonth(month);
-        bill.setYear(year);
-        bill.setAmount(amount);
-        bill.setStatus(UtilityBillStatus.UNPAID);
-        return bill;
     }
 
     // Tương tác – Phản ánh & Thông báo
@@ -482,12 +511,6 @@ public class InitialDataConfig implements CommandLineRunner {
     // Ngày ngẫu nhiên trong khoảng [hôm nay - maxDaysAgo, hôm nay].
     private LocalDate randomPastDate(int maxDaysAgo) {
         return LocalDate.now().minusDays(random.nextInt(maxDaysAgo + 1));
-    }
-
-    // Số tiền ngẫu nhiên (đồng), làm tròn xuống bội của 1.000đ
-    private BigDecimal randomAmount(int minInclusive, int maxInclusive) {
-        int value = minInclusive + random.nextInt(maxInclusive - minInclusive + 1);
-        return BigDecimal.valueOf((value / 1000) * 1000L);
     }
 
     // Số điện thoại di động dạng 0xxxxxxxxx (10 số).

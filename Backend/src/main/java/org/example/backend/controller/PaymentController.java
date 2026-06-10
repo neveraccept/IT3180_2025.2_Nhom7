@@ -3,6 +3,7 @@ package org.example.backend.controller;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
+import org.example.backend.dto.request.ConfirmCashPaymentRequest;
 import org.example.backend.entity.Household;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.security.CurrentUserService;
@@ -52,17 +53,18 @@ public class PaymentController {
         return h.getId();
     }
 
-    //  Admin xem / lọc phiếu nộp (theo householdId, status)
-    //  GET /api/admin/payments?householdId=&status=
+    //  Admin xem / lọc phiếu nộp (theo householdId, status, tên khoản thu)
+    //  GET /api/admin/payments?householdId=&status=&keyword=
     @GetMapping("/api/admin/payments")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<PaymentDetailDTO>>> list(
             @RequestParam(required = false) Long householdId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)
             Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.ok(
-                paymentService.listPayments(householdId, status, pageable)));
+                paymentService.listPayments(householdId, status, keyword, pageable)));
     }
 
     //  Admin xác nhận đã nộp đủ tiền mặt
@@ -71,8 +73,10 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PaymentDetailDTO>> confirmCash(
             @PathVariable Long id,
+            @RequestBody(required = false) ConfirmCashPaymentRequest req,
             @AuthenticationPrincipal CustomUserDetails admin) {
-        PaymentDetailDTO dto = paymentService.confirmCashPayment(id, admin.getUser().getId());
+        java.math.BigDecimal customAmount = req != null ? req.amount() : null;
+        PaymentDetailDTO dto = paymentService.confirmCashPayment(id, admin.getUser().getId(), customAmount);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Xác nhận nộp tiền mặt thành công"));
     }
 }

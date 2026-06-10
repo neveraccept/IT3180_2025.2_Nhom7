@@ -1,5 +1,7 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.VehicleDTO;
 import org.example.backend.dto.request.RegisterVehicleRequest;
@@ -50,6 +52,8 @@ public class VehicleService {
     }
 
     // F6.1 - Đăng ký xe cho hộ.
+    @LogAdminAction(entity = "Vehicle", action = "CREATE", description = "Đăng ký xe cho hộ",
+            detail = "'Biển số ' + #result.licensePlate() + ' - hộ ' + #result.householdCode()")
     @Transactional
     public VehicleDTO register(RegisterVehicleRequest req) {
         String plate = req.licensePlate().trim();
@@ -73,6 +77,8 @@ public class VehicleService {
     }
 
     // F6.2 - Cập nhật thông tin xe.
+    @LogAdminAction(entity = "Vehicle", action = "UPDATE", description = "Cập nhật thông tin xe",
+            detail = "'Biển số ' + #result.licensePlate()")
     @Transactional
     public VehicleDTO update(Long id, UpdateVehicleRequest req) {
         Vehicle v = requireVehicle(id);
@@ -94,11 +100,13 @@ public class VehicleService {
     }
 
     // F6.2 - Huỷ đăng ký xe (soft delete) + trả chỗ gửi về EMPTY.
+    @LogAdminAction(entity = "Vehicle", action = "DELETE", description = "Huỷ đăng ký xe & trả chỗ gửi")
     @Transactional
     public void cancel(Long id) {
         Vehicle v = requireVehicle(id);
         v.setActive(false);
         vehicleRepository.save(v);
+        AuditContext.detail("Huỷ đăng ký xe biển số " + v.getLicensePlate());
 
         registrationRepository
                 .findByVehicleIdAndStatus(id, ParkingRegistrationStatus.ACTIVE)

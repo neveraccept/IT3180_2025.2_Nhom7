@@ -1,6 +1,6 @@
 // ============================================================
 //  RegisterPage — cư dân tự đăng ký (UC-REGISTER), bước 1: nhập thông tin
-//  Gửi OTP (POST /api/auth/register/send-otp) -> chuyển sang /verify-otp
+//  Gửi OTP (POST /api/auth/send-otp, purpose=REGISTER) -> chuyển sang /verify-otp
 //  mang theo payload đăng ký để OtpVerifyPage hoàn tất.
 // ============================================================
 import { useState } from "react";
@@ -79,7 +79,7 @@ export function RegisterPage() {
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }}>
         <div className="grid gap-4 md:grid-cols-2">
           <Input label="Họ tên" placeholder="Nguyễn Văn A" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <Input label="Mã căn hộ" placeholder="1201" value={apartment} onChange={(e) => setApartment(e.target.value)} />
+          <Input label="Mã căn hộ" placeholder="A12-01" value={apartment} onChange={(e) => setApartment(e.target.value)} />
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Input label="Email" type="email" placeholder="name@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />

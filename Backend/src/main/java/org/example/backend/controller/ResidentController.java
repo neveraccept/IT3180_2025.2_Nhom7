@@ -73,4 +73,10 @@ public class ResidentController {
         return ApiResponse.ok(residentService.registerTemporaryResidence(id), "Đăng ký tạm trú thành công");
     }
 
+    // Đăng ký thường trú
+    @PutMapping("/{id}/permanent-residence")
+    public ApiResponse<ResidentDetailDTO> registerPermanentResidence(@PathVariable Long id) {
+        return ApiResponse.ok(residentService.registerPermanentResidence(id), "Đăng ký thường trú thành công");
+    }
+
 }

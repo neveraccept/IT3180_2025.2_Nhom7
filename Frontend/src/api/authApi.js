@@ -25,18 +25,49 @@ export const loginAPI = async (username, password) => {
 // POST /api/auth/register -> tạo tài khoản cư dân (active=false, chờ Admin duyệt)
 export const registerAPI = (payload) => callApi(axiosClient.post("/api/auth/register", payload));
 
-// PUT /api/auth/me/password -> đổi mật khẩu (đã đăng nhập)
-export const changePasswordAPI = (payload) => callApi(axiosClient.put("/api/auth/me/password", payload));
+// PUT /api/me/password -> đổi mật khẩu (đã đăng nhập)
+export const changePasswordAPI = (payload) => callApi(axiosClient.put("/api/me/password", payload));
 
-// GET /api/auth/me/profile -> { id, username, phone, role }
-export const getProfileAPI = () => callApi(axiosClient.get("/api/auth/me/profile"));
+// GET /api/me/profile -> { id, username, fullName, email, phone, role, apartmentCode }
+export const getProfileAPI = () => callApi(axiosClient.get("/api/me/profile"));
 
-// PUT /api/auth/me/profile -> backend chỉ nhận { username, phone }
-export const updateProfileAPI = (payload) => callApi(axiosClient.put("/api/auth/me/profile", payload));
+// PUT /api/me/profile/update -> backend chỉ nhận { username, phone }
+export const updateProfileAPI = (payload) => callApi(axiosClient.put("/api/me/profile/update", payload));
 
-// POST /api/auth/createAccount -> Admin tạo tài khoản nội bộ (ADMIN/RESIDENT)
+// ----- Quản lý tài khoản (UserController, /api/users — chỉ ADMIN) -----
+
+// GET /api/users -> danh sách TẤT CẢ tài khoản
+export const getAllUsersAPI = () => callApi(axiosClient.get("/api/users"));
+
+// GET /api/users/pending -> danh sách tài khoản cư dân đang chờ duyệt
+export const getPendingAccountsAPI = () => callApi(axiosClient.get("/api/users/pending"));
+
+// POST /api/users -> Admin tạo tài khoản nội bộ (ADMIN/RESIDENT)
 export const createInternalAccountAPI = (payload) =>
-  callApi(axiosClient.post("/api/auth/createAccount", payload));
+  callApi(axiosClient.post("/api/users", payload));
 
-// PUT /api/auth/{id}/approve -> Admin duyệt tài khoản cư dân
-export const approveAccountAPI = (id) => callApi(axiosClient.put(`/api/auth/${id}/approve`));
+// PUT /api/users/{id}/approve -> Admin duyệt tài khoản cư dân.
+// payload (tùy chọn) gắn/tạo nhân khẩu cho tài khoản:
+//   { linkResidentId?, idCard?, dateOfBirth?, gender?, relationToHead?, residencyStatus?, newHouseholdCode?, moveInDate? }
+export const approveAccountAPI = (id, payload) =>
+  callApi(axiosClient.put(`/api/users/${id}/approve`, payload || {}));
+
+// DELETE /api/users/{id}/reject -> Admin từ chối & xóa tài khoản chờ duyệt
+export const rejectAccountAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}/reject`));
+
+// PUT /api/users/{id} -> Admin cập nhật thông tin tài khoản
+export const updateUserAPI = (id, payload) => callApi(axiosClient.put(`/api/users/${id}`, payload));
+
+// DELETE /api/users/{id} -> Admin xóa mềm tài khoản (đặt deleted = true ở backend)
+export const deleteUserAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}`));
+
+// POST /api/users/grant-access -> Admin cấp tài khoản đăng nhập cho 1 nhân khẩu
+// payload: { residentId } -> { userId, username, temporaryPassword, role, residentId, residentName }
+export const grantAccessAPI = (residentId) =>
+  callApi(axiosClient.post("/api/users/grant-access", { residentId }));
+
+// PUT /api/users/{id}/lock -> khóa tài khoản (active=false)
+export const lockUserAPI = (id) => callApi(axiosClient.put(`/api/users/${id}/lock`));
+
+// PUT /api/users/{id}/unlock -> mở khóa tài khoản (active=true)
+export const unlockUserAPI = (id) => callApi(axiosClient.put(`/api/users/${id}/unlock`));

@@ -24,7 +24,7 @@ public class Fee {
     private BigDecimal unitPrice;
 
     @Column(nullable = false, length = 20)
-    private String unit; // PER_M2, PER_VEHICLE, FIXED, NONE
+    private String unit; // PER_M2, PER_PERSON, PER_HOUSEHOLD, PER_VEHICLE, FIXED, NONE
 
     @Column(columnDefinition = "TEXT")
     private String description;

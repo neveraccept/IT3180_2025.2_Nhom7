@@ -17,5 +17,6 @@ public record ResidentDetailDTO(
         ResidentStatus status,
         Long householdId,
         String householdCode,
-        String apartmentCode
+        String apartmentCode,
+        Boolean headOfHousehold
 ) {}

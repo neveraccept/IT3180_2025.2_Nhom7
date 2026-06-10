@@ -26,3 +26,28 @@ export const updateHouseholdAPI = (apartmentId, payload) =>
 // Tiện ích: chuyển hộ ra khỏi căn hộ
 export const moveOutHouseholdAPI = (apartmentId) =>
   updateHouseholdAPI(apartmentId, { action: "MOVE_OUT" });
+
+// ============================================================
+//  API theo "hành động nghiệp vụ" — lấy Hộ gia đình làm trung tâm
+//  (HouseholdController /api/households, ROLE_ADMIN)
+// ============================================================
+
+// Action 1 – Bàn giao nhà: POST /api/households/move-in
+// payload: { apartmentCode, householdCode, moveInDate,
+//   headOfHousehold: { fullName, idCard, dateOfBirth, gender, relationToHead, residencyStatus }, createAccount }
+// -> { household: HouseholdSummaryDTO, account: AccountCreatedDTO|null }
+export const moveInAPI = (payload) =>
+  callApi(axiosClient.post("/api/households/move-in", payload));
+
+// Action 2 – Thêm nhân khẩu vào hộ: POST /api/households/{householdId}/members
+// payload: { fullName, idCard, dateOfBirth, gender, relationToHead, residencyStatus? }
+export const addMemberAPI = (householdId, payload) =>
+  callApi(axiosClient.post(`/api/households/${householdId}/members`, payload));
+
+// Action 4 – Chuyển cả hộ đi: POST /api/households/{householdId}/move-out
+export const moveOutByHouseholdIdAPI = (householdId) =>
+  callApi(axiosClient.post(`/api/households/${householdId}/move-out`));
+
+// GET /api/households/{householdId}/accounts -> danh sách UserDTO gắn với hộ
+export const getHouseholdAccountsAPI = (householdId) =>
+  callApi(axiosClient.get(`/api/households/${householdId}/accounts`));
