@@ -9,12 +9,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.Random;
 
 @Service
 public class OtpService {
+
+    // SecureRandom (an toàn mật mã) thay cho java.util.Random vốn có thể đoán trước được.
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final EmailOtpRepository emailOtpRepo;
     private final PasswordEncoder passwordEncoder;
@@ -39,8 +42,12 @@ public class OtpService {
             throw new RuntimeException("Vui lòng thử lại sau. Bạn đã vượt quá số lần yêu cầu OTP cho phép.");
         }
 
-        // Tạo hàm sinh mã OTP ngẫu nhiên gồm 6 chữ số
-        String plainOtp = String.format("%06d", new Random().nextInt(999999));
+        // Sinh mã OTP ngẫu nhiên gồm 6 chữ số (000000..999999) bằng SecureRandom
+        String plainOtp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+
+        // Vô hiệu hoá các OTP cũ chưa dùng cùng email + mục đích trước khi lưu mã mới,
+        // để chỉ duy nhất mã mới nhất còn hiệu lực.
+        emailOtpRepo.invalidateActiveOtps(email, purposeRequest);
 
         // Băm mã OTP bằng BCrypt trước khi lưu vào cơ sở dữ liệu
         String hashedOtp = passwordEncoder.encode(plainOtp);

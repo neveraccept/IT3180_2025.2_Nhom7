@@ -2,6 +2,7 @@ package org.example.backend.repository;
 
 import org.example.backend.entity.EmailOtp;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,5 +22,9 @@ public interface EmailOtpRepository extends JpaRepository<EmailOtp, Long> {
     @Query(value = "SELECT COUNT(*) FROM email_otps WHERE email = :email AND created_at > (NOW() - INTERVAL 15 MINUTE)", nativeQuery = true)
     int countRecentOtps(@Param("email") String email);
 
-
+    // Vô hiệu hoá toàn bộ OTP chưa dùng của một email + mục đích trước khi sinh mã mới,
+    // tránh để các OTP cũ vẫn còn hiệu lực (used = false) song song với mã mới nhất.
+    @Modifying
+    @Query("UPDATE EmailOtp e SET e.used = true WHERE e.email = :email AND e.purpose = :purpose AND e.used = false")
+    int invalidateActiveOtps(@Param("email") String email, @Param("purpose") String purpose);
 }

@@ -16,7 +16,7 @@ public record CreateResidentRequest(
         String fullName,
 
         @NotBlank(message = "CCCD/CMND không được để trống")
-        @Pattern(regexp = "^[0-9]{9}|[0-9]{12}$", message = "CCCD/CMND phải là 9 hoặc 12 chữ số")
+        @Pattern(regexp = "^([0-9]{9}|[0-9]{12})$", message = "CCCD/CMND phải là 9 hoặc 12 chữ số")
         String idCard,
 
         @NotNull(message = "Ngày sinh không được để trống")

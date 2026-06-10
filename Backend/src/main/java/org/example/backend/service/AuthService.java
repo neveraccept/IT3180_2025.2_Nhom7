@@ -11,6 +11,8 @@ import org.example.backend.repository.ApartmentRepository;
 import org.example.backend.repository.HouseholdRepository;
 import org.example.backend.repository.*;
 import org.example.backend.security.JwtUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -20,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+	private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
 	private final UserRepository userRepo;
 	private final RoleRepository roleRepo;
 	private final EmailOtpRepository emailOtpRepo;
@@ -139,7 +143,14 @@ public class AuthService {
 			// Nếu có, sinh OTP và gửi mail
 			OtpRequest otpRequest = new OtpRequest(email); //, "FORGOT_PASSWORD");
 			String plainOtp = otpService.generateAndSaveOtp(otpRequest, "FORGOT_PASSWORD");
-			emailService.sendOtpEmail(email, plainOtp, "FORGOT_PASSWORD");
+			try {
+				emailService.sendOtpEmail(email, plainOtp, "FORGOT_PASSWORD");
+			} catch (Exception e) {
+				// Nuốt lỗi gửi mail (vd SMTP lỗi) và CHỈ ghi log. Nếu để lỗi lan ra,
+				// client sẽ nhận 400 khi email tồn tại nhưng 200 khi email không tồn tại
+				// -> lộ việc email có trong hệ thống, phá vỡ cơ chế chống dò quét email.
+				log.warn("Gửi OTP quên mật khẩu thất bại: {}", e.getMessage());
+			}
 		}
 		// Nếu không tồn tại: không làm gì cả để tránh bị dò quét email.
 		// Controller vẫn sẽ trả về thông báo thành công chung chung.
