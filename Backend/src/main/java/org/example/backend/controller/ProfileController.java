@@ -7,7 +7,6 @@ import org.example.backend.dto.request.UpdateProfileRequest;
 import org.example.backend.dto.UserProfileDTO;
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.ProfileService;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
