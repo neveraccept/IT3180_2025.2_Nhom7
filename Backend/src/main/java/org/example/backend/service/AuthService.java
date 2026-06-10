@@ -62,9 +62,19 @@ public class AuthService {
 			throw new IllegalArgumentException("Email đã được sử dụng!");
 		}
 
-		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.email(), "REGISTER")
+		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true) VÀ phiên xác thực còn hiệu lực.
+		// Lấy mã OTP REGISTER mới nhất đã xác thực để ràng buộc đăng ký vào đúng phiên xác thực đó,
+		// tránh việc tái sử dụng một lần xác thực cũ không giới hạn thời gian.
+		var verifiedOtp = emailOtpRepo
+				.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.email(), "REGISTER")
 				.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+
+		// Cửa sổ hoàn tất đăng ký: 10 phút kể từ lúc sinh mã OTP (tách biệt với hạn xác thực OTP 5 phút).
+		// Quá hạn này buộc người dùng xác thực lại để khoá chặt phiên đăng ký theo thời gian.
+		java.time.LocalDateTime registrationDeadline = verifiedOtp.getCreatedAt().plusMinutes(10);
+		if (java.time.LocalDateTime.now().isAfter(registrationDeadline)) {
+			throw new IllegalArgumentException("Phiên xác thực đã hết hạn. Vui lòng xác thực lại mã OTP trước khi đăng ký!");
+		}
 
 		// Lấy Role RESIDENT từ Database
 		Role residentRole = roleRepo.findByName("RESIDENT")
