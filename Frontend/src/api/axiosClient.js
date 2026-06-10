@@ -41,6 +41,20 @@ export const clearStoredAuth = () => {
   }
 };
 
+let authFailureHandler = null;
+
+export const setAuthFailureHandler = (handler) => {
+  authFailureHandler = handler;
+  return () => {
+    if (authFailureHandler === handler) authFailureHandler = null;
+  };
+};
+
+function handleAuthFailure() {
+  clearStoredAuth();
+  authFailureHandler?.();
+}
+
 // ---------- Instance axios ----------
 const axiosClient = axios.create({
   baseURL: BASE_URL,
@@ -54,6 +68,17 @@ axiosClient.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+axiosClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    if ((status === 401 || status === 403) && getToken()) {
+      handleAuthFailure();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ---------- Chuẩn hoá kết quả ----------
 // Bọc mọi lời gọi axios để page nhận về cùng một shape, không phải try/catch lặp lại.

@@ -1,5 +1,6 @@
 package org.example.backend.controller;
 
+import jakarta.validation.Valid;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.PaymentDetailDTO;
@@ -73,7 +74,7 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PaymentDetailDTO>> confirmCash(
             @PathVariable Long id,
-            @RequestBody(required = false) ConfirmCashPaymentRequest req,
+            @Valid @RequestBody(required = false) ConfirmCashPaymentRequest req,
             @AuthenticationPrincipal CustomUserDetails admin) {
         java.math.BigDecimal customAmount = req != null ? req.amount() : null;
         PaymentDetailDTO dto = paymentService.confirmCashPayment(id, admin.getUser().getId(), customAmount);

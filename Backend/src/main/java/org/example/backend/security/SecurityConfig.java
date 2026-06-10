@@ -52,7 +52,7 @@ public class SecurityConfig {
                                 "/api/me/**",
                                 "/api/payments/my-household",
                                 "/api/utility-bills/my-household",
-                                "/api/payments/vnpay/create",
+                                "/api/payments/vnpay/create-url",
                                 "/api/payments/vnpay/my-history"
                         ).authenticated()
 

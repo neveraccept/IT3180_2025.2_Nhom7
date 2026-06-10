@@ -37,7 +37,6 @@ public class ProfileService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + userId));
 
-        user.setUsername(request.username());
         user.setPhone(request.phone());
 
         user = userRepo.save(user);

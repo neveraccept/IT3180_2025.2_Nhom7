@@ -2,7 +2,7 @@
 //  AuthContext — lưu JWT + thông tin user, khôi phục phiên khi tải lại trang
 // ============================================================
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { getStoredAuth, setStoredAuth, clearStoredAuth } from "../api/axiosClient";
+import { getStoredAuth, setStoredAuth, clearStoredAuth, setAuthFailureHandler } from "../api/axiosClient";
 
 const AuthContext = createContext(null);
 
@@ -29,6 +29,8 @@ export function AuthProvider({ children }) {
     setUser(toUser(getStoredAuth()));
     setInitializing(false);
   }, []);
+
+  useEffect(() => setAuthFailureHandler(() => setUser(null)), []);
 
   // Gọi sau khi loginAPI thành công (nhận object auth đã lưu localStorage).
   const loginWithAuth = useCallback((auth) => {
