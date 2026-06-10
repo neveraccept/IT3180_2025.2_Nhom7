@@ -29,6 +29,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     /** Số phiếu thu đã sinh cho một đợt thu — dùng để backfill những đợt chưa có phiếu. */
     long countByFeePeriod_Id(Long feePeriodId);
 
+    /** Id các phiếu thu của một đợt theo trạng thái — dùng khi đóng đợt để rà soát giao dịch batch còn treo. */
+    @Query("SELECT p.id FROM Payment p WHERE p.feePeriod.id = :feePeriodId AND p.status = :status")
+    java.util.List<Long> findIdsByFeePeriodAndStatus(@Param("feePeriodId") Long feePeriodId,
+                                                     @Param("status") String status);
+
     @Query(value = """
             SELECT p FROM Payment p
             LEFT JOIN FETCH p.feePeriod fp

@@ -26,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class FeePeriodService {
@@ -164,12 +166,68 @@ public class FeePeriodService {
                 .orElseThrow(() -> new NotFoundException("FEE_PERIOD_NOT_FOUND", "Đợt thu phí không tồn tại"));
         feePeriod.setStatus("CLOSED");
         feePeriodRepository.save(feePeriod);
+
+        // 1) Huỷ các giao dịch đơn lẻ (FEE_PAYMENT) đang PENDING của đợt này.
         paymentTransactionRepository.updatePendingFeeTransactionsByFeePeriod(
                 id,
                 PaymentTransaction.TARGET_FEE_PAYMENT,
                 PaymentTransaction.STATUS_PENDING,
                 PaymentTransaction.STATUS_CANCELLED);
+
+        // 2) Huỷ thêm các giao dịch batch (FEE_PAYMENT_BATCH / MIXED_PAYMENT_BATCH) đang PENDING
+        //    có chứa phiếu thu thuộc đợt vừa đóng — nếu không, cư dân vẫn có thể hoàn tất
+        //    thanh toán VNPay cho một đợt đã CLOSED qua luồng batch.
+        cancelPendingBatchTransactionsOfPeriod(id);
+
         AuditContext.detail("Đóng đợt thu: " + feePeriod.getName());
+    }
+
+    /**
+     * Quét các giao dịch batch đang PENDING và huỷ những giao dịch có ít nhất một phiếu thu
+     * UNPAID thuộc đợt thu vừa đóng. Danh sách phiếu của batch được lưu dạng chuỗi id
+     * (cách nhau dấu phẩy) trong cột {@code targetIds}.
+     */
+    private void cancelPendingBatchTransactionsOfPeriod(Long feePeriodId) {
+        Set<Long> unpaidPaymentIds = new HashSet<>(
+                paymentRepository.findIdsByFeePeriodAndStatus(feePeriodId, Payment.STATUS_UNPAID));
+        if (unpaidPaymentIds.isEmpty()) {
+            return;
+        }
+
+        List<PaymentTransaction> pendingBatches = paymentTransactionRepository.findByTargetTypeInAndStatus(
+                List.of(PaymentTransaction.TARGET_FEE_PAYMENT_BATCH,
+                        PaymentTransaction.TARGET_MIXED_PAYMENT_BATCH),
+                PaymentTransaction.STATUS_PENDING);
+
+        List<PaymentTransaction> toCancel = new ArrayList<>();
+        for (PaymentTransaction tx : pendingBatches) {
+            if (batchContainsAnyPayment(tx.getTargetIds(), unpaidPaymentIds)) {
+                tx.setStatus(PaymentTransaction.STATUS_CANCELLED);
+                toCancel.add(tx);
+            }
+        }
+        if (!toCancel.isEmpty()) {
+            paymentTransactionRepository.saveAll(toCancel);
+        }
+    }
+
+    /** Kiểm tra chuỗi id phiếu thu (vd "12,15,20") có giao với tập phiếu của đợt vừa đóng không. */
+    private boolean batchContainsAnyPayment(String targetIds, Set<Long> paymentIds) {
+        if (targetIds == null || targetIds.isBlank()) {
+            return false;
+        }
+        for (String part : targetIds.split(",")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
+            try {
+                if (paymentIds.contains(Long.valueOf(trimmed))) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {
+                // Bỏ qua phần tử không phải số.
+            }
+        }
+        return false;
     }
 
     private FeePeriodDTO convertToDto(FeePeriod entity) {
