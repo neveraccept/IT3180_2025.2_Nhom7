@@ -58,10 +58,8 @@ public class ProfileController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ChangePasswordRequest request) {
 
-        // 1. Gọi Service Layer xử lý logic đổi mật khẩu
         profileService.changePassword(currentUser.getId(), request);
 
-        // 2. Bọc kết quả vào cấu trúc ApiResponse chuẩn hóa của dự án
         ApiResponse<Void> response = new ApiResponse<>(
                 true,
                 null,

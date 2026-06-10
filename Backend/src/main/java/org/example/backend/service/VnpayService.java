@@ -73,7 +73,6 @@ public class VnpayService {
         String received = incoming.get("vnp_SecureHash");
         if (received == null || received.isBlank()) return false;
 
-        // Loại bỏ trường chữ ký rồi sắp xếp phần còn lại
         TreeMap<String, String> params = new TreeMap<>(incoming);
         params.remove("vnp_SecureHash");
         params.remove("vnp_SecureHashType");

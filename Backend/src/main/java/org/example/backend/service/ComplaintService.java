@@ -135,8 +135,6 @@ public class ComplaintService {
         return mapper.toDto(saved);
     }
 
-    // Helpers
-
     private Complaint requireComplaint(Long id) {
         return complaintRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(

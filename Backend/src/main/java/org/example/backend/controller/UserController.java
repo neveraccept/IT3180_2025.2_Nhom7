@@ -58,7 +58,6 @@ public class UserController {
                 errorCode = "ROLE_NOT_FOUND";
             }
 
-            // Trả về mã lỗi 400 kèm chính xác ErrorCode và câu thông báo
             return ResponseEntity.badRequest().body(ApiResponse.error(errorCode, errorMsg));
 
         } catch (Exception ex) {

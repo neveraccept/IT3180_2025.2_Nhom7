@@ -121,7 +121,7 @@ public class AuthService {
 		// 4. Sinh JWT Token thông qua Provider
 		String accessToken = jwtTokenProvider.generateToken(user);
 
-		// 5. Trích xuất Household ID (nếu tài khoản đã được gán vào hộ dân)
+		// 5. Trích xuất Household ID nếu tài khoản đã được gán vào hộ dân
 		Long householdId = user.getHousehold() != null ? user.getHousehold().getId() : null;
 
 		// 6. Đóng gói và trả về DTO
@@ -145,9 +145,6 @@ public class AuthService {
 			try {
 				emailService.sendOtpEmail(email, plainOtp, "FORGOT_PASSWORD");
 			} catch (Exception e) {
-				// Nuốt lỗi gửi mail (vd SMTP lỗi) và CHỈ ghi log. Nếu để lỗi lan ra,
-				// client sẽ nhận 400 khi email tồn tại nhưng 200 khi email không tồn tại
-				// -> lộ việc email có trong hệ thống, phá vỡ cơ chế chống dò quét email.
 				log.warn("Gửi OTP quên mật khẩu thất bại: {}", e.getMessage());
 			}
 		}
