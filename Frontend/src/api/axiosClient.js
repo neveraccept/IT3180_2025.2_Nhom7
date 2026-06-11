@@ -12,12 +12,45 @@ const BASE_URL =
   "http://localhost:9090";
 
 const AUTH_STORAGE_KEY = "bluemoon_auth";
+const LAST_SEEN_KEY = "bluemoon_last_seen";
+
+// Idle timeout: nếu tab đóng (ngừng cập nhật lastSeen) lâu hơn mốc này thì
+// phiên bị coi là hết hạn -> phải đăng nhập lại. Trong lúc tab đang mở,
+// AuthContext cập nhật lastSeen định kỳ nên phiên sống tới hạn token (24h).
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 phút
+
+// ---------- Dấu hiệu "phiên còn sống" ----------
+// Gọi định kỳ khi tab đang mở để gia hạn mốc lastSeen.
+export const touchSession = () => {
+  try {
+    localStorage.setItem(LAST_SEEN_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+};
+
+// Vắng mặt (không cập nhật lastSeen) quá IDLE_TIMEOUT_MS -> hết phiên.
+const isIdleExpired = () => {
+  try {
+    const raw = localStorage.getItem(LAST_SEEN_KEY);
+    if (!raw) return false; // chưa có mốc -> chưa coi là hết hạn
+    return Date.now() - Number(raw) > IDLE_TIMEOUT_MS;
+  } catch {
+    return false;
+  }
+};
 
 // ---------- Lưu trữ phiên đăng nhập (token + thông tin user) ----------
 export const getStoredAuth = () => {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    if (isIdleExpired()) {
+      // Tắt trang quá lâu -> xoá phiên, buộc đăng nhập lại.
+      clearStoredAuth();
+      return null;
+    }
+    return JSON.parse(raw);
   } catch {
     return null;
   }
@@ -28,6 +61,7 @@ export const getToken = () => getStoredAuth()?.token || null;
 export const setStoredAuth = (auth) => {
   try {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    touchSession(); // đánh dấu phiên còn sống ngay khi đăng nhập
   } catch {
     // Trình duyệt chặn localStorage -> phiên chỉ tồn tại trong bộ nhớ.
   }
@@ -36,6 +70,7 @@ export const setStoredAuth = (auth) => {
 export const clearStoredAuth = () => {
   try {
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(LAST_SEEN_KEY);
   } catch {
     // ignore
   }

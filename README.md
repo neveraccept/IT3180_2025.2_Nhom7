@@ -141,7 +141,7 @@ trong `application.properties`. `vnpay.frontend-return-url` đã trỏ về `htt
 
 ## 🔑 Tài khoản mẫu
 
-Khi khởi động, hệ thống tự seed 2 tài khoản:
+Khi khởi động, hệ thống tự seed tài khoản admin và ~100 tài khoản cư dân mẫu (phân bố ngẫu nhiên trong 100 căn hộ). Dưới đây là:
 
 | Vai trò | Username | Mật khẩu | Ghi chú |
 |---------|----------|----------|---------|
