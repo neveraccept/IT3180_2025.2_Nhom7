@@ -226,18 +226,22 @@ F. Phần mềm quản lý thu phí chung cư BlueMoon
 │   ├── F5.9 Backend kiểm tra chữ ký phản hồi từ VNPay
 │   ├── F5.10 Backend cập nhật trạng thái giao dịch và khoản phải thu tương ứng
 │   ├── F5.11 Cư dân xem lịch sử giao dịch online của hộ mình
-│   └── F5.12 Admin tra cứu toàn bộ giao dịch thanh toán online
+│   ├── F5.12 Admin tra cứu toàn bộ giao dịch thanh toán online
+│   └── F5.13 Cư dân thanh toán gộp nhiều khoản trong một giao dịch online (FEE_PAYMENT_BATCH / MIXED_PAYMENT_BATCH)
 ├── M6. Quản lý phí gửi xe
 │   ├── F6.1 Đăng ký gửi xe (xe máy/ô tô) cho hộ
 │   ├── F6.2 Cập nhật / huỷ đăng ký gửi xe
 │   ├── F6.3 Tra cứu danh sách xe theo hộ
 │   ├── F6.4 Quản lý chỗ gửi xe (số chỗ tổng / đã dùng / còn trống)
-│   └── F6.5 Cho thuê chỗ gửi xe thừa (cho người ngoài hộ)
+│   ├── F6.5 Cho thuê chỗ gửi xe thừa (cho người ngoài hộ)
+│   └── F6.6 Sinh phí gửi xe theo tháng từ các đăng ký đang ACTIVE (POST /api/admin/parking-fees/generate)
 ├── M7. Quản lý phí điện, nước, internet
 │   ├── F7.1 Nhập hoá đơn điện/nước/internet theo hộ và theo tháng
 │   ├── F7.2 Sửa / xoá hoá đơn
 │   ├── F7.3 Ghi nhận hộ đã nộp tiền hoá đơn
-│   └── F7.4 Tra cứu hoá đơn theo hộ
+│   ├── F7.4 Tra cứu hoá đơn theo hộ
+│   ├── F7.5 Nhập hoá đơn tiện ích hàng loạt từ file Excel (có template tải sẵn)
+│   └── F7.6 Sinh hoá đơn điện/nước/internet theo tháng từ đơn giá cấu hình (POST /api/admin/utility-fees/generate)
 ├── M8. Quản lý khiếu nại
 │   ├── F8.1 Cư dân gửi khiếu nại
 │   ├── F8.2 Admin xem danh sách khiếu nại
@@ -294,6 +298,9 @@ F. Phần mềm quản lý thu phí chung cư BlueMoon
 | **FR-26** | **Hệ thống tự động ghi nhật ký (audit log) các thao tác quản trị (tạo/sửa/xoá) và cho phép Admin tra cứu** | **M11** |
 | **FR-27** | **Hệ thống xoá mềm tài khoản (đặt `deleted = TRUE`), không xoá vật lý; tài khoản đã xoá mềm không đăng nhập được** | **M11** |
 | **FR-28** | **Hệ thống cho phép Admin quản lý đơn giá cấu hình (điện/nước/internet, phí gửi xe) dùng để sinh hoá đơn/khoản thu** | **M11** |
+| **FR-29** | **Hệ thống cho phép Admin nhập hoá đơn tiện ích hàng loạt từ file Excel (kèm template tải sẵn)** | **M7** |
+| **FR-30** | **Hệ thống cho phép Admin sinh hoá đơn điện/nước/internet và phí gửi xe theo tháng từ đơn giá cấu hình và các đăng ký đang ACTIVE** | **M6, M7** |
+| **FR-31** | **Hệ thống cho phép cư dân thanh toán gộp nhiều khoản phí/hoá đơn trong một giao dịch online (thanh toán theo batch)** | **M5** |
 
 ### 3.4 Yêu cầu phi chức năng (Non-Functional Requirements)
 
@@ -653,7 +660,7 @@ Ghi chú: H4 (ghi audit log) không phải thao tác thủ công của Admin mà
 | **Tiền điều kiện** | Người dùng đã có tài khoản, tài khoản chưa bị khoá và đã được duyệt (`active = TRUE`) |
 | **Hậu điều kiện** | Người dùng nhận được JWT và vào trang chính |
 | **Luồng chính** | 1. Người dùng nhập username + mật khẩu<br>2. Hệ thống kiểm tra username trong CSDL<br>3. Hệ thống so sánh mật khẩu băm BCrypt<br>4. Hệ thống sinh JWT chứa userId + role<br>5. Hệ thống trả JWT cho frontend<br>6. Frontend lưu JWT và chuyển sang trang chính theo role |
-| **Luồng phụ** | Sai mật khẩu lần 5 trong 10 phút → khoá tạm 15 phút |
+| **Luồng phụ** | Không có. Hệ thống không tự khoá tạm sau số lần sai mật khẩu; tài khoản chỉ bị vô hiệu khi `active = FALSE` (Admin chưa duyệt hoặc đã khoá tài khoản) |
 | **Ngoại lệ** | Username không tồn tại → "Tài khoản không tồn tại"<br>Mật khẩu sai → "Mật khẩu không đúng"<br>Tài khoản bị khoá → "Tài khoản đã bị khoá"<br>`active = FALSE` → "Tài khoản chưa được duyệt" |
 
 #### UC-REGISTER: Cư dân tự đăng ký tài khoản
@@ -733,7 +740,13 @@ Ghi chú: H4 (ghi audit log) không phải thao tác thủ công của Admin mà
 | **Luồng phụ** | Cư dân huỷ thanh toán trên VNPay → VNPay trả `vnp_ResponseCode = "24"` → cập nhật `status = CANCELLED` |
 | **Ngoại lệ** | - Thanh toán thất bại (`vnp_ResponseCode ≠ "00"` và ≠ `"24"`) → `status = FAILED`<br>- Phản hồi sai chữ ký → từ chối, ghi log cảnh báo, không cập nhật<br>- Giao dịch đã được xử lý trước đó (idempotency) → bỏ qua, trả kết quả lần đầu<br>- Khoản phí/hoá đơn đã có giao dịch `PENDING` → trả lại `paymentUrl` cũ hoặc yêu cầu cư dân chờ/hủy giao dịch cũ, không tạo thêm giao dịch song song<br>- Số tiền phản hồi không khớp với `amount` hệ thống tạo → từ chối, ghi log cảnh báo<br>- `transaction_code` không tồn tại trong hệ thống → từ chối<br>- Cư dân thử thanh toán khoản phí không thuộc household của mình → 403 Forbidden |
 
-Ghi chú: Trong phiên bản hiện tại, thanh toán VNPay chỉ áp dụng cho `FEE_PAYMENT` và `UTILITY_BILL`. Không thêm `PARKING_FEE` làm `target_type` riêng: phí gửi xe hằng tháng được tổng hợp thành một đợt thu trong `fee_periods/payments` với khoản thu loại phí gửi xe (`unit = PER_VEHICLE` hoặc `FIXED`). Vì vậy nếu cư dân thanh toán phí gửi xe online thì hệ thống vẫn xử lý qua `target_type = FEE_PAYMENT`.
+Ghi chú: Thanh toán VNPay hỗ trợ 4 loại `target_type`:
+- `FEE_PAYMENT` — thanh toán một phiếu nộp theo đợt thu.
+- `UTILITY_BILL` — thanh toán một hoá đơn điện/nước/internet.
+- `FEE_PAYMENT_BATCH` — thanh toán **gộp** nhiều phiếu nộp trong một giao dịch.
+- `MIXED_PAYMENT_BATCH` — thanh toán **gộp** hỗn hợp cả phiếu nộp lẫn hoá đơn tiện ích trong một giao dịch.
+
+Với các loại gộp, danh sách id và số tiền từng khoản được lưu ở `target_ids` / `target_amounts` / `utility_bill_ids`. Không thêm `PARKING_FEE` làm `target_type` riêng: phí gửi xe hằng tháng được tổng hợp thành một đợt thu trong `fee_periods/payments` với khoản thu loại phí gửi xe (`unit = PER_VEHICLE` hoặc `FIXED`). Vì vậy nếu cư dân thanh toán phí gửi xe online thì hệ thống vẫn xử lý qua `target_type = FEE_PAYMENT` (hoặc gộp chung trong một batch).
 
 #### UC-VIEW-MY-PAYMENT-HISTORY: Cư dân xem lịch sử giao dịch online
 
@@ -863,8 +876,8 @@ graph TB
 5. Cư dân thanh toán; VNPay gọi `GET /api/payments/vnpay/ipn` từ server đến server để xác nhận chính thức, đồng thời redirect trình duyệt cư dân về `GET /api/payments/vnpay/return` trên backend.
 6. `VnpayService` kiểm tra `vnp_SecureHash`, đối chiếu `transaction_code`, `amount`, `vnp_ResponseCode`.
 7. Nếu hợp lệ và thành công → `PaymentService` cập nhật `payment_transactions.status = SUCCESS`, cập nhật khoản phí/hoá đơn tương ứng (`payments.status = PAID` với `payment_method = ONLINE`, hoặc `utility_bills.status = PAID`, `payment_method = ONLINE`).
-8. Backend Return URL redirect cư dân về trang kết quả của frontend; frontend chỉ hiển thị trạng thái đã lưu, không tự quyết định giao dịch thành công/thất bại.
-9. Đảm bảo idempotency: một giao dịch chỉ được cập nhật một lần.
+8. Backend Return URL: nếu giao dịch còn `PENDING` (IPN chưa tới) thì chốt trạng thái dự phòng sau khi verify chữ ký + khớp số tiền; nếu đã ở trạng thái cuối thì chỉ đọc trạng thái. Sau đó redirect cư dân về trang kết quả của frontend; frontend chỉ hiển thị trạng thái đã lưu, không tự quyết định giao dịch thành công/thất bại.
+9. Đảm bảo idempotency: một giao dịch chỉ được cập nhật một lần; IPN và Return không ghi đè lẫn nhau.
 
 ### 5.3 Kiến trúc backend – cấu trúc package
 
@@ -1085,8 +1098,8 @@ Khi có lỗi:
 | Method | Endpoint | Quyền | Mục đích |
 |---|---|---|---|
 | POST | `/api/payments/vnpay/create-url` | RESIDENT | Tạo giao dịch VNPay Sandbox và trả về `paymentUrl`. Body: `{ targetType, targetId, ... }` (hỗ trợ thanh toán gộp nhiều khoản) |
-| GET | `/api/payments/vnpay/return` | PUBLIC | Return URL nhận redirect trình duyệt từ VNPay Sandbox. Backend kiểm tra chữ ký, đọc trạng thái giao dịch đã lưu và redirect cư dân về trang kết quả của frontend. Không coi Return URL là nguồn cập nhật chính. |
-| GET | `/api/payments/vnpay/ipn` | PUBLIC | Nhận thông báo IPN từ VNPay Sandbox (server-to-server). Backend kiểm tra `vnp_SecureHash`; đây là nguồn xác nhận chính để cập nhật trạng thái thanh toán. |
+| GET | `/api/payments/vnpay/return` | PUBLIC | Return URL nhận redirect trình duyệt từ VNPay Sandbox. Backend kiểm tra chữ ký, kiểm tra khớp số tiền, và nếu giao dịch còn `PENDING` thì chốt trạng thái dự phòng (cập nhật transaction + khoản phí/hoá đơn) trong trường hợp IPN chưa tới; nếu giao dịch đã ở trạng thái cuối thì chỉ đọc trạng thái. Sau đó redirect cư dân về trang kết quả của frontend. |
+| GET | `/api/payments/vnpay/ipn` | PUBLIC | Nhận thông báo IPN từ VNPay Sandbox (server-to-server). Backend kiểm tra `vnp_SecureHash`; đây là nguồn xác nhận chính (server-to-server) để cập nhật trạng thái thanh toán. |
 | GET | `/api/payments/vnpay/my-history` | RESIDENT | Cư dân xem lịch sử giao dịch VNPay của hộ mình |
 | GET | `/api/admin/payment-transactions` | ADMIN | Admin tra cứu toàn bộ giao dịch online (có thể lọc theo `status`, `householdId`, `fromDate`, `toDate`, `targetType`) |
 | GET | `/api/admin/payment-transactions/{id}` | ADMIN | Admin xem chi tiết một giao dịch online |
@@ -2190,8 +2203,8 @@ Bảng lưu các đơn giá dùng để sinh hoá đơn điện/nước/internet
 | SC-16 | Quên mật khẩu + đặt lại mật khẩu qua OTP | Cư dân (chưa đăng nhập) |
 | SC-17 | Thanh toán phí của hộ (chọn khoản, khởi tạo VNPay) | Cư dân |
 | SC-18 | Trang trả về sau khi thanh toán VNPay (Return URL) | Cư dân |
-| SC-19 | Lịch sử thanh toán của cư dân | Cư dân |
-| SC-20 | Tra cứu giao dịch thanh toán | Admin |
+| SC-19 | Lịch sử thanh toán của cư dân (khu vực trong màn hình khoản phí của hộ – MyFees, không phải màn hình/menu riêng) | Cư dân |
+| SC-20 | Tra cứu giao dịch thanh toán online (chức năng "Giao dịch online" trong màn hình Thống kê & Báo cáo – Statistics, không phải màn hình/menu riêng) | Admin |
 | SC-21 | Nhật ký hệ thống (audit log) | Admin |
 
 ### 8.2 Quy ước chung
@@ -2275,17 +2288,17 @@ Bảng lưu các đơn giá dùng để sinh hoá đơn điện/nước/internet
 | Mục | Nội dung |
 |---|---|
 | Người dùng | Admin |
-| Chức năng | Đăng ký xe cho hộ, huỷ đăng ký, quản lý chỗ gửi (trống/đã dùng/cho thuê), cho thuê chỗ thừa |
-| Dữ liệu nhập | Biển số, loại xe, hộ; với cho thuê: tên người thuê, SĐT, thời gian, giá |
-| Kết quả | Bảng danh sách xe và bảng tình trạng chỗ gửi |
+| Chức năng | Đăng ký xe cho hộ, huỷ đăng ký, quản lý chỗ gửi (trống/đã dùng/cho thuê), cho thuê chỗ thừa; sinh phí gửi xe theo tháng từ các đăng ký đang ACTIVE (`POST /api/admin/parking-fees/generate`) |
+| Dữ liệu nhập | Biển số, loại xe, hộ; với cho thuê: tên người thuê, SĐT, thời gian, giá; với sinh phí: tháng/năm |
+| Kết quả | Bảng danh sách xe và bảng tình trạng chỗ gửi; phí gửi xe theo tháng được tạo thành phiếu nộp tương ứng |
 
 **SC-09 – Quản lý phí điện/nước/internet**
 
 | Mục | Nội dung |
 |---|---|
 | Người dùng | Admin |
-| Chức năng | Nhập hoá đơn theo từng hộ và từng tháng; xác nhận hoá đơn đã nộp đủ tiền mặt bằng thao tác "Đã nộp tiền mặt"; tra cứu hoá đơn; xem trạng thái hoá đơn đã được thanh toán online qua VNPay nếu có |
-| Dữ liệu nhập | Hộ, loại hoá đơn, tháng/năm, số tiền |
+| Chức năng | Nhập hoá đơn theo từng hộ và từng tháng; nhập hàng loạt từ file Excel (`POST /api/utility-bills/import`, có template tải sẵn `GET /api/utility-bills/import-template`); sinh hoá đơn điện/nước/internet theo tháng từ đơn giá cấu hình (`POST /api/admin/utility-fees/generate`); xác nhận hoá đơn đã nộp đủ tiền mặt bằng thao tác "Đã nộp tiền mặt"; tra cứu hoá đơn; xem trạng thái hoá đơn đã được thanh toán online qua VNPay nếu có |
+| Dữ liệu nhập | Hộ, loại hoá đơn, tháng/năm, số tiền; hoặc file Excel hoá đơn; hoặc tháng/năm để sinh hàng loạt |
 | Kết quả | Bảng hoá đơn lọc theo hộ/tháng; có cột "Trạng thái" PAID/UNPAID, "Phương thức" CASH/ONLINE, mã giao dịch online nếu thanh toán qua VNPay |
 
 **SC-10 – Thống kê và xuất file**
@@ -2356,8 +2369,8 @@ Bảng lưu các đơn giá dùng để sinh hoá đơn điện/nước/internet
 | Mục | Nội dung |
 |---|---|
 | Người dùng | Cư dân |
-| Chức năng | Hiển thị danh sách khoản phí/hoá đơn chưa thanh toán của hộ (lấy theo `household_id` trong JWT); chọn một khoản → nhấn "Thanh toán qua VNPay" → backend tạo `payment_transactions` (PENDING) và URL chuyển hướng → cư dân được redirect sang trang VNPay Sandbox |
-| Dữ liệu nhập | Chọn khoản phí/hoá đơn cần thanh toán |
+| Chức năng | Hiển thị danh sách khoản phí/hoá đơn chưa thanh toán của hộ (lấy theo `household_id` trong JWT); chọn **một hoặc nhiều** khoản → nhấn "Thanh toán qua VNPay" → backend tạo `payment_transactions` (PENDING; khi chọn nhiều khoản dùng `FEE_PAYMENT_BATCH`/`MIXED_PAYMENT_BATCH`) và URL chuyển hướng → cư dân được redirect sang trang VNPay Sandbox |
+| Dữ liệu nhập | Chọn một hoặc nhiều khoản phí/hoá đơn cần thanh toán (thanh toán gộp) |
 | Kết quả | Redirect sang VNPay Sandbox để hoàn tất thanh toán |
 
 **SC-18 – Trang trả về sau khi thanh toán VNPay (Return URL)**
@@ -2365,11 +2378,11 @@ Bảng lưu các đơn giá dùng để sinh hoá đơn điện/nước/internet
 | Mục | Nội dung |
 |---|---|
 | Người dùng | Cư dân |
-| Chức năng | Hiển thị kết quả thanh toán dựa trên tham số VNPay trả về và trạng thái giao dịch trong CSDL (đã được cập nhật bởi IPN URL); chỉ dùng để hiển thị, không phải nguồn xác nhận cuối cùng |
+| Chức năng | Hiển thị kết quả thanh toán dựa trên trạng thái giao dịch trong CSDL. Trạng thái này thường do IPN URL cập nhật; nếu IPN chưa tới và giao dịch còn `PENDING`, backend chốt trạng thái dự phòng ngay tại Return URL (sau khi verify chữ ký + khớp số tiền) |
 | Dữ liệu nhập | Tham số truy vấn từ VNPay (`vnp_TxnRef`, `vnp_ResponseCode`, `vnp_SecureHash`, …) |
 | Kết quả | Thông báo SUCCESS / FAILED / CANCELLED kèm mã giao dịch; nút "Xem lịch sử thanh toán" sang SC-19 |
 
-**SC-19 – Lịch sử thanh toán của cư dân**
+**SC-19 – Lịch sử thanh toán của cư dân** (khu vực "Lịch sử thanh toán VNPay" nằm trong màn hình MyFees, không có menu điều hướng riêng)
 
 | Mục | Nội dung |
 |---|---|
@@ -2378,7 +2391,7 @@ Bảng lưu các đơn giá dùng để sinh hoá đơn điện/nước/internet
 | Dữ liệu nhập | Bộ lọc trạng thái (PENDING/SUCCESS/FAILED/CANCELLED), thời gian |
 | Kết quả | Bảng giao dịch gồm: mã giao dịch, loại khoản phí, số tiền, trạng thái, thời gian; chi tiết hiển thị thêm `paid_at`, phương thức |
 
-**SC-20 – Tra cứu giao dịch thanh toán (Admin)**
+**SC-20 – Tra cứu giao dịch thanh toán (Admin)** (chức năng "Giao dịch online" trong màn hình Thống kê & Báo cáo – Statistics, không có menu điều hướng riêng)
 
 | Mục | Nội dung |
 |---|---|
@@ -2433,7 +2446,7 @@ flowchart TD
     Rate -- Có --> ErrRate[Báo lỗi quá số lần<br/>gửi OTP cho phép]
     ErrRate --> End1([Kết thúc])
     Rate -- Không --> GenOTP[OtpService sinh OTP 6 số<br/>+ băm BCrypt]
-    GenOTP --> SaveOTP[(Lưu email_otps:<br/>purpose=REGISTER,<br/>expires_at=now+5ph,<br/>used=FALSE)]
+    GenOTP --> SaveOTP[(Lưu email_otps:<br/>purpose=REGISTER,<br/>expired_at=now+5ph,<br/>used=FALSE)]
     SaveOTP --> SendMail[EmailService gửi OTP<br/>qua SMTP]
     SendMail --> InputOTP[Cư dân nhập OTP 6 số]
     InputOTP --> Verify{OTP đúng,<br/>chưa hết hạn,<br/>chưa dùng?}
@@ -2560,7 +2573,7 @@ flowchart TD
     Find -- Không --> Pretend[Trả response giống<br/>trường hợp tồn tại<br/>tránh dò email]
     Pretend --> End1
     Find -- Có --> GenOTP[OtpService sinh OTP 6 số<br/>+ băm BCrypt]
-    GenOTP --> SaveOTP[(Lưu email_otps:<br/>purpose=FORGOT_PASSWORD,<br/>expires_at=now+5ph,<br/>used=FALSE)]
+    GenOTP --> SaveOTP[(Lưu email_otps:<br/>purpose=FORGOT_PASSWORD,<br/>expired_at=now+5ph,<br/>used=FALSE)]
     SaveOTP --> SendMail[EmailService gửi OTP<br/>qua SMTP]
     SendMail --> InOTP[Cư dân nhập OTP +<br/>mật khẩu mới]
     InOTP --> Verify{OTP đúng,<br/>chưa hết hạn,<br/>chưa dùng?}
@@ -2618,7 +2631,10 @@ flowchart TD
     Redirect -.song song.-> Return[VNPay redirect trình duyệt về<br/>Return URL của backend]
     Return --> VerifyReturn{Return URL<br/>chữ ký hợp lệ?}
     VerifyReturn -- Không --> ShowErr[Redirect FE kết quả lỗi]
-    VerifyReturn -- Có --> ReadTx[(Backend đọc trạng thái<br/>payment_transactions)]
+    VerifyReturn -- Có --> CheckPending{Giao dịch<br/>còn PENDING?}
+    CheckPending -- Không --> ReadTx[(Backend đọc trạng thái<br/>payment_transactions)]
+    CheckPending -- Có --> Fallback[Chốt trạng thái dự phòng:<br/>khớp số tiền, cập nhật tx<br/>+ khoản phí/hoá đơn]
+    Fallback --> ReadTx
     ReadTx --> ShowResult[Backend redirect FE<br/>SC-18 hiển thị kết quả]
     ShowErr --> End3([Kết thúc])
     ShowResult --> End3
@@ -2843,7 +2859,7 @@ sequenceDiagram
     else n < 5
         OSvc->>OSvc: Sinh OTP 6 số ngẫu nhiên
         OSvc->>OSvc: BCrypt(OTP) → otp_hash
-        OSvc->>ORepo: save(email_otps:<br/>email, otp_hash, purpose=REGISTER,<br/>expires_at=now+5ph, used=FALSE)
+        OSvc->>ORepo: save(email_otps:<br/>email, otp_hash, purpose=REGISTER,<br/>expired_at=now+5ph, used=FALSE)
         ORepo->>DB: INSERT INTO email_otps
         DB-->>ORepo: id
         OSvc->>ESvc: sendOtpMail(email, otp)
@@ -2860,7 +2876,7 @@ sequenceDiagram
     ORepo->>DB: SELECT
     DB-->>ORepo: EmailOtp
     ORepo-->>OSvc: EmailOtp
-    OSvc->>OSvc: BCrypt.matches(otp, otp_hash)<br/>và expires_at > now và used = FALSE
+    OSvc->>OSvc: BCrypt.matches(otp, otp_hash)<br/>và expired_at > now và used = FALSE
     alt OTP hợp lệ
         OSvc->>ORepo: markUsed(otpId)
         ORepo->>DB: UPDATE email_otps SET used=TRUE
@@ -2964,7 +2980,7 @@ sequenceDiagram
         end
     end
 
-    Note over Res,VNPay: 3) Return URL (chỉ để hiển thị)
+    Note over Res,VNPay: 3) Return URL (hiển thị kết quả + chốt trạng thái dự phòng nếu IPN chưa tới)
 
     VNPay->>PCtrl: Redirect trình duyệt tới<br/>GET /api/payments/vnpay/return<br/>?vnp_TxnRef=...
     PCtrl->>VSvc: verifySignature(params)
@@ -2973,10 +2989,17 @@ sequenceDiagram
         PCtrl-->>FE: 302 Redirect /payment-result?status=INVALID
         FE-->>Res: SC-18 hiển thị lỗi xác thực
     else Chữ ký Return hợp lệ
-        PCtrl->>TxRepo: findByTransactionCode(vnp_TxnRef)
-        TxRepo->>DB: SELECT
-        DB-->>TxRepo: tx (trạng thái do IPN cập nhật; nếu IPN chưa tới thì vẫn có thể là PENDING)
+        PCtrl->>TxRepo: findByTransactionCodeForUpdate(vnp_TxnRef)
+        TxRepo->>DB: SELECT ... FOR UPDATE
+        DB-->>TxRepo: tx
         TxRepo-->>PCtrl: tx
+        alt Giao dịch còn PENDING (IPN chưa tới)
+            PCtrl->>PCtrl: Khớp số tiền, applyVnpayResult()
+            PCtrl->>TxRepo: cập nhật tx + khoản phí/hoá đơn
+            TxRepo->>DB: UPDATE
+        else Giao dịch đã ở trạng thái cuối
+            PCtrl->>PCtrl: Chỉ đọc trạng thái (không ghi đè)
+        end
         PCtrl-->>FE: 302 Redirect /payment-result?transactionCode=...&status=...
         FE-->>Res: SC-18 hiển thị kết quả theo trạng thái giao dịch
     end
@@ -3188,7 +3211,7 @@ Giải thích các endpoint nhân khẩu:
 
 Giải thích các endpoint thanh toán online:
 - `POST /api/payments/vnpay/create-url`: cư dân khởi tạo một giao dịch VNPay cho khoản phí/hoá đơn của hộ mình (hỗ trợ thanh toán gộp nhiều khoản). Backend kiểm tra `target.household_id == JWT.household_id`; vi phạm → 403. Endpoint này chỉ cho role `RESIDENT`, không cho Admin thanh toán hộ cư dân. Khi cần kiểm thử/hỗ trợ, Admin dùng tài khoản Resident test đã gán Household test hoặc tra cứu giao dịch qua endpoint Admin.
-- `GET /api/payments/vnpay/return`: Return URL là đường VNPay redirect trình duyệt quay về backend sau thanh toán. Return URL thường không có JWT trong header nên để PUBLIC, nhưng backend vẫn phải kiểm tra `vnp_SecureHash`. Endpoint này không phải nguồn cập nhật chính; sau khi đọc trạng thái giao dịch đã lưu, backend redirect cư dân về trang kết quả của frontend.
+- `GET /api/payments/vnpay/return`: Return URL là đường VNPay redirect trình duyệt quay về backend sau thanh toán. Return URL thường không có JWT trong header nên để PUBLIC, nhưng backend vẫn phải kiểm tra `vnp_SecureHash`. Đây không phải nguồn cập nhật chính (IPN mới là chính), nhưng đóng vai trò dự phòng: nếu giao dịch còn `PENDING` vì IPN chưa tới, backend chốt trạng thái ngay tại Return URL sau khi verify chữ ký + khớp số tiền; nếu đã ở trạng thái cuối thì chỉ đọc. Sau đó backend redirect cư dân về trang kết quả của frontend.
 - `GET /api/payments/vnpay/ipn`: VNPay gọi server-to-server. Đây là **nguồn xác nhận chính** cho trạng thái thanh toán. Backend xác thực `vnp_SecureHash`, kiểm tra idempotency, rồi cập nhật `payment_transactions` cùng với `payments` hoặc `utility_bills` tương ứng.
 - `GET /api/payments/vnpay/my-history`: cư dân xem lịch sử giao dịch online của hộ mình.
 - `GET /api/admin/payment-transactions`: Admin tra cứu mọi giao dịch online, lọc theo mã giao dịch, hộ, trạng thái, thời gian.
@@ -3224,7 +3247,7 @@ Tương tự, `UtilityBillService.getMyHouseholdBills(currentUser)` và `Complai
 ### 11.8 Bảo mật OTP email
 
 - **Lưu băm OTP:** mã OTP 6 số không lưu nguyên bản trong CSDL. Bảng `email_otps` chỉ lưu `otp_hash = BCrypt(otp)`. Khi xác thực, backend dùng `BCrypt.matches(inputOtp, otpHashFromDB)` để kiểm tra OTP người dùng nhập.
-- **Thời gian sống:** mỗi OTP có `expires_at = created_at + 5 phút`. OTP quá hạn không được chấp nhận.
+- **Thời gian sống:** mỗi OTP có `expired_at = created_at + 5 phút`. OTP quá hạn không được chấp nhận.
 - **Một lần dùng:** OTP đã xác thực thành công được đánh dấu `used = TRUE`; không dùng lại được.
 - **Giới hạn số lần thử:** mỗi OTP có cột `failed_attempts`; khi `failed_attempts >= 5` → OTP bị vô hiệu hoá, người dùng phải gửi lại OTP mới.
 - **Rate limit gửi OTP:** tối đa **5 yêu cầu gửi OTP** cho cùng một email trong **15 phút**. Vượt ngưỡng trả `429 Too Many Requests`.
@@ -3240,7 +3263,7 @@ Tương tự, `UtilityBillService.getMyHouseholdBills(currentUser)` và `Complai
 - **Xác thực chữ ký callback:** mọi tham số nhận về tại Return URL và IPN URL đều được tính lại HMAC-SHA512 và so sánh với `vnp_SecureHash` gửi kèm. Sai chữ ký → IPN trả `vnp_ResponseCode = 97 (Invalid signature)` và **không cập nhật CSDL**. Sau khi verify, hệ thống không lưu `vnp_SecureHash`/`vnpay_secure_hash` vào CSDL vì giá trị này không phục vụ đối soát về sau.
 - **`transaction_code` duy nhất:** mỗi lần khởi tạo giao dịch sinh một `transaction_code` duy nhất (UUID rút gọn hoặc timestamp + random) và lưu vào `payment_transactions.transaction_code` (UNIQUE). Đây cũng là `vnp_TxnRef` gửi cho VNPay.
 - **Idempotency:** khi nhận IPN, nếu `payment_transactions.status` đã ở trạng thái cuối (SUCCESS/FAILED/CANCELLED) → backend trả ack `vnp_ResponseCode = 00` nhưng không cập nhật lại CSDL, tránh ghi đè trạng thái và không tạo Payment trùng.
-- **Nguồn xác nhận chính là IPN URL:** trạng thái cuối cùng của giao dịch chỉ được cập nhật trong tay IPN URL (server-to-server). Return URL chỉ dùng để hiển thị kết quả cho cư dân và không được tin cậy như một xác nhận thanh toán độc lập.
+- **Nguồn xác nhận chính là IPN URL:** trạng thái cuối cùng của giao dịch được cập nhật chủ yếu qua IPN URL (server-to-server). Return URL đóng vai trò dự phòng: nếu redirect trình duyệt về trước khi IPN tới và giao dịch còn `PENDING`, Return URL (sau khi verify chữ ký và khớp số tiền) sẽ chốt trạng thái để cư dân thấy kết quả ngay; nếu giao dịch đã ở trạng thái cuối thì Return URL chỉ đọc trạng thái, không ghi đè. Nhờ cơ chế idempotency, hai luồng IPN và Return không cập nhật trùng.
 - **Kiểm tra quyền sở hữu:** khi cư dân khởi tạo `POST /api/payments/vnpay/create-url`, backend luôn kiểm tra `target.household_id == JWT.household_id`. Vi phạm → 403 Forbidden, không tạo giao dịch.
 - **Khớp số tiền:** số tiền trong `payment_transactions` lấy từ khoản phí/hoá đơn ở backend, không tin số tiền do client gửi lên. Khi xử lý IPN, backend so sánh `vnp_Amount` (chia 100) với `payment_transactions.amount`; lệch → cập nhật `status = FAILED` và ghi log cảnh báo.
 - **Không hoàn tiền tự động:** hệ thống chỉ ghi nhận trạng thái thanh toán; mọi việc đối soát, hoàn tiền hoặc xử lý lỗi tài chính được thực hiện thủ công ngoài hệ thống dựa trên dữ liệu trong `payment_transactions`.
@@ -3263,7 +3286,7 @@ Tài liệu SDD trên mô tả thiết kế của phần mềm quản lý thu ph
     - Bảng `residents` có `status` ACTIVE/MOVED_OUT, không xoá vật lý khi chuyển hộ.
     - Mọi trường tiền dùng `DECIMAL(15,2)` ở CSDL và `BigDecimal` ở Java.
     - Bảng `email_otps` lưu OTP đã băm BCrypt.
-    - Bảng `payment_transactions` theo dõi giao dịch VNPay Sandbox, thống nhất cho 2 loại `target_type`: `FEE_PAYMENT` và `UTILITY_BILL`; không chứa `payment_method = CASH` và không lưu `vnpay_secure_hash`.
+    - Bảng `payment_transactions` theo dõi giao dịch VNPay Sandbox với 4 loại `target_type`: `FEE_PAYMENT`, `UTILITY_BILL`, `FEE_PAYMENT_BATCH`, `MIXED_PAYMENT_BATCH` (hai loại sau dùng cho thanh toán gộp nhiều khoản); không chứa `payment_method = CASH` và không lưu `vnpay_secure_hash`.
     - Bảng `audit_logs` (`admin_username`, `action`, `target_entity`, `details`, `timestamp`) lưu nhật ký thao tác quản trị, ghi tự động qua AOP (`@LogAdminAction` + `AuditAspect`).
     - Bảng `system_configs` lưu các đơn giá cấu hình (điện/nước/internet, phí gửi xe).
 - **21 màn hình giao diện** (SC-01 đến SC-21) với đặc tả người dùng / chức năng / dữ liệu nhập / kết quả; gồm các màn hình cho OTP, quên mật khẩu, thanh toán VNPay, lịch sử thanh toán, tra cứu giao dịch Admin và nhật ký hệ thống.
@@ -3297,7 +3320,7 @@ Các chức năng mở rộng theo yêu cầu Ban quản trị: **khiếu nại,
 - Chỉ tích hợp VNPay Sandbox; chưa tích hợp các cổng thanh toán khác (Momo, ZaloPay, thẻ quốc tế).
 - Không xử lý hoàn tiền tự động qua API VNPay — mọi việc đối soát, hoàn tiền được làm thủ công dựa trên `payment_transactions`.
 - Không lưu trữ thông tin thẻ ngân hàng của cư dân; mỗi lần thanh toán cư dân phải nhập lại trên trang VNPay.
-- Thông báo hệ thống chưa gửi qua email/SMS; email chỉ dùng cho OTP (đăng ký, quên mật khẩu, xác nhận thanh toán).
+- Thông báo hệ thống chưa gửi qua email/SMS; email chỉ dùng cho OTP (đăng ký, quên mật khẩu) và thông báo từ chối duyệt đăng ký tài khoản. Chưa có email xác nhận thanh toán.
 - Báo cáo Excel/PDF dùng mẫu cố định, chưa cho phép tuỳ chỉnh mẫu báo cáo.
 - Khiếu nại chưa hỗ trợ đính kèm hình ảnh.
 - Chưa hỗ trợ chuyển đổi đa ngôn ngữ – chỉ tiếng Việt.
