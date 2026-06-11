@@ -147,6 +147,19 @@ public class UserService {
         // 5. Lưu thay đổi
         User saved = userRepo.saveAndFlush(user);
         notificationService.backfillRecipientsForNewResidentAccount(saved);
+
+        // 6. Gửi email báo cho cư dân biết tài khoản đã được duyệt.
+        //    Nuốt lỗi gửi mail để KHÔNG làm rollback việc duyệt chỉ vì SMTP gặp sự cố.
+        try {
+            emailService.sendApprovalEmail(
+                    saved.getEmail(),
+                    saved.getFullName(),
+                    saved.getUsername(),
+                    saved.getRequestedApartmentCode());
+        } catch (Exception e) {
+            log.warn("Gửi email duyệt tài khoản '{}' thất bại: {}", saved.getUsername(), e.getMessage());
+        }
+
         return saved;
     }
 
