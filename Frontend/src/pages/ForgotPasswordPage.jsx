@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { forgotPasswordSendOtpAPI } from "../api/otpApi";
 import { Button, Input } from "../components/common";
 import { AuthShell, AuthError } from "../components/auth/AuthShell";
+import { logError } from "../utils/logger";
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export function ForgotPasswordPage() {
       }
     } catch (err) {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
-      console.error("Forgot OTP error:", err);
+      logError("Forgot OTP error:", err);
     } finally {
       setLoading(false);
     }

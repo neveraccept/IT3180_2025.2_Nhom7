@@ -3,7 +3,6 @@
 //  Map trực tiếp ResidentController (/api/residents) của backend (ROLE_ADMIN).
 //  ResidentSummaryDTO{ id, fullName, idCard, dateOfBirth, gender,
 //    relationToHead, residencyStatus(PERMANENT|TEMPORARY|ABSENT), status(ACTIVE|MOVED_OUT) }
-//  ResidentDetailDTO bổ sung: householdId, householdCode, apartmentCode
 // ============================================================
 import axiosClient, { callApi } from "./axiosClient";
 

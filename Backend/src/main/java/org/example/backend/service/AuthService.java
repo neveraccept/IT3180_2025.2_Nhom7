@@ -2,15 +2,12 @@ package org.example.backend.service;
 
 import org.example.backend.dto.request.*;
 import org.example.backend.dto.LoginResponseDTO;
-import org.example.backend.entity.Apartment;
-import org.example.backend.entity.Household;
 import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
-import org.example.backend.entity.enums.HouseholdStatus;
-import org.example.backend.repository.ApartmentRepository;
-import org.example.backend.repository.HouseholdRepository;
 import org.example.backend.repository.*;
 import org.example.backend.security.JwtUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -20,11 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+	private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
 	private final UserRepository userRepo;
 	private final RoleRepository roleRepo;
 	private final EmailOtpRepository emailOtpRepo;
-	private final ApartmentRepository apartmentRepo;
-	private final HouseholdRepository householdRepo;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtUtil jwtTokenProvider;
 	private final OtpService otpService;
@@ -33,8 +30,6 @@ public class AuthService {
 	@Autowired
 	public AuthService(UserRepository userRepo,
 	                   RoleRepository roleRepo,
-	                   ApartmentRepository apartmentRepo,
-	                   HouseholdRepository householdRepo,
 	                   PasswordEncoder passwordEncoder,
 	                   EmailOtpRepository emailOtpRepo,
 	                   JwtUtil jwtTokenProvider,
@@ -42,8 +37,6 @@ public class AuthService {
 	                   EmailService emailService) {
 		this.userRepo = userRepo;
 		this.roleRepo = roleRepo;
-		this.apartmentRepo = apartmentRepo;
-		this.householdRepo = householdRepo;
 		this.passwordEncoder = passwordEncoder;
 		this.emailOtpRepo = emailOtpRepo;
 		this.jwtTokenProvider = jwtTokenProvider;
@@ -69,9 +62,19 @@ public class AuthService {
 			throw new IllegalArgumentException("Email đã được sử dụng!");
 		}
 
-		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true)
-		emailOtpRepo.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.email(), "REGISTER")
+		// Kiểm tra OTP gửi về mail đã được xác thực chưa (used = true) VÀ phiên xác thực còn hiệu lực.
+		// Lấy mã OTP REGISTER mới nhất đã xác thực để ràng buộc đăng ký vào đúng phiên xác thực đó,
+		// tránh việc tái sử dụng một lần xác thực cũ không giới hạn thời gian.
+		var verifiedOtp = emailOtpRepo
+				.findTopByEmailAndPurposeAndUsedTrueOrderByCreatedAtDesc(request.email(), "REGISTER")
 				.orElseThrow(() -> new IllegalArgumentException("Email chưa được xác thực. Vui lòng xác thực mã OTP trước khi đăng ký!"));
+
+		// Cửa sổ hoàn tất đăng ký: 10 phút kể từ lúc sinh mã OTP (tách biệt với hạn xác thực OTP 5 phút).
+		// Quá hạn này buộc người dùng xác thực lại để khoá chặt phiên đăng ký theo thời gian.
+		java.time.LocalDateTime registrationDeadline = verifiedOtp.getCreatedAt().plusMinutes(10);
+		if (java.time.LocalDateTime.now().isAfter(registrationDeadline)) {
+			throw new IllegalArgumentException("Phiên xác thực đã hết hạn. Vui lòng xác thực lại mã OTP trước khi đăng ký!");
+		}
 
 		// Lấy Role RESIDENT từ Database
 		Role residentRole = roleRepo.findByName("RESIDENT")
@@ -118,7 +121,7 @@ public class AuthService {
 		// 4. Sinh JWT Token thông qua Provider
 		String accessToken = jwtTokenProvider.generateToken(user);
 
-		// 5. Trích xuất Household ID (nếu tài khoản đã được gán vào hộ dân)
+		// 5. Trích xuất Household ID nếu tài khoản đã được gán vào hộ dân
 		Long householdId = user.getHousehold() != null ? user.getHousehold().getId() : null;
 
 		// 6. Đóng gói và trả về DTO
@@ -139,7 +142,11 @@ public class AuthService {
 			// Nếu có, sinh OTP và gửi mail
 			OtpRequest otpRequest = new OtpRequest(email); //, "FORGOT_PASSWORD");
 			String plainOtp = otpService.generateAndSaveOtp(otpRequest, "FORGOT_PASSWORD");
-			emailService.sendOtpEmail(email, plainOtp, "FORGOT_PASSWORD");
+			try {
+				emailService.sendOtpEmail(email, plainOtp, "FORGOT_PASSWORD");
+			} catch (Exception e) {
+				log.warn("Gửi OTP quên mật khẩu thất bại: {}", e.getMessage());
+			}
 		}
 		// Nếu không tồn tại: không làm gì cả để tránh bị dò quét email.
 		// Controller vẫn sẽ trả về thông báo thành công chung chung.

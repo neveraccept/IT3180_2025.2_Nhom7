@@ -73,7 +73,6 @@ public class JwtUtil {
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             // Token không hợp lệ, đã hết hạn, chữ ký sai, hoặc bị trống
-            // Bạn có thể thêm log ở đây (ví dụ: logger.error("Invalid JWT token", e))
         }
         return false;
     }

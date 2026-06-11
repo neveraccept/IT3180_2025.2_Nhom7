@@ -31,6 +31,10 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     Optional<PaymentTransaction> findFirstByTargetTypeAndTargetIdAndStatus(
             String targetType, Long targetId, String status);
 
+    /** Các giao dịch batch (FEE_PAYMENT_BATCH / MIXED_PAYMENT_BATCH) đang ở một trạng thái cho trước. */
+    java.util.List<PaymentTransaction> findByTargetTypeInAndStatus(
+            java.util.Collection<String> targetTypes, String status);
+
     @Modifying
     @Query("""
             UPDATE PaymentTransaction t

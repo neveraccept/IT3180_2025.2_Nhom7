@@ -8,8 +8,7 @@ import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 
 /**
- * F7.2 – Sửa hoá đơn (chỉ áp dụng khi hoá đơn còn UNPAID).
- * Trường null = giữ nguyên. Không cho đổi hộ sở hữu hoá đơn.
+ * F7.2 – Sửa hóa đơn (chỉ áp dụng khi hóa đơn còn UNPAID).
  */
 public record UpdateUtilityBillRequest(
         UtilityType type,

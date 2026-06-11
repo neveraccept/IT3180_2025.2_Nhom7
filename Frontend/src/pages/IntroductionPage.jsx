@@ -88,7 +88,7 @@ export function IntroductionPage({ onStartLogin, onStartRegister }) {
               </div>
               <div>
                 <div className="font-black tracking-tight">BlueMoon</div>
-                <div className="text-xs text-slate-300">Chung cư văn minh</div>
+                <div className="text-xs text-slate-300">Phần mềm quản lý chung cư</div>
               </div>
             </button>
             <div className="hidden items-center gap-6 text-sm font-semibold text-slate-200 md:flex">
@@ -125,7 +125,10 @@ export function IntroductionPage({ onStartLogin, onStartRegister }) {
         </div>
       </section>
 
-      <section id="overview" className="bg-blue-50 py-24">
+      {/* Dải chuyển tiếp mềm từ hero (nền tối) sang phần nội dung sáng */}
+      <div aria-hidden className="h-24 bg-gradient-to-b from-slate-950 via-slate-900/60 to-blue-50 md:h-32" />
+
+      <section id="overview" className="bg-blue-50 pb-24 pt-4">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-[1fr_0.95fr]">
           <div>
             <Badge tone="blue">Tổng Quan Dự Án</Badge>

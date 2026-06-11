@@ -15,8 +15,6 @@ import java.time.LocalDate;
 @Repository
 public interface ReportHouseholdRepository extends JpaRepository<Household, Long> {
 
-    long countByStatus(HouseholdStatus status);
-
     // Đếm số hộ theo trạng thái, lọc theo ngày chuyển vào [from, to] (null = không giới hạn).
     @Query("""
             SELECT COUNT(h) FROM Household h

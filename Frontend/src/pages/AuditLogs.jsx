@@ -66,7 +66,6 @@ export function AuditLogs() {
     <>
       <SectionHeader
         title="Lịch sử hệ thống"
-        desc="Nhật ký các thao tác quản trị: tạo, cập nhật, xóa dữ liệu."
       />
 
       {loadError && (

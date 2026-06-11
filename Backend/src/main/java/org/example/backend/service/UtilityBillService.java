@@ -37,11 +37,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * M7 - Quản lý hoá đơn điện/nước/internet.
- * F7.1 nhập hoá đơn, F7.2 sửa/xoá, F7.3 ghi nhận đã nộp tiền mặt, F7.4 tra cứu theo hộ.
+ * M7 - Quản lý hóa đơn điện/nước/internet.
+ * F7.1 nhập hóa đơn, F7.2 sửa/xoá, F7.3 ghi nhận đã nộp tiền mặt, F7.4 tra cứu theo hộ.
  *
- * Quy ước: chỉ thao tác trên hoá đơn còn UNPAID khi sửa/xoá để giữ tính toàn vẹn đối soát.
- * Hoá đơn đã PAID (tiền mặt hoặc online qua VNPay) không được sửa/xoá.
+ * Quy ước: chỉ thao tác trên hóa đơn còn UNPAID khi sửa/xoá để giữ tính toàn vẹn đối soát.
+ * Hóa đơn đã PAID (tiền mặt hoặc online qua VNPay) không được sửa/xoá.
  */
 @Service
 public class UtilityBillService {
@@ -64,8 +64,8 @@ public class UtilityBillService {
         this.systemConfigService = systemConfigService;
     }
 
-    // F7.1 - Nhập hoá đơn.
-    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hoá đơn điện/nước/internet",
+    // F7.1 - Nhập hóa đơn.
+    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hóa đơn điện/nước/internet",
             detail = "'Hộ ' + #result.householdCode() + ' - ' + #result.type() + ' tháng ' + #result.month() + '/' + #result.year()")
     @Transactional
     public UtilityBillDTO create(CreateUtilityBillRequest req) {
@@ -76,7 +76,7 @@ public class UtilityBillService {
         if (billRepository.existsByHouseholdIdAndTypeAndMonthAndYear(
                 req.householdId(), req.type(), req.month(), req.year())) {
             throw new BadRequestException("UTILITY_BILL_DUPLICATE",
-                    "Hộ đã có hoá đơn " + req.type() + " tháng " + req.month() + "/" + req.year());
+                    "Hộ đã có hóa đơn " + req.type() + " tháng " + req.month() + "/" + req.year());
         }
 
         UtilityBill b = new UtilityBill();
@@ -95,7 +95,7 @@ public class UtilityBillService {
     }
 
     /**
-     * Tính số tiền hoá đơn sinh hoạt.
+     * Tính số tiền hóa đơn sinh hoạt.
      * - ĐIỆN/NƯỚC: amount = (newIndex - oldIndex) * đơn giá (SystemConfig).
      * - INTERNET: dùng số tiền nhập tay nếu có, ngược lại lấy giá gói trong SystemConfig.
      */
@@ -103,7 +103,7 @@ public class UtilityBillService {
         if (type == UtilityType.ELECTRICITY || type == UtilityType.WATER) {
             if (oldIndex == null || newIndex == null) {
                 throw new BadRequestException("UTILITY_INDEX_REQUIRED",
-                        "Hoá đơn điện/nước cần nhập chỉ số cũ và chỉ số mới");
+                        "Hóa đơn điện/nước cần nhập chỉ số cũ và chỉ số mới");
             }
             if (newIndex < oldIndex) {
                 throw new BadRequestException("UTILITY_INDEX_INVALID",
@@ -123,8 +123,8 @@ public class UtilityBillService {
         return systemConfigService.getValue(SystemConfig.INTERNET_PRICE);
     }
 
-    // F7.2 - Sửa hoá đơn (chỉ khi UNPAID).
-    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Cập nhật hoá đơn điện/nước/internet",
+    // F7.2 - Sửa hóa đơn (chỉ khi UNPAID).
+    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Cập nhật hóa đơn điện/nước/internet",
             detail = "'Hộ ' + #result.householdCode() + ' - ' + #result.type() + ' tháng ' + #result.month() + '/' + #result.year()")
     @Transactional
     public UtilityBillDTO update(Long id, UpdateUtilityBillRequest req) {
@@ -141,21 +141,19 @@ public class UtilityBillService {
         if (keyChanged && billRepository.existsByHouseholdIdAndTypeAndMonthAndYear(
                 b.getHousehold().getId(), newType, newMonth, newYear)) {
             throw new BadRequestException("UTILITY_BILL_DUPLICATE",
-                    "Hộ đã có hoá đơn " + newType + " tháng " + newMonth + "/" + newYear);
+                    "Hộ đã có hóa đơn " + newType + " tháng " + newMonth + "/" + newYear);
         }
 
         b.setType(newType);
         b.setMonth(newMonth);
         b.setYear(newYear);
 
-        // Chỉ số cũ/mới: null = giữ nguyên.
         Integer newOldIndex = req.oldIndex() != null ? req.oldIndex() : b.getOldIndex();
         Integer newNewIndex = req.newIndex() != null ? req.newIndex() : b.getNewIndex();
         b.setOldIndex(newOldIndex);
         b.setNewIndex(newNewIndex);
 
         // Điện/nước: tính lại từ chỉ số & đơn giá hiện hành.
-        // Internet: dùng số tiền nhập tay nếu có, ngược lại giữ nguyên số tiền cũ.
         if (newType == UtilityType.ELECTRICITY || newType == UtilityType.WATER) {
             b.setAmount(computeAmount(newType, newOldIndex, newNewIndex, null));
         } else if (req.amount() != null) {
@@ -166,27 +164,27 @@ public class UtilityBillService {
         return mapper.toDto(b);
     }
 
-    // F7.2 - Xoá hoá đơn (chỉ khi UNPAID).
-    @LogAdminAction(entity = "UtilityBill", action = "DELETE", description = "Xoá hoá đơn điện/nước/internet")
+    // F7.2 - Xoá hóa đơn (chỉ khi UNPAID).
+    @LogAdminAction(entity = "UtilityBill", action = "DELETE", description = "Xoá hóa đơn điện/nước/internet")
     @Transactional
     public void delete(Long id) {
         UtilityBill b = requireBill(id);
         requireUnpaid(b, "xoá");
         String householdCode = b.getHousehold() != null ? b.getHousehold().getCode() : "?";
         billRepository.delete(b);
-        AuditContext.detail("Xoá hoá đơn " + b.getType() + " - hộ " + householdCode
+        AuditContext.detail("Xoá hóa đơn " + b.getType() + " - hộ " + householdCode
                 + " tháng " + b.getMonth() + "/" + b.getYear());
     }
 
     // F7.3 - Ghi nhận hộ đã nộp tiền mặt.
-    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Xác nhận hộ nộp tiền mặt hoá đơn",
+    @LogAdminAction(entity = "UtilityBill", action = "UPDATE", description = "Xác nhận hộ nộp tiền mặt hóa đơn",
             detail = "'Hộ ' + #result.householdCode() + ' - ' + #result.type() + ' tháng ' + #result.month() + '/' + #result.year()")
     @Transactional
     public UtilityBillDTO confirmCash(Long id) {
         UtilityBill b = requireBill(id);
         if (b.getStatus() == UtilityBillStatus.PAID) {
             throw new BadRequestException("UTILITY_BILL_ALREADY_PAID",
-                    "Hoá đơn đã được thanh toán trước đó");
+                    "Hóa đơn đã được thanh toán trước đó");
         }
         b.setStatus(UtilityBillStatus.PAID);
         b.setPaymentMethod(PaymentMethod.CASH);
@@ -197,7 +195,7 @@ public class UtilityBillService {
         return mapper.toDto(b);
     }
 
-    // F7.4 - Admin tra cứu/lọc hoá đơn (có thể lọc theo hộ).
+    // F7.4 - Admin tra cứu/lọc hóa đơn (có thể lọc theo hộ).
     @Transactional(readOnly = true)
     public PageResponse<UtilityBillDTO> search(Long householdId,
                                                UtilityType type,
@@ -211,7 +209,7 @@ public class UtilityBillService {
         return PageResponse.of(page);
     }
 
-    // F7.4 - Cư dân tra cứu hoá đơn của hộ mình.
+    // F7.4 - Cư dân tra cứu hóa đơn của hộ mình.
     @Transactional(readOnly = true)
     public PageResponse<UtilityBillDTO> listMyHousehold(UtilityType type,
                                                         Integer month,
@@ -229,7 +227,7 @@ public class UtilityBillService {
         return PageResponse.of(page);
     }
 
-    // Admin xem chi tiết một hoá đơn.
+    // Admin xem chi tiết một hóa đơn.
     @Transactional(readOnly = true)
     public UtilityBillDTO getDetail(Long id) {
         return mapper.toDto(requireBill(id));
@@ -237,18 +235,18 @@ public class UtilityBillService {
 
     // ====================== NHẬP HÀNG LOẠT TỪ EXCEL ======================
 
-    /** Cột file Excel nhập hoá đơn (khớp với template tải về). */
+    /** Cột file Excel nhập hóa đơn (khớp với template tải về). */
     private static final String[] IMPORT_HEADERS = {
             "Mã hộ", "Loại (DIEN/NUOC/INTERNET)", "Tháng", "Năm", "Chỉ số cũ", "Chỉ số mới", "Số tiền (Internet)"
     };
 
     /**
-     * F7.1 (mở rộng) — Nhập hoá đơn cho NHIỀU hộ cùng lúc từ file Excel.
-     * Mỗi dòng là một hoá đơn; dòng lỗi được bỏ qua và gom vào danh sách lỗi để admin sửa lại.
-     * Chỉ những dòng hợp lệ mới được lưu (không vì 1 dòng lỗi mà huỷ cả file).
+     * F7.1 (mở rộng) — Nhập hóa đơn cho NHIỀU hộ cùng lúc từ file Excel.
+     * Mỗi dòng là một hóa đơn; dòng lỗi được bỏ qua và gom vào danh sách lỗi để admin sửa lại.
+     * Chỉ những dòng hợp lệ mới được lưu (không vì 1 dòng lỗi mà hủy cả file).
      */
-    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hoá đơn điện/nước/internet từ Excel",
-            detail = "'Đã tạo ' + #result.createdCount() + ' hoá đơn, bỏ qua ' + #result.skippedCount() + ' dòng (không có hộ), lỗi ' + #result.failedCount() + ' dòng'")
+    @LogAdminAction(entity = "UtilityBill", action = "CREATE", description = "Nhập hóa đơn điện/nước/internet từ Excel",
+            detail = "'Đã tạo ' + #result.createdCount() + ' hóa đơn, bỏ qua ' + #result.skippedCount() + ' dòng (không có hộ), lỗi ' + #result.failedCount() + ' dòng'")
     @Transactional
     public UtilityBillImportResultDTO importFromExcel(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -299,10 +297,10 @@ public class UtilityBillService {
     private enum RowOutcome { CREATED, SKIPPED }
 
     /**
-     * Đọc & lưu một dòng hoá đơn.
+     * Đọc & lưu một dòng hóa đơn.
      * Trả về {@link RowOutcome#CREATED} nếu tạo thành công, {@link RowOutcome#SKIPPED} nếu
      * mã hộ không tồn tại trong hệ thống (dòng được bỏ qua, không tính là lỗi).
-     * Các trường hợp dữ liệu sai khác (trùng hoá đơn, thiếu chỉ số, loại sai...) vẫn ném lỗi.
+     * Các trường hợp dữ liệu sai khác (trùng hóa đơn, thiếu chỉ số, loại sai...) vẫn ném lỗi.
      */
     private RowOutcome importRow(Row row, DataFormatter fmt) {
         String code = cellString(row, 0, fmt);
@@ -329,7 +327,7 @@ public class UtilityBillService {
 
         if (billRepository.existsByHouseholdIdAndTypeAndMonthAndYear(household.getId(), type, month, year)) {
             throw new BadRequestException("UTILITY_BILL_DUPLICATE",
-                    "Hộ đã có hoá đơn " + type + " tháng " + month + "/" + year);
+                    "Hộ đã có hóa đơn " + type + " tháng " + month + "/" + year);
         }
 
         Integer oldIndex = cellInt(row, 4, fmt);
@@ -353,7 +351,7 @@ public class UtilityBillService {
     public byte[] buildImportTemplate() {
         try (Workbook wb = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Sheet sheet = wb.createSheet("Hoá đơn điện nước");
+            Sheet sheet = wb.createSheet("Hóa đơn điện nước");
 
             CellStyle headerStyle = wb.createCellStyle();
             Font headerFont = wb.createFont();
@@ -371,7 +369,7 @@ public class UtilityBillService {
 
             // Dòng ví dụ minh hoạ cách điền (điện theo chỉ số, internet theo số tiền).
             Row ex1 = sheet.createRow(1);
-            ex1.createCell(0).setCellValue("HK-A02-01");
+            ex1.createCell(0).setCellValue("HK-A06-01");
             ex1.createCell(1).setCellValue("DIEN");
             ex1.createCell(2).setCellValue(6);
             ex1.createCell(3).setCellValue(2026);
@@ -379,7 +377,7 @@ public class UtilityBillService {
             ex1.createCell(5).setCellValue(1320);
 
             Row ex2 = sheet.createRow(2);
-            ex2.createCell(0).setCellValue("HK-A02-01");
+            ex2.createCell(0).setCellValue("HK-A06-01");
             ex2.createCell(1).setCellValue("INTERNET");
             ex2.createCell(2).setCellValue(6);
             ex2.createCell(3).setCellValue(2026);
@@ -415,7 +413,7 @@ public class UtilityBillService {
                 return UtilityType.INTERNET;
             default:
                 throw new BadRequestException("UTILITY_IMPORT_TYPE",
-                        "Loại hoá đơn không hợp lệ: '" + raw + "' (dùng DIEN/NUOC/INTERNET)");
+                        "Loại hóa đơn không hợp lệ: '" + raw + "' (dùng DIEN/NUOC/INTERNET)");
         }
     }
 
@@ -468,13 +466,13 @@ public class UtilityBillService {
     private UtilityBill requireBill(Long id) {
         return billRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(
-                        "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hoá đơn id=" + id));
+                        "UTILITY_BILL_NOT_FOUND", "Không tìm thấy hóa đơn id=" + id));
     }
 
     private void requireUnpaid(UtilityBill b, String actionLabel) {
         if (b.getStatus() == UtilityBillStatus.PAID) {
             throw new BadRequestException("UTILITY_BILL_PAID_LOCKED",
-                    "Hoá đơn đã thanh toán, không thể " + actionLabel);
+                    "Hóa đơn đã thanh toán, không thể " + actionLabel);
         }
     }
 }

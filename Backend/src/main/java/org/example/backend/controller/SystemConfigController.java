@@ -16,7 +16,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/system-configs")
-@PreAuthorize("hasRole('ADMIN')")
 public class SystemConfigController {
 
     private final SystemConfigService service;
@@ -27,12 +26,14 @@ public class SystemConfigController {
 
     // GET /api/system-configs -> danh sách đơn giá hệ thống
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")
     public ResponseEntity<ApiResponse<List<SystemConfigDTO>>> getAll() {
         return ResponseEntity.ok(ApiResponse.ok(service.getAll()));
     }
 
     // PUT /api/system-configs/{key} -> cập nhật giá trị đơn giá
     @PutMapping("/{key}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<SystemConfigDTO>> update(
             @PathVariable String key,
             @RequestBody UpdateConfigRequest req) {

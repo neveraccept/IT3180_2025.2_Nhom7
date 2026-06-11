@@ -11,7 +11,7 @@ import java.math.BigDecimal;
  *  - ELECTRICITY_UNIT_PRICE: đơn giá 1 số điện
  *  - WATER_UNIT_PRICE: đơn giá 1 khối nước
  *  - INTERNET_PRICE: giá 1 gói internet/tháng
- * Hoá đơn điện/nước/internet đọc đơn giá ở đây để tự tính số tiền.
+ * Hóa đơn điện/nước/internet đọc đơn giá ở đây để tự tính số tiền.
  */
 @Entity
 @Table(name = "system_configs",

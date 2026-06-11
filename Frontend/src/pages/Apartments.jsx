@@ -18,7 +18,6 @@ const PAGE_SIZE = 20;
 
 // Map nhãn tầng/trạng thái trên UI -> giá trị backend
 const STATUS_MAP = { "Đang ở": "OCCUPIED", "Đang trống": "AVAILABLE" };
-const GENDER_LABEL = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
 
 const yearOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 4) : "—");
 const buildHouseholdForm = (household) => ({
@@ -413,7 +412,7 @@ export function Apartments() {
 
   return (
     <>
-      <SectionHeader title="Quản lý căn hộ" desc="Lấy căn hộ làm trung tâm: bàn giao, thêm thành viên, cấp tài khoản và chuyển hộ ngay tại đây." />
+      <SectionHeader title="Quản lý căn hộ" />
 
       <div className="mb-5 grid gap-3 md:grid-cols-4">
         <Input label="Số căn hộ" placeholder="VD: A12-01" value={filters.code}
@@ -421,7 +420,7 @@ export function Apartments() {
           onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
         <Select label="Tầng" value={filters.floor} onChange={(e) => setFilters({ ...filters, floor: e.target.value })}>
           <option>Tất cả tầng</option>
-          {Array.from({ length: 26 }, (_, i) => <option key={i + 1}>{`Tầng ${i + 1}`}</option>)}
+          {Array.from({ length: 30 }, (_, i) => <option key={i + 1}>{`Tầng ${i + 1}`}</option>)}
         </Select>
         <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option>Tất cả</option>

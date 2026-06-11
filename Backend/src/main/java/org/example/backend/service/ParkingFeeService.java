@@ -7,7 +7,9 @@ import org.example.backend.entity.FeePeriod;
 import org.example.backend.entity.Household;
 import org.example.backend.entity.ParkingRegistration;
 import org.example.backend.entity.Payment;
+import org.example.backend.entity.SystemConfig;
 import org.example.backend.entity.enums.ParkingRegistrationStatus;
+import org.example.backend.entity.enums.VehicleType;
 import org.example.backend.exception.BadRequestException;
 import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
@@ -24,11 +26,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Sinh hoá đơn phí gửi xe hàng tháng cho từng hộ dân.
+ * Sinh hóa đơn phí gửi xe hàng tháng cho từng hộ dân.
  *
  * Cơ chế: tận dụng hệ thống Payment sẵn có — tạo một đợt thu (FeePeriod) gắn với khoản
  * "Phí gửi xe", rồi sinh một phiếu nộp (Payment) cho mỗi hộ với số tiền = tổng phí tháng
- * (monthlyFee) của các lượt gửi xe đang hiệu lực của hộ. Nhờ vậy hoá đơn hiện ngay ở trang
+ * (monthlyFee) của các lượt gửi xe đang hiệu lực của hộ. Nhờ vậy hóa đơn hiện ngay ở trang
  * Thu phí / Công nợ và hộ dân thanh toán được qua VNPay hoặc tiền mặt như các khoản khác.
  */
 @Service
@@ -41,19 +43,22 @@ public class ParkingFeeService {
     private final FeePeriodRepository feePeriodRepository;
     private final PaymentRepository paymentRepository;
     private final ParkingRegistrationRepository registrationRepository;
+    private final SystemConfigService systemConfigService;
 
     public ParkingFeeService(FeeRepository feeRepository,
                              FeePeriodRepository feePeriodRepository,
                              PaymentRepository paymentRepository,
-                             ParkingRegistrationRepository registrationRepository) {
+                             ParkingRegistrationRepository registrationRepository,
+                             SystemConfigService systemConfigService) {
         this.feeRepository = feeRepository;
         this.feePeriodRepository = feePeriodRepository;
         this.paymentRepository = paymentRepository;
         this.registrationRepository = registrationRepository;
+        this.systemConfigService = systemConfigService;
     }
 
     @LogAdminAction(entity = "FeePeriod", action = "CREATE",
-            description = "Sinh hoá đơn phí gửi xe theo tháng",
+            description = "Sinh hóa đơn phí gửi xe theo tháng",
             detail = "'Đợt thu: ' + #result.feePeriodName() + ' — ' + #result.invoiceCount() + ' hộ'")
     @Transactional
     public ParkingFeeGenerationResultDTO generateInvoices(int month, int year) {
@@ -61,7 +66,7 @@ public class ParkingFeeService {
         String periodName = "Phí gửi xe tháng " + month + "/" + year;
         if (feePeriodRepository.existsByFeeIdAndName(fee.getId(), periodName)) {
             throw new BadRequestException("PARKING_FEE_PERIOD_EXISTS",
-                    "Đã tạo hoá đơn phí gửi xe cho tháng " + month + "/" + year);
+                    "Đã tạo hóa đơn phí gửi xe cho tháng " + month + "/" + year);
         }
 
         // Gom tổng phí tháng theo hộ từ các lượt gửi xe ACTIVE (chỉ lượt gắn với xe của hộ).
@@ -73,7 +78,7 @@ public class ParkingFeeService {
             if (r.getVehicle() == null || r.getVehicle().getHousehold() == null) {
                 continue;
             }
-            BigDecimal monthly = r.getMonthlyFee() != null ? r.getMonthlyFee() : BigDecimal.ZERO;
+            BigDecimal monthly = currentParkingFee(r);
             if (monthly.signum() <= 0) {
                 continue;
             }
@@ -84,7 +89,7 @@ public class ParkingFeeService {
 
         if (feeByHouseholdId.isEmpty()) {
             throw new BadRequestException("NO_PARKING_FEE",
-                    "Không có lượt gửi xe nào đang hiệu lực để tạo hoá đơn phí gửi xe");
+                    "Không có lượt gửi xe nào đang hiệu lực để tạo hóa đơn phí gửi xe");
         }
 
         YearMonth ym = YearMonth.of(year, month);
@@ -126,5 +131,13 @@ public class ParkingFeeService {
             f.setActive(true);
             return feeRepository.save(f);
         });
+    }
+
+    private BigDecimal currentParkingFee(ParkingRegistration registration) {
+        VehicleType type = registration.getVehicle().getType();
+        String key = type == VehicleType.CAR
+                ? SystemConfig.CAR_PARKING_PRICE
+                : SystemConfig.MOTORBIKE_PARKING_PRICE;
+        return systemConfigService.getValue(key);
     }
 }

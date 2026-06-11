@@ -14,7 +14,7 @@ const txStatusBadge = (status) => {
     SUCCESS: ["Thành công", "green"],
     PENDING: ["Đang chờ", "yellow"],
     FAILED: ["Thất bại", "red"],
-    CANCELLED: ["Đã huỷ", "gray"],
+    CANCELLED: ["Đã hủy", "gray"],
   };
   const [label, tone] = map[status] || [status, "gray"];
   return <Badge tone={tone}>{label}</Badge>;
@@ -30,7 +30,7 @@ const transactionTypeLabel = (type) => {
   if (type === VNPAY_TARGET.MIXED_PAYMENT_BATCH) return "Nhiều mục";
   if (type === VNPAY_TARGET.FEE_PAYMENT_BATCH) return "Nhiều khoản phí";
   if (type === VNPAY_TARGET.FEE_PAYMENT) return "Khoản phí";
-  return "Hoá đơn";
+  return "Hóa đơn";
 };
 
 const HISTORY_PAGE_SIZE = 10;
@@ -93,7 +93,7 @@ export function MyFees() {
       listMyVnpayHistoryAPI(),
     ]);
     if (pRes.success) setPayments(pRes.data?.items || []);
-    else setPageError(pRes.message || "Không tải được khoản phí của hộ");
+    else setPageError(pRes.message || "Không tải được danh sách thanh toán của hộ");
     if (bRes.success) setBills(bRes.data?.items || []);
     if (hRes.success) setHistory(hRes.data?.items || []);
     setLoading(false);
@@ -115,9 +115,9 @@ export function MyFees() {
     key: `FEE-${p.id}`,
     targetType: VNPAY_TARGET.FEE_PAYMENT,
     targetId: p.id,
-    group: "Khoản phí",
+    group: p.feeType === "DONATION" ? "Đóng góp" : "Khoản phí",
     name: p.feeName || p.feePeriodName || "Khoản phí",
-    period: p.feePeriodName || "__",
+    period: p.feePeriodName || "—",
     amount: Number(p.amountDue || 0),
     feeType: p.feeType || "MANDATORY",
     feePeriodStatus: p.feePeriodStatus || "OPEN",
@@ -130,7 +130,7 @@ export function MyFees() {
     targetType: VNPAY_TARGET.UTILITY_BILL,
     targetId: b.id,
     group: utilityLabel(b.type),
-    name: `Hoá đơn ${utilityLabel(b.type).toLowerCase()}`,
+    name: `Hóa đơn ${utilityLabel(b.type).toLowerCase()}`,
     period: `Tháng ${b.month}/${b.year}`,
     amount: Number(b.amount || 0),
     feeType: "UTILITY",
@@ -240,7 +240,7 @@ export function MyFees() {
 
   const paySelectedFees = async () => {
     if (selectedRows.length === 0) {
-      setPageError("Vui lòng chọn ít nhất một khoản phí chưa nộp.");
+      setPageError("Vui lòng chọn ít nhất một mục chưa thanh toán.");
       return;
     }
     if (selectedRows.length === 1) {
@@ -255,7 +255,7 @@ export function MyFees() {
       if (row.feeType === "DONATION") {
         const amount = Number(donationAmounts[row.key]);
         if (!(amount > 0)) {
-          setPageError("Vui lòng nhập số tiền đóng góp lớn hơn 0 cho các khoản tự nguyện đã chọn.");
+          setPageError("Vui lòng nhập số tiền đóng góp lớn hơn 0 cho các khoản đóng góp đã chọn.");
           return;
         }
         customAmounts[row.targetId] = amount;
@@ -305,7 +305,7 @@ export function MyFees() {
         return baseRow({
           id,
           type: VNPAY_TARGET.UTILITY_BILL,
-          name: row ? `${row.name}${row.period ? ` - ${row.period}` : ""}` : `Hoá đơn #${id}`,
+          name: row ? `${row.name}${row.period ? ` - ${row.period}` : ""}` : `Hóa đơn #${id}`,
           amount: row?.amount ?? 0,
         }, feeIds.length + index);
       });
@@ -347,7 +347,7 @@ export function MyFees() {
     return {
       ...row,
       summaryType: row.lines.length > 1 ? `Thanh toán gộp (${row.lines.length} khoản)` : transactionTypeLabel(row.lines[0]?.type),
-      summaryName: row.lines.length > 1 ? row.lines.map((line) => line.name).join(", ") : row.lines[0]?.name || "__",
+      summaryName: row.lines.length > 1 ? row.lines.map((line) => line.name).join(", ") : row.lines[0]?.name || "—",
       summaryAmount: Number(row.amount || fallbackAmount || 0),
     };
   });
@@ -370,8 +370,7 @@ export function MyFees() {
   return (
     <>
       <SectionHeader
-        title="Khoản phí của tôi"
-        desc="Các khoản phí và hoá đơn điện/nước/internet của hộ bạn. Có thể chọn nhiều khoản phí để thanh toán VNPay trong một lần."
+        title="Thanh toán của tôi"
       />
 
       {pageError && (
@@ -379,16 +378,16 @@ export function MyFees() {
       )}
 
       <div className="mb-5 grid gap-4 md:grid-cols-3">
-        <Card><p className="text-sm font-semibold text-slate-500">Tổng còn phải nộp</p><p className="mt-2 text-2xl font-black text-rose-700">{money(summary.totalDue)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Đã nộp</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Khoản chưa nộp</p><p className="mt-2 text-2xl font-black text-rose-700">{summary.unpaid}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Cần thanh toán</p><p className="mt-2 text-2xl font-black text-rose-700">{money(summary.totalDue)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Đã thanh toán</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Mục đang mở</p><p className="mt-2 text-2xl font-black text-slate-900">{summary.unpaid}</p></Card>
       </div>
 
       <Card className="mb-5">
         <div className="grid gap-3 lg:grid-cols-[minmax(180px,1.5fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto] lg:items-end">
           <Input
             label="Tìm theo tên"
-            placeholder="Nhập tên khoản phí"
+            placeholder="Nhập tên phí, hóa đơn hoặc đóng góp"
             value={filters.keyword}
             onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
           />
@@ -403,11 +402,11 @@ export function MyFees() {
               <option key={key} value={key}>{monthLabel(key)}</option>
             ))}
           </Select>
-          <Select label="Loại phí" value={filters.feeType} onChange={(e) => setFilters({ ...filters, feeType: e.target.value })}>
+          <Select label="Nhóm thanh toán" value={filters.feeType} onChange={(e) => setFilters({ ...filters, feeType: e.target.value })}>
             <option value="ALL">Tất cả</option>
-            <option value="MANDATORY">Bắt buộc</option>
-            <option value="DONATION">Đóng góp</option>
-            <option value="UTILITY">Hoá đơn</option>
+            <option value="MANDATORY">Phí bắt buộc</option>
+            <option value="DONATION">Đóng góp tự nguyện</option>
+            <option value="UTILITY">Hóa đơn</option>
           </Select>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-slate-600">
@@ -437,7 +436,7 @@ export function MyFees() {
                 </th>
                 <th className="px-5 py-4">Nhóm</th>
                 <th className="px-5 py-4">Nội dung</th>
-                <th className="px-5 py-4">Loại phí</th>
+                <th className="px-5 py-4">Loại khoản</th>
                 <th className="px-5 py-4">Kỳ</th>
                 <th className="px-5 py-4">Số tiền</th>
                 <th className="px-5 py-4">Trạng thái</th>
@@ -446,7 +445,7 @@ export function MyFees() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu...</td></tr>}
-              {!loading && allRows.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có khoản phí nào phù hợp với bộ lọc.</td></tr>}
+              {!loading && allRows.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Không có mục thanh toán nào phù hợp với bộ lọc.</td></tr>}
               {!loading && paginatedRows.map((r) => {
                 const canSelect = selectableRows.some((row) => row.key === r.key);
                 return (
@@ -511,14 +510,14 @@ export function MyFees() {
       </div>
 
       <div className="mt-8">
-        <SectionHeader title="Lịch sử thanh toán VNPay" desc="Các giao dịch online của hộ bạn." />
+        <SectionHeader title="Lịch sử thanh toán VNPay" />
         <Card className="mb-4">
           <div className="flex flex-wrap gap-2">
             {[
               { key: "ALL", label: `Tất cả (${groupedAllHistoryRows.length})` },
               { key: "SUCCESS", label: `Thành công (${groupedAllHistoryRows.filter((t) => t.status === "SUCCESS").length})` },
               { key: "PENDING", label: `Đang chờ (${groupedAllHistoryRows.filter((t) => t.status === "PENDING").length})` },
-              { key: "FAILED", label: `Thất bại/Huỷ (${groupedAllHistoryRows.filter((t) => t.status === "FAILED" || t.status === "CANCELLED").length})` },
+              { key: "FAILED", label: `Thất bại/Hủy (${groupedAllHistoryRows.filter((t) => t.status === "FAILED" || t.status === "CANCELLED").length})` },
             ].map((f) => (
               <button
                 key={f.key}
@@ -575,7 +574,7 @@ export function MyFees() {
                         </td>
                         <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-900">{money(t.summaryAmount)}</td>
                         <td className="whitespace-nowrap px-5 py-4">{txStatusBadge(t.status)}</td>
-                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">{t.createdAt ? new Date(t.createdAt).toLocaleString("vi-VN") : "__"}</td>
+                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">{t.createdAt ? new Date(t.createdAt).toLocaleString("vi-VN") : "—"}</td>
                       </tr>
                       {expanded && t.lines.map((line) => (
                         <tr key={line.key} className="bg-slate-50/70">

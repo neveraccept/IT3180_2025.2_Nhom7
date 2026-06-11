@@ -131,7 +131,7 @@ public class ApartmentService {
                             "trước khi đổi trạng thái.");
         }
 
-        // Đặt VAILABLE khi đã có hộ ACTIVE → cũng chặn để chắc chắn
+        // Đặt AVAILABLE khi đã có hộ ACTIVE → cũng chặn để chắc chắn
         if (hasActive && (newStatus == ApartmentStatus.AVAILABLE)) {
             throw new BadRequestException(
                     "INVALID_STATUS_TRANSITION",

@@ -38,7 +38,6 @@ public class AuditLog {
     @Column(length = 1000)
     private String details;
 
-    // Thời điểm thực hiện — tự sinh khi lưu.
     @CreationTimestamp
     @Column(name = "timestamp", updatable = false)
     private LocalDateTime timestamp;

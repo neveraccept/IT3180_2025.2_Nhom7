@@ -5,10 +5,8 @@ import org.example.backend.dto.request.ChangePasswordRequest;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.request.UpdateProfileRequest;
 import org.example.backend.dto.UserProfileDTO;
-// Đảm bảo import đúng đường dẫn của CustomUserDetails dự án bạn
 import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.ProfileService;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -60,10 +58,8 @@ public class ProfileController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ChangePasswordRequest request) {
 
-        // 1. Gọi Service Layer xử lý logic đổi mật khẩu
         profileService.changePassword(currentUser.getId(), request);
 
-        // 2. Bọc kết quả vào cấu trúc ApiResponse chuẩn hóa của dự án
         ApiResponse<Void> response = new ApiResponse<>(
                 true,
                 null,

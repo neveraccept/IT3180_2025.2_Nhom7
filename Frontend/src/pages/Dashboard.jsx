@@ -149,7 +149,7 @@ export function Dashboard({ role }) {
   if (role !== "ADMIN") {
     return (
       <>
-        <SectionHeader title="Dashboard cư dân" desc="Các khoản phí chưa nộp và thông báo mới nhất của hộ cư dân." />
+        <SectionHeader title="Dashboard cư dân" />
 
         <div className="mb-6 grid gap-4 md:grid-cols-2">
           <Card>
@@ -265,14 +265,14 @@ export function Dashboard({ role }) {
       value: loading ? "..." : String(stats?.totalActiveHouseholds ?? "—"),
       icon: Building2,
       tone: "text-sky-700",
-      sub: loading ? "" : `${stats?.permanentCount ?? 0} thường trú`,
+      sub: "",
     },
     {
       label: "Nhân khẩu",
       value: loading ? "..." : String(stats?.totalActiveResidents ?? "—"),
       icon: Users,
       tone: "text-emerald-700",
-      sub: loading ? "" : `${stats?.temporaryCount ?? 0} tạm trú, ${stats?.absentCount ?? 0} tạm vắng`,
+      sub: loading ? "" : `${stats?.temporaryCount ?? 0} tạm trú`,
     },
     {
       label: "Đợt thu đang mở",
@@ -292,10 +292,7 @@ export function Dashboard({ role }) {
 
   return (
     <>
-      <SectionHeader
-        title="Dashboard"
-        desc="Tổng quan vận hành và thu phí của chung cư BlueMoon."
-      />
+      <SectionHeader title="Dashboard" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {adminCards.map((card) => {
           const Icon = card.icon;

@@ -24,11 +24,7 @@ const STATUS_SELECT_CLASS = {
   REJECTED: "bg-rose-50 text-rose-700 ring-rose-200",
 };
 
-export function Complaints({
-  role,
-  initialComplaintId,
-  onInitialComplaintHandled,
-}) {
+export function Complaints({ role }) {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageError, setPageError] = useState("");
@@ -99,7 +95,6 @@ export function Complaints({
         : complaint.status
     );
     setDetailError("");
-    onInitialComplaintHandled?.();
   };
 
   const closeDetail = () => {
@@ -113,8 +108,6 @@ export function Complaints({
   const handleInlineStatusChange = async (complaint, newStatus) => {
     if (newStatus === complaint.status || updatingStatusId === complaint.id) return;
     setUpdatingStatusId(complaint.id);
-    // Chỉ gửi status; giữ nguyên nội dung phản hồi cũ (không gửi chuỗi rỗng để
-    // tránh ghi đè và tránh lỗi validate ở backend khi đổi nhanh trạng thái).
     const payload = { status: newStatus };
     if (complaint.response) payload.response = complaint.response;
     const res = await respondComplaintAPI(complaint.id, payload);
@@ -180,11 +173,6 @@ export function Complaints({
     <>
       <SectionHeader
         title={role === "ADMIN" ? "Xử lý khiếu nại" : "Khiếu nại của tôi"}
-        desc={
-          role === "ADMIN"
-            ? "Admin xem nội dung khiếu nại, nhập nội dung xử lý và cập nhật trạng thái."
-            : "Gửi khiếu nại mới hoặc xem tình trạng xử lý khiếu nại đã gửi."
-        }
         action={
           role !== "ADMIN" ? (
             <Button onClick={() => setShowCreateForm(true)}>

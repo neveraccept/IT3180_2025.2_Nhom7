@@ -1,9 +1,8 @@
 // ============================================================
 //  AuthContext — lưu JWT + thông tin user, khôi phục phiên khi tải lại trang
-//  (theo SDD 5.4: context/ // AuthContext lưu JWT và thông tin user)
 // ============================================================
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { getStoredAuth, setStoredAuth, clearStoredAuth } from "../api/axiosClient";
+import { getStoredAuth, setStoredAuth, clearStoredAuth, setAuthFailureHandler, touchSession } from "../api/axiosClient";
 
 const AuthContext = createContext(null);
 
@@ -31,6 +30,26 @@ export function AuthProvider({ children }) {
     setInitializing(false);
   }, []);
 
+  useEffect(() => setAuthFailureHandler(() => setUser(null)), []);
+
+  // Heartbeat: trong khi đã đăng nhập và tab đang mở, định kỳ gia hạn lastSeen.
+  // Khi tắt tab, heartbeat dừng -> nếu vắng quá 10 phút, phiên hết hạn.
+  useEffect(() => {
+    if (!user) return;
+    touchSession(); // đánh dấu ngay khi phiên bắt đầu / khôi phục
+    const intervalId = setInterval(touchSession, 30 * 1000); // mỗi 30s
+    const onVisible = () => {
+      if (document.visibilityState === "visible") touchSession();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", touchSession);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", touchSession);
+    };
+  }, [user]);
+
   // Gọi sau khi loginAPI thành công (nhận object auth đã lưu localStorage).
   const loginWithAuth = useCallback((auth) => {
     setStoredAuth(auth);
@@ -43,7 +62,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Cập nhật cục bộ thông tin hiển thị (vd: sau khi sửa hồ sơ).
-  // Hỗ trợ cả dạng object lẫn updater function để tương thích code cũ.
   const updateUser = useCallback((patch) => {
     setUser((prev) => {
       if (!prev) return prev;

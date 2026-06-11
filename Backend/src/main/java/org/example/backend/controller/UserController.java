@@ -5,6 +5,7 @@ import org.example.backend.dto.AccountCreatedDTO;
 import org.example.backend.dto.UserDTO;
 import org.example.backend.dto.request.AdminRegisterRequest;
 import org.example.backend.dto.request.AdminUpdateRegisterRequest;
+import org.example.backend.dto.request.ApproveAccountRequest;
 import org.example.backend.dto.request.GrantAccessRequest;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
@@ -42,7 +43,7 @@ public class UserController {
 
         } catch (IllegalArgumentException ex) {
             String errorMsg = ex.getMessage();
-            String errorCode = "CREATE_USER_FAILED"; // Mã mặc định
+            String errorCode = "CREATE_USER_FAILED";
 
             // Phân loại mã lỗi (ErrorCode) dựa trên thông điệp từ UserService
             if (errorMsg.contains("Username")) {
@@ -57,7 +58,6 @@ public class UserController {
                 errorCode = "ROLE_NOT_FOUND";
             }
 
-            // Trả về mã lỗi 400 kèm chính xác ErrorCode và câu thông báo
             return ResponseEntity.badRequest().body(ApiResponse.error(errorCode, errorMsg));
 
         } catch (Exception ex) {
@@ -66,12 +66,13 @@ public class UserController {
         }
     }
 
-    // API duyệt tài khoản
+    // API duyệt tài khoản. Body (tùy chọn) mang thông tin gắn/tạo nhân khẩu cho tài khoản cư dân.
     @PutMapping("/{id}/approve")
-    public ResponseEntity<?> approvePendingAccount(@PathVariable Long id) {
+    public ResponseEntity<?> approvePendingAccount(@PathVariable Long id,
+                                                   @RequestBody(required = false) ApproveAccountRequest req) {
         try {
             // Gọi logic từ UserService để duyệt tài khoản cư dân
-            User approvedUser = userService.approvePendingAccount(id);
+            User approvedUser = userService.approvePendingAccount(id, req);
 
             // Ép sang UserDTO trước khi trả về
             UserDTO responseDto = mapper.toDto(approvedUser);
@@ -86,10 +87,12 @@ public class UserController {
 
     // API từ chối (xóa) tài khoản cư dân đang chờ duyệt
     @DeleteMapping("/{id}/reject")
-    public ResponseEntity<ApiResponse<Void>> rejectPendingAccount(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> rejectPendingAccount(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason) {
 
-        // Gọi Service để xử lý xóa
-        userService.rejectPendingAccount(id);
+        // Gọi Service để xử lý xóa (kèm lý do từ chối nếu Admin có nhập)
+        userService.rejectPendingAccount(id, reason);
 
         // Trả về thông báo thành công
         return ResponseEntity.ok(

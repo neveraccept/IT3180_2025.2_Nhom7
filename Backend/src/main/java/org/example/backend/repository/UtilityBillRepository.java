@@ -18,7 +18,7 @@ public interface UtilityBillRepository extends JpaRepository<UtilityBill, Long> 
             Long householdId, UtilityType type, Integer month, Integer year);
 
     /**
-     * Tra cứu hoá đơn có lọc động (F7.4). Tham số null → bỏ qua điều kiện tương ứng.
+     * Tra cứu hóa đơn có lọc động (F7.4). Tham số null → bỏ qua điều kiện tương ứng.
      * Dùng chung cho cả Admin (truyền householdId) và Cư dân (Service ép householdId của hộ mình).
      */
     // Fetch-join household mà UtilityBillMapper.toDto(...) sẽ đọc → tránh N+1.

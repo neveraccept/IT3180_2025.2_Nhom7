@@ -4,8 +4,8 @@ Sinh file Excel mẫu hoá đơn điện/nước/internet để Admin import qua
 POST /api/utility-bills/import (chức năng "Nhập hoá đơn hàng loạt").
 
 InitialDataConfig chọn NGẪU NHIÊN 100 hộ trong số các căn ở. Vì không biết trước hộ nào
-được chọn, file này liệt kê TẤT CẢ mã hộ có thể có (145 hộ = tầng 2..25 mỗi tầng 6 căn +
-penthouse PH26-01) => HK-A02-01 ... HK-A25-06, HK-PH26-01.
+được chọn, file này liệt kê TẤT CẢ mã hộ có thể có (145 hộ = tầng 6..29 mỗi tầng 6 căn +
+penthouse PH30-01) => HK-A06-01 ... HK-A29-06, HK-PH30-01.
 Khi import, dòng nào trỏ tới hộ chưa tồn tại sẽ được hệ thống TỰ ĐỘNG BỎ QUA.
 
 Cột phải khớp IMPORT_HEADERS trong UtilityBillService:
@@ -30,12 +30,12 @@ INTERNET_PRICES = [200000, 250000, 300000]
 
 
 def household_codes():
-    """Tất cả mã hộ có thể có giống InitialDataConfig: tầng 2..25 (6 căn/tầng) + PH26-01."""
+    """Tất cả mã hộ có thể có giống InitialDataConfig: tầng 6..29 (6 căn/tầng) + PH30-01."""
     codes = []
-    for floor in range(2, 26):              # tầng 2..25
+    for floor in range(6, 30):              # tầng 6..29
         for i in range(1, 7):               # 6 căn mỗi tầng
             codes.append("HK-A%02d-%02d" % (floor, i))
-    codes.append("HK-PH26-01")              # penthouse
+    codes.append("HK-PH30-01")              # penthouse
     return codes
 
 

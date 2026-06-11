@@ -4,7 +4,7 @@
 //  Phương tiện:
 //    ADMIN     POST   /api/vehicles                         body RegisterVehicleRequest
 //    ADMIN     PUT    /api/vehicles/{id}                    body UpdateVehicleRequest
-//    ADMIN     DELETE /api/vehicles/{id}                    (huỷ đăng ký)
+//    ADMIN     DELETE /api/vehicles/{id}                    (hủy đăng ký)
 //    ADMIN     GET    /api/vehicles/household/{householdId}
 //    RESIDENT  GET    /api/vehicles/my-household
 //  Chỗ gửi xe:
@@ -28,11 +28,11 @@ export const VEHICLE_TYPE = { MOTORBIKE: "MOTORBIKE", CAR: "CAR" };
 export const registerVehicleAPI = (payload) =>
   callApi(axiosClient.post("/api/vehicles", payload));
 
-// ADMIN: cập nhật xe. payload = { licensePlate?, type?, active? } (null = giữ nguyên)
+// ADMIN: cập nhật xe.
 export const updateVehicleAPI = (id, payload) =>
   callApi(axiosClient.put(`/api/vehicles/${id}`, payload));
 
-// ADMIN: huỷ đăng ký xe.
+// ADMIN: hủy đăng ký xe.
 export const cancelVehicleAPI = (id) => callApi(axiosClient.delete(`/api/vehicles/${id}`));
 
 // ADMIN: tra cứu xe theo hộ.
@@ -67,7 +67,7 @@ export const listMyParkingRegistrationsAPI = ({ page = 0, size = 100, sort = "st
 
 // ----------------------------- HOÁ ĐƠN PHÍ GỬI XE --------------------------
 
-// ADMIN: sinh hoá đơn phí gửi xe cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
+// ADMIN: sinh hóa đơn phí gửi xe cho từng hộ theo tháng (gắn vào hệ thống Thu phí).
 // payload = { month, year } -> { feePeriodId, feePeriodName, invoiceCount, totalAmount }
 export const generateParkingFeesAPI = ({ month, year }) =>
   callApi(axiosClient.post("/api/admin/parking-fees/generate", { month: Number(month), year: Number(year) }));

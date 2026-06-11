@@ -14,10 +14,13 @@ import { listAdminPaymentsAPI, confirmCashPaymentAPI, confirmCashPaymentsBatchAP
 //    amountDue, amountPaid, status(UNPAID|PAID), paymentMethod, paidDate, collectedByName, transactionCode }
 //  Mặc định sắp xếp theo hộ (household.id) để gom các phiếu cùng hộ liền nhau.
 // ============================================================
-const statusBadge = (status) => (
-  <Badge tone={status === "PAID" ? "green" : "red"}>{status === "PAID" ? "Đã nộp" : "Chưa nộp"}</Badge>
-);
-const methodLabel = (m) => (m === "CASH" ? "Tiền mặt" : m === "ONLINE" ? "VNPay" : "__");
+const statusBadge = (p) => {
+  if (p.status === "PAID") {
+    return <Badge tone="green">{isDonation(p) ? "Đã đóng góp" : "Đã nộp"}</Badge>;
+  }
+  return <Badge tone={isDonation(p) ? "violet" : "red"}>{isDonation(p) ? "Chưa đóng góp" : "Chưa nộp"}</Badge>;
+};
+const methodLabel = (m) => (m === "CASH" ? "Tiền mặt" : m === "ONLINE" ? "VNPay" : "—");
 
 // Khoản tự nguyện chưa chốt số tiền: không hiển thị "0 đ" mà để ký hiệu riêng cho dễ phân biệt.
 const isDonation = (p) => p.feeType === "DONATION";
@@ -33,12 +36,29 @@ const paidDisplay = (p) => {
   if (!(Number(p.amountPaid) > 0)) return <span className="text-slate-400">—</span>;
   return <span className="font-semibold text-emerald-700">{money(p.amountPaid)}</span>;
 };
+const kindMatches = (p, kind) => kind === "ALL" || p.feeType === kind;
+
+// Tính các thẻ thống kê từ danh sách phiếu ĐÃ lọc theo nhóm khoản (không lọc lại trong này).
+const computeSummary = (rows) =>
+  rows.reduce(
+    (a, p) => {
+      if (isDonation(p)) a.donationPaid += Number(p.amountPaid || 0);
+      else {
+        a.mandatoryDue += p.status === "PAID" ? 0 : Number(p.amountDue || 0);
+        a.mandatoryPaid += Number(p.amountPaid || 0);
+      }
+      if (p.status === "PAID") a.paid += 1;
+      else a.pending += 1;
+      return a;
+    },
+    { mandatoryDue: 0, mandatoryPaid: 0, donationPaid: 0, paid: 0, pending: 0 }
+  );
 
 export function Payments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
-  const [filters, setFilters] = useState({ householdId: "", keyword: "", status: "ALL" });
+  const [filters, setFilters] = useState({ householdId: "", keyword: "", status: "ALL", kind: "ALL" });
   const [selected, setSelected] = useState(null);
   const [cashAmount, setCashAmount] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -48,86 +68,66 @@ export function Payments() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkConfirm, setBulkConfirm] = useState(false);
 
-  // Phân trang phía server: 20 phiếu/trang.
+  // Toàn bộ phiếu khớp bộ lọc (đã lọc theo nhóm khoản) — giữ ở client để phân trang & tính
+  // thống kê mà không phải gọi lại API mỗi khi đổi trang.
+  const [allRows, setAllRows] = useState([]);
+
+  // Phân trang phía client trên allRows: 20 phiếu/trang.
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 20;
 
   // Thống kê tính trên TOÀN BỘ phiếu khớp bộ lọc (không phụ thuộc trang đang xem).
-  // pendingDonation: số phiếu tự nguyện (DONATION) chưa nộp — hiển thị riêng dưới "Phiếu chưa nộp".
-  const [summary, setSummary] = useState({ totalDue: 0, totalPaid: 0, paid: 0, pending: 0, pendingDonation: 0 });
+  const [summary, setSummary] = useState({ mandatoryDue: 0, mandatoryPaid: 0, donationPaid: 0, paid: 0, pending: 0 });
 
   const showToast = (message, tone = "green") => {
     setToast({ message, tone });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Tải 1 trang phiếu nộp để hiển thị bảng (xoá lựa chọn hàng loạt cũ để tránh nhầm).
-  const loadPayments = useCallback(async (targetPage = 1) => {
+  // Hiển thị một trang từ allRows (đã có sẵn ở client) — không gọi API.
+  const showPage = useCallback((rows, targetPage) => {
+    setPayments(rows.slice((targetPage - 1) * PAGE_SIZE, targetPage * PAGE_SIZE));
+    setPage(targetPage);
+  }, []);
+
+  // Tải phiếu nộp khớp bộ lọc MỘT LẦN, rồi tính thống kê + phân trang từ cùng dataset.
+  // (overrideFilters dùng khi xoá bộ lọc để tránh đọc state cũ trong closure.)
+  const loadPayments = useCallback(async (targetPage = 1, overrideFilters = null) => {
+    const f = overrideFilters || filters;
     setLoading(true);
     setPageError("");
     setSelectedIds(new Set());
     const res = await listAdminPaymentsAPI({
-      householdId: filters.householdId || undefined,
-      keyword: filters.keyword || undefined,
-      status: filters.status !== "ALL" ? filters.status : undefined,
-      page: targetPage - 1,
-      size: PAGE_SIZE,
-    });
-    if (res.success) {
-      setPayments(res.data?.items || []);
-      setTotal(res.data?.totalElements || 0);
-      setPage(targetPage);
-    } else {
-      setPageError(res.message || "Không tải được danh sách phiếu nộp");
-    }
-    setLoading(false);
-  }, [filters]);
-
-  // Tải toàn bộ phiếu khớp bộ lọc để tính các thẻ thống kê (tổng phải thu/đã thu...).
-  const loadSummary = useCallback(async () => {
-    const res = await listAdminPaymentsAPI({
-      householdId: filters.householdId || undefined,
-      keyword: filters.keyword || undefined,
-      status: filters.status !== "ALL" ? filters.status : undefined,
+      householdId: f.householdId || undefined,
+      keyword: f.keyword || undefined,
+      status: f.status !== "ALL" ? f.status : undefined,
       page: 0,
       size: 100000,
     });
     if (res.success) {
-      const acc = (res.data?.items || []).reduce(
-        (a, p) => {
-          a.totalDue += Number(p.amountDue || 0);
-          a.totalPaid += Number(p.amountPaid || 0);
-          if (p.status === "PAID") a.paid += 1;
-          else {
-            a.pending += 1;
-            if (isDonation(p)) a.pendingDonation += 1;
-          }
-          return a;
-        },
-        { totalDue: 0, totalPaid: 0, paid: 0, pending: 0, pendingDonation: 0 }
-      );
-      setSummary(acc);
+      const rows = (res.data?.items || []).filter((p) => kindMatches(p, f.kind));
+      setAllRows(rows);
+      setTotal(rows.length);
+      setSummary(computeSummary(rows));
+      showPage(rows, targetPage);
+    } else {
+      setPageError(res.message || "Không tải được danh sách phiếu nộp");
     }
-  }, [filters]);
+    setLoading(false);
+  }, [filters, showPage]);
 
   useEffect(() => {
     loadPayments(1);
-    loadSummary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = () => {
-    loadPayments(1);
-    loadSummary();
-  };
+  const handleSearch = () => loadPayments(1);
 
   const handleResetFilters = () => {
-    setFilters({ householdId: "", keyword: "", status: "ALL" });
-    setTimeout(() => {
-      loadPayments(1);
-      loadSummary();
-    }, 0);
+    const reset = { householdId: "", keyword: "", status: "ALL", kind: "ALL" };
+    setFilters(reset);
+    loadPayments(1, reset);
   };
 
   // ----- Lựa chọn hàng loạt -----
@@ -173,7 +173,6 @@ export function Payments() {
     setCashAmount("");
     showToast("Đã xác nhận nộp tiền mặt");
     await loadPayments(page);
-    loadSummary();
   };
 
   const handleBulkConfirm = async () => {
@@ -189,14 +188,12 @@ export function Payments() {
       showToast(`Đã xác nhận tiền mặt cho ${res.ok} phiếu`);
     }
     await loadPayments(page);
-    loadSummary();
   };
 
   return (
     <>
       <SectionHeader
         title="Thu phí / Công nợ"
-        desc="Danh sách phiếu nộp của các hộ. Xác nhận khi hộ nộp tiền mặt; phiếu thanh toán online (VNPay) được cập nhật tự động."
       />
 
       {toast && (
@@ -204,13 +201,12 @@ export function Payments() {
       )}
 
       <div className="mb-5 grid gap-4 md:grid-cols-4">
-        <Card><p className="text-sm font-semibold text-slate-500">Tổng phải thu</p><p className="mt-2 text-2xl font-black">{money(summary.totalDue)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Đã thu</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.totalPaid)}</p></Card>
-        <Card><p className="text-sm font-semibold text-slate-500">Phiếu đã nộp</p><p className="mt-2 text-2xl font-black text-emerald-700">{summary.paid}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Công nợ bắt buộc</p><p className="mt-2 text-2xl font-black text-rose-700">{money(summary.mandatoryDue)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Đã thu phí</p><p className="mt-2 text-2xl font-black text-emerald-700">{money(summary.mandatoryPaid)}</p></Card>
+        <Card><p className="text-sm font-semibold text-slate-500">Tổng đóng góp</p><p className="mt-2 text-2xl font-black text-violet-700">{money(summary.donationPaid)}</p></Card>
         <Card>
-          <p className="text-sm font-semibold text-slate-500">Phiếu chưa nộp</p>
-          <p className="mt-2 text-2xl font-black text-rose-700">{summary.pending}</p>
-          <p className="mt-1 text-xs text-slate-500">{summary.pendingDonation} phiếu tự nguyện</p>
+          <p className="text-sm font-semibold text-slate-500">Mục đang mở</p>
+          <p className="mt-2 text-2xl font-black text-slate-900">{summary.pending}</p>
         </Card>
       </div>
 
@@ -219,7 +215,7 @@ export function Payments() {
       )}
 
       <Card className="mb-5">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Input
             label="Mã hộ (householdId)"
             placeholder="VD: 1"
@@ -238,6 +234,11 @@ export function Payments() {
             <option value="ALL">Tất cả</option>
             <option value="PAID">Đã nộp</option>
             <option value="UNPAID">Chưa nộp</option>
+          </Select>
+          <Select label="Nhóm khoản" value={filters.kind} onChange={(e) => setFilters({ ...filters, kind: e.target.value })}>
+            <option value="ALL">Tất cả</option>
+            <option value="MANDATORY">Công nợ bắt buộc</option>
+            <option value="DONATION">Đóng góp</option>
           </Select>
           <div className="flex items-end gap-3">
             <Button onClick={handleSearch}><Search className="h-4 w-4" /> Tìm kiếm</Button>
@@ -285,7 +286,7 @@ export function Payments() {
                 <th className="px-5 py-4">Hộ</th>
                 <th className="px-5 py-4">Khoản thu</th>
                 <th className="px-5 py-4">Đợt thu</th>
-                <th className="px-5 py-4 text-right">Cần đóng</th>
+                <th className="px-5 py-4 text-right">Số tiền</th>
                 <th className="px-5 py-4 text-right">Đã nộp</th>
                 <th className="px-5 py-4">Hình thức</th>
                 <th className="px-5 py-4">Trạng thái</th>
@@ -312,12 +313,12 @@ export function Payments() {
                       />
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{p.householdCode || p.householdId}</td>
-                    <td className="px-5 py-4 text-slate-700">{p.feeName || "__"}</td>
-                    <td className="px-5 py-4 text-slate-700">{p.feePeriodName || "__"}</td>
+                    <td className="px-5 py-4 text-slate-700">{p.feeName || "—"}</td>
+                    <td className="px-5 py-4 text-slate-700">{p.feePeriodName || "—"}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{dueDisplay(p)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{paidDisplay(p)}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-700">{methodLabel(p.paymentMethod)}</td>
-                    <td className="whitespace-nowrap px-5 py-4">{statusBadge(p.status)}</td>
+                    <td className="whitespace-nowrap px-5 py-4">{statusBadge(p)}</td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end">
                         {unpaid ? (
@@ -341,7 +342,7 @@ export function Payments() {
         </div>
         {!loading && total > 0 && (
           <div className="border-t border-slate-200">
-            <Pagination page={page} total={total} pageSize={PAGE_SIZE} onPageChange={(p) => loadPayments(p)} />
+            <Pagination page={page} total={total} pageSize={PAGE_SIZE} onPageChange={(p) => { setSelectedIds(new Set()); showPage(allRows, p); }} />
           </div>
         )}
       </div>

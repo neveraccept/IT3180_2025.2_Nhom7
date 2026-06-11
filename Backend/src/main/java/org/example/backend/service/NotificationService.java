@@ -81,9 +81,10 @@ public class NotificationService {
 
     // F9.3 - Cư dân/Admin xem thông báo gửi cho mình (filter theo recipient_id)
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<NotificationDTO> getMyNotifications(Pageable pageable) {
         User me = currentUserService.getCurrentUser();
+        backfillRecipientsForNewResidentAccount(me);
         Page<NotificationDTO> page = recipientRepository
                 .findByRecipientId(me.getId(), pageable)
                 .map(mapper::toRecipientDto);
@@ -100,6 +101,34 @@ public class NotificationService {
                 .map(n -> mapper.toSentDto(
                         n, (int) recipientRepository.countByNotificationId(n.getId())));
         return PageResponse.of(page);
+    }
+
+    @Transactional
+    public void backfillRecipientsForNewResidentAccount(User user) {
+        if (!isActiveResidentAccount(user) || user.getHousehold() == null) {
+            return;
+        }
+
+        Long householdId = user.getHousehold().getId();
+        Integer floor = user.getHousehold().getApartment() == null
+                ? null
+                : user.getHousehold().getApartment().getFloor();
+
+        List<Notification> notifications = notificationRepository
+                .findMissingApplicableNotificationsForUser(user.getId(), householdId, floor);
+        if (notifications.isEmpty()) {
+            return;
+        }
+
+        List<NotificationRecipient> rows = new ArrayList<>(notifications.size());
+        for (Notification notification : notifications) {
+            NotificationRecipient nr = new NotificationRecipient();
+            nr.setNotification(notification);
+            nr.setRecipient(user);
+            nr.setIsRead(false);
+            rows.add(nr);
+        }
+        recipientRepository.saveAll(rows);
     }
 
     // F9.4 - Đánh dấu thông báo đã đọc
@@ -142,6 +171,14 @@ public class NotificationService {
     }
 
     /** Quy đổi phạm vi (ALL / BY_FLOOR / BY_HOUSEHOLD) thành danh sách cư dân nhận. */
+    private boolean isActiveResidentAccount(User user) {
+        return user != null
+                && user.isActive()
+                && !user.isDeleted()
+                && user.getRole() != null
+                && "RESIDENT".equals(user.getRole().getName());
+    }
+
     private List<User> resolveRecipients(NotificationCreateRequest req) {
         return switch (req.scope()) {
             case ALL -> userRepository.findActiveResidents();

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Building2, X, Menu, LogOut } from "lucide-react";
-import { adminNav, residentNav } from "../../data/mockData";
+import { adminNav, residentNav } from "../../data/navigation";
 import { Badge, Button } from "../common";
 import { Dashboard } from "../../pages/Dashboard";
 import { Registrations } from "../../pages/Registrations";
@@ -22,19 +22,6 @@ export function Layout({ user, setUser, logout }) {
   const nav = user.role === "ADMIN" ? adminNav : residentNav;
   const [active, setActive] = useState("dashboard");
   const [open, setOpen] = useState(false);
-  const [dashboardTarget, setDashboardTarget] = useState({ complaintId: null, notificationId: null });
-
-  const openComplaintFromDashboard = (complaintId) => {
-    setDashboardTarget({ complaintId, notificationId: null });
-  };
-
-  const openNotificationFromDashboard = (notificationId) => {
-    setDashboardTarget({ complaintId: null, notificationId });
-  };
-
-  const clearDashboardTarget = () => {
-    setDashboardTarget({ complaintId: null, notificationId: null });
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -46,7 +33,7 @@ export function Layout({ user, setUser, logout }) {
             </div>
             <div>
               <div className="font-black">BlueMoon</div>
-              <div className="text-xs text-slate-500">Thu phí chung cư</div>
+              <div className="text-xs text-slate-500">Phần mềm quản lý chung cư</div>
             </div>
           </div>
           <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
@@ -61,7 +48,6 @@ export function Layout({ user, setUser, logout }) {
                 onClick={() => {
                   setActive(item.key);
                   setOpen(false);
-                  clearDashboardTarget();
                 }}
                 className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold transition ${selected ? "bg-sky-50 text-sky-700 ring-1 ring-sky-100" : "text-slate-600 hover:bg-slate-50"}`}
               >
@@ -91,10 +77,6 @@ export function Layout({ user, setUser, logout }) {
             user={user}
             setUser={setUser}
             role={user.role}
-            dashboardTarget={dashboardTarget}
-            onDashboardTargetHandled={clearDashboardTarget}
-            onOpenComplaint={openComplaintFromDashboard}
-            onOpenNotification={openNotificationFromDashboard}
           />
         </div>
       </main>
@@ -107,19 +89,9 @@ export function Page({
   user,
   setUser,
   role,
-  dashboardTarget,
-  onDashboardTargetHandled,
-  onOpenComplaint,
-  onOpenNotification,
 }) {
   if (active === "dashboard") {
-    return (
-      <Dashboard
-        role={role}
-        onOpenComplaint={onOpenComplaint}
-        onOpenNotification={onOpenNotification}
-      />
-    );
+    return <Dashboard role={role} />;
   }
   if (active === "registrations") return <Registrations />;
   if (active === "accounts") return <Accounts />;
@@ -130,33 +102,14 @@ export function Page({
   if (active === "vehicles") return <Vehicles role={role} user={user} />;
   if (active === "utilities") return <Utilities />;
   if (active === "complaints") {
-    return (
-      <Complaints
-        role={role}
-        user={user}
-        initialComplaintId={dashboardTarget.complaintId}
-        onInitialComplaintHandled={onDashboardTargetHandled}
-      />
-    );
+    return <Complaints role={role} user={user} />;
   }
   if (active === "notifications") {
-    return (
-      <Notifications
-        role={role}
-        initialNotificationId={dashboardTarget.notificationId}
-        onInitialNotificationHandled={onDashboardTargetHandled}
-      />
-    );
+    return <Notifications role={role} />;
   }
   if (active === "statistics") return <Statistics />;
   if (active === "auditLogs") return <AuditLogs />;
   if (active === "myFees") return <MyFees user={user} />;
   if (active === "profile") return <Profile user={user} setUser={setUser} />;
-  return (
-    <Dashboard
-      role={role}
-      onOpenComplaint={onOpenComplaint}
-      onOpenNotification={onOpenNotification}
-    />
-  );
+  return <Dashboard role={role} />;
 }

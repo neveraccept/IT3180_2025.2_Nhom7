@@ -134,7 +134,7 @@ public class ParkingService {
                                     "VEHICLE_NOT_FOUND", "Không tìm thấy xe id=" + req.vehicleId()));
             if (!Boolean.TRUE.equals(vehicle.getActive())) {
                 throw new BadRequestException("VEHICLE_INACTIVE",
-                        "Xe " + vehicle.getLicensePlate() + " đã huỷ đăng ký, không thể gán chỗ");
+                        "Xe " + vehicle.getLicensePlate() + " đã hủy đăng ký, không thể gán chỗ");
             }
             if (vehicle.getType() != slot.getType()) {
                 throw new BadRequestException("PARKING_TYPE_MISMATCH",

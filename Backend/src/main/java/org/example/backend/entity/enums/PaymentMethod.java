@@ -1,7 +1,7 @@
 package org.example.backend.entity.enums;
 
 /**
- * Phương thức thanh toán hoá đơn.
+ * Phương thức thanh toán hóa đơn.
  *   CASH   – Admin xác nhận đã nộp tiền mặt (F7.3).
  *   ONLINE – Thanh toán qua VNPay Sandbox (module thanh toán xử lý).
  *

@@ -1,5 +1,6 @@
 package org.example.backend.controller;
 
+import jakarta.validation.Valid;
 import org.example.backend.dto.FeeDTO;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.dto.response.PageResponse;
@@ -18,13 +19,13 @@ public class FeeController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ApiResponse<FeeDTO> createFee(@RequestBody FeeDTO feeDTO) {
+    public ApiResponse<FeeDTO> createFee(@Valid @RequestBody FeeDTO feeDTO) {
         return ApiResponse.ok(feeService.createFee(feeDTO), "Tạo khoản thu thành công");
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ApiResponse<FeeDTO> updateFee(@PathVariable Long id, @RequestBody FeeDTO feeDTO) {
+    public ApiResponse<FeeDTO> updateFee(@PathVariable Long id, @Valid @RequestBody FeeDTO feeDTO) {
         return ApiResponse.ok(feeService.updateFee(id, feeDTO), "Cập nhật khoản thu thành công");
     }
 

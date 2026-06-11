@@ -23,7 +23,7 @@ import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
 // ============================================================
 //  Module 6 — Phương tiện (Vehicle) + chỗ gửi xe (Parking).
 //  Nguồn dữ liệu: backend VehicleController + ParkingController.
-//  - ADMIN: tổng quan chỗ gửi, đăng ký/sửa/huỷ xe theo hộ, xem chỗ gửi, tạo lượt gửi.
+//  - ADMIN: tổng quan chỗ gửi, đăng ký/sửa/hủy xe theo hộ, xem chỗ gửi, tạo lượt gửi.
 //  - RESIDENT: chỉ xem xe & lượt gửi của hộ mình (backend không có cư dân tự đăng ký).
 //  Backend chỉ có loại xe MOTORBIKE | CAR. Giữ ngôn ngữ UI/Tailwind sẵn có.
 //  Khoảng trống backend: không có API "liệt kê tất cả xe / tất cả lượt đăng ký" cho admin
@@ -38,6 +38,13 @@ const slotStatusBadge = (status) => {
 const regStatusBadge = (status) => (
   <Badge tone={status === "ACTIVE" ? "green" : "gray"}>{status === "ACTIVE" ? "Đang hiệu lực" : "Đã kết thúc"}</Badge>
 );
+const getRegistrationMonthlyFee = (registration) =>
+  registration.monthlyFee ?? registration.parkingFee ?? registration.feePerMonth ?? registration.fee;
+const parkingPriceKeyByVehicleType = (type) => {
+  if (type === "CAR") return CONFIG_KEYS.CAR_PARKING_PRICE;
+  if (type === "MOTORBIKE") return CONFIG_KEYS.MOTORBIKE_PARKING_PRICE;
+  return null;
+};
 
 export function Vehicles({ role = "ADMIN" }) {
   const isAdmin = role === "ADMIN";
@@ -84,7 +91,7 @@ function AdminVehicles() {
   // Bộ lọc chỗ gửi: ALL | OCCUPIED (đang có xe) | EMPTY (đang trống)
   const [slotFilter, setSlotFilter] = useState("ALL");
 
-  // Sinh hoá đơn phí gửi xe theo tháng.
+  // Sinh hóa đơn phí gửi xe theo tháng.
   const [showFeeForm, setShowFeeForm] = useState(false);
   const [feeForm, setFeeForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [feeError, setFeeError] = useState("");
@@ -349,8 +356,8 @@ function AdminVehicles() {
       if (!parkingRes.success) {
         setSaving(false);
         setFormError(`Đã đăng ký xe nhưng gán chỗ gửi thất bại: ${parkingRes.message || "Vui lòng thử lại ở form gán chỗ"}`);
-        await loadVehicles(String(form.householdId));
-        refreshLookupSlots(await loadSlots());
+        const freshSlots = await loadSlots();
+        refreshLookupSlots(freshSlots);
         await loadSummary();
         return;
       }
@@ -358,9 +365,9 @@ function AdminVehicles() {
     setSaving(false);
     setShowForm(false);
     showToast(editingVehicle ? "Đã cập nhật xe" : form.parkingSlotId ? "Đã đăng ký xe và gán chỗ gửi" : "Đã đăng ký xe");
-    const hid = editingVehicle ? loadedHousehold : String(form.householdId);
-    if (hid) await loadVehicles(hid);
-    refreshLookupSlots(await loadSlots());
+    if (editingVehicle && loadedHousehold) await loadVehicles(loadedHousehold);
+    const freshSlots = await loadSlots();
+    refreshLookupSlots(freshSlots);
     loadSummary();
   };
 
@@ -369,11 +376,11 @@ function AdminVehicles() {
     const res = await cancelVehicleAPI(cancelConfirm.id);
     setCancelConfirm(null);
     if (!res.success) {
-      showToast(res.message || "Huỷ xe thất bại", "red");
+      showToast(res.message || "Hủy xe thất bại", "red");
       return;
     }
     setShowForm(false);
-    showToast("Đã huỷ đăng ký xe");
+    showToast("Đã hủy đăng ký xe");
     if (loadedHousehold) await loadVehicles(loadedHousehold);
     loadSummary();
     refreshLookupSlots(await loadSlots());
@@ -398,18 +405,17 @@ function AdminVehicles() {
     const res = await generateParkingFeesAPI({ month: feeForm.month, year: feeForm.year });
     setFeeSaving(false);
     if (!res.success) {
-      setFeeError(res.message || "Tạo hoá đơn phí gửi xe thất bại");
+      setFeeError(res.message || "Tạo hóa đơn phí gửi xe thất bại");
       return;
     }
     setShowFeeForm(false);
-    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hoá đơn phí gửi xe (xem ở mục Thu phí)`);
+    showToast(`Đã tạo ${res.data?.invoiceCount ?? 0} hóa đơn phí gửi xe (xem ở mục Thu phí)`);
   };
 
   return (
     <>
       <SectionHeader
         title="Quản lý gửi xe"
-        desc="Đăng ký xe cho hộ, quản lý chỗ gửi và các lượt gửi/cho thuê. Tra cứu xe theo từng hộ."
         action={
           <div className="flex flex-wrap gap-3">
             <Button variant="secondary" onClick={() => { setFeeError(""); setShowFeeForm(true); }}>
@@ -503,7 +509,7 @@ function AdminVehicles() {
       </Card>
 
       {/* Chỗ gửi xe */}
-      <SectionHeader title="Chỗ gửi xe" desc="Danh sách chỗ gửi và trạng thái. Bấm để tạo lượt gửi (gán xe của hộ)." />
+      <SectionHeader title="Chỗ gửi xe" />
 
       {slotLookupTitle && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 ring-1 ring-sky-200">
@@ -516,7 +522,7 @@ function AdminVehicles() {
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="flex flex-wrap gap-2">
           {[
-            { key: "ALL", label: `Tat ca (${filterSourceSlots.length})` },
+            { key: "ALL", label: `Tất cả (${filterSourceSlots.length})` },
             { key: "OCCUPIED", label: `Đang có xe (${filterOccupiedCount})` },
             { key: "EMPTY", label: `Đang trống (${filterEmptyCount})` },
           ].map((f) => (
@@ -551,7 +557,7 @@ function AdminVehicles() {
             <tbody className="divide-y divide-slate-100">
               {displayedSlots.length === 0 && (
                 <tr><td colSpan={6} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">
-                  {slots.length === 0 ? "Chua co cho gui nao." : "Chua co cho gui nao phu hop."}
+                  {slots.length === 0 ? "Chưa có chỗ gửi nào." : "Chưa có chỗ gửi nào phù hợp."}
                 </td></tr>
               )}
               {pagedSlots.map((s) => (
@@ -636,7 +642,7 @@ function AdminVehicles() {
               <div className="flex justify-between gap-3 pt-2">
                 <div className="flex gap-3">
                   <Button variant="secondary" onClick={() => setShowForm(false)}>Hủy</Button>
-                  {editingVehicle && <Button variant="danger" onClick={() => setCancelConfirm(editingVehicle)}>Huỷ đăng ký</Button>}
+                  {editingVehicle && <Button variant="danger" onClick={() => setCancelConfirm(editingVehicle)}>Hủy đăng ký</Button>}
                 </div>
                 <Button onClick={handleSaveVehicle} disabled={saving}>{saving ? "Đang lưu…" : editingVehicle ? "Lưu" : "Đăng ký"}</Button>
               </div>
@@ -650,12 +656,12 @@ function AdminVehicles() {
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center gap-3">
               <div className="rounded-full bg-rose-100 p-3"><AlertCircle className="h-6 w-6 text-rose-600" /></div>
-              <h3 className="text-lg font-bold text-slate-900">Huỷ đăng ký xe</h3>
+              <h3 className="text-lg font-bold text-slate-900">Hủy đăng ký xe</h3>
             </div>
-            <p className="mb-6 text-slate-600">Bạn có chắc muốn huỷ đăng ký xe biển số <strong>{cancelConfirm.licensePlate}</strong>?</p>
+            <p className="mb-6 text-slate-600">Bạn có chắc muốn hủy đăng ký xe biển số <strong>{cancelConfirm.licensePlate}</strong>?</p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setCancelConfirm(null)}>Hủy</Button>
-              <Button variant="danger" onClick={handleCancelVehicle}>Huỷ đăng ký</Button>
+              <Button variant="danger" onClick={handleCancelVehicle}>Hủy đăng ký</Button>
             </div>
           </motion.div>
         </div>
@@ -679,7 +685,7 @@ function AdminVehicles() {
         </div>
       )}
 
-      {/* MODAL: sinh hoá đơn phí gửi xe theo tháng */}
+      {/* MODAL: sinh hóa đơn phí gửi xe theo tháng */}
       {showFeeForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
@@ -712,23 +718,44 @@ function AdminVehicles() {
 function ResidentVehicles() {
   const [vehicles, setVehicles] = useState([]);
   const [regs, setRegs] = useState([]);
+  const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
+
+  const vehicleTypeByPlate = useMemo(
+    () => new Map(vehicles.map((v) => [String(v.licensePlate || "").trim().toLowerCase(), v.type])),
+    [vehicles]
+  );
+  const parkingPrices = useMemo(
+    () => new Map(configs.map((c) => [c.configKey, Number(c.configValue)])),
+    [configs]
+  );
+  const systemMonthlyFeeOf = (registration) => {
+    const plateKey = String(registration.licensePlate || "").trim().toLowerCase();
+    const vehicleType = vehicleTypeByPlate.get(plateKey);
+    const priceKey = parkingPriceKeyByVehicleType(vehicleType);
+    const systemFee = priceKey ? parkingPrices.get(priceKey) : undefined;
+    return Number.isFinite(systemFee) ? systemFee : getRegistrationMonthlyFee(registration);
+  };
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [vRes, rRes] = await Promise.all([listMyVehiclesAPI(), listMyParkingRegistrationsAPI()]);
+      const [vRes, rRes, cRes] = await Promise.all([
+        listMyVehiclesAPI(),
+        listMyParkingRegistrationsAPI(),
+        listSystemConfigsAPI(),
+      ]);
       if (vRes.success) setVehicles(vRes.data?.items || []);
       else setPageError(vRes.message || "Không tải được danh sách xe");
       if (rRes.success) setRegs(rRes.data?.items || []);
+      if (cRes.success) setConfigs(cRes.data || []);
       setLoading(false);
     })();
   }, []);
-
   return (
     <>
-      <SectionHeader title="Xe của tôi" desc="Danh sách xe và các lượt gửi xe đang hiệu lực của hộ bạn. Liên hệ Ban quản lý để đăng ký xe mới." />
+      <SectionHeader title="Xe của tôi" />
 
       {pageError && (
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
@@ -753,8 +780,8 @@ function ResidentVehicles() {
                 <tr key={v.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{v.licensePlate}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(v.type)}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã huỷ"}</Badge></td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã hủy"}</Badge></td>
                 </tr>
               ))}
             </tbody>
@@ -780,9 +807,11 @@ function ResidentVehicles() {
               {regs.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50/80">
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{r.slotCode}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.licensePlate || "__"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{money(r.monthlyFee || 0)}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.startDate || "__"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.licensePlate || "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">
+                    {systemMonthlyFeeOf(r) == null ? "—" : money(systemMonthlyFeeOf(r))}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{r.startDate || "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{regStatusBadge(r.status)}</td>
                 </tr>
               ))}

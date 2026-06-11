@@ -17,7 +17,6 @@ import {
 // ============================================================
 //  Module 4 — Quản lý khoản thu (Fee) + đợt thu (FeePeriod).
 //  Nguồn dữ liệu: backend FeeController/FeePeriodController (ADMIN).
-//  Giữ nguyên UI/Tailwind; thay toàn bộ logic mock bằng gọi API thật.
 //  Mapping FeeDTO: { name, type(MANDATORY|DONATION), unitPrice, unit, description, active }.
 //  (Backend không có "cách tính" hay "lịch sử chỉnh sửa" → đã lược bỏ.)
 // ============================================================
@@ -52,6 +51,7 @@ export function Fees() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [filters, setFilters] = useState({ keyword: "", type: "ALL", active: "ALL" });
+  const [activeKind, setActiveKind] = useState("MANDATORY");
 
   // ---- Đợt thu ----
   const emptyPeriodForm = { feeId: "", name: "", startDate: "", endDate: "" };
@@ -60,19 +60,40 @@ export function Fees() {
   const [periodError, setPeriodError] = useState("");
   const [closeConfirm, setCloseConfirm] = useState(null);
 
-  const getTypeLabel = (type) => (type === "MANDATORY" ? "Bắt buộc" : "Tự nguyện");
+  const activeKindConfig = activeKind === "DONATION"
+    ? {
+        title: "Đóng góp tự nguyện",
+        createFee: "Tạo khoản đóng góp",
+        periodTitle: "Đợt kêu gọi đóng góp",
+        createPeriod: "Tạo đợt kêu gọi",
+        periodNameLabel: "Tên đợt kêu gọi",
+        periodPlaceholder: "VD: Đóng góp quỹ Trung thu 2026",
+      }
+    : {
+        title: "Phí bắt buộc",
+        createFee: "Tạo khoản phí",
+        periodTitle: "Đợt thu phí",
+        createPeriod: "Tạo đợt thu",
+        periodNameLabel: "Tên đợt thu",
+        periodPlaceholder: "VD: Phí quản lý tháng 6/2026",
+      };
+  const scopedFees = fees.filter((fee) => fee.type === activeKind);
+  const scopedPeriods = periods.filter((period) => fees.find((fee) => fee.id === period.feeId)?.type === activeKind);
+  const selectedPeriodFee = fees.find((fee) => String(fee.id) === String(periodForm.feeId));
+  const selectedPeriodIsDonation = selectedPeriodFee?.type === "DONATION";
+  const getTypeLabel = (type) => (type === "MANDATORY" ? "Bắt buộc" : "Đóng góp");
   const getTypeTone = (type) => (type === "MANDATORY" ? "red" : "violet");
   const getStatusLabel = (active) => (active ? "Đang dùng" : "Ngừng dùng");
   const getStatusTone = (active) => (active ? "green" : "gray");
   const formatUnitPrice = (fee) => {
     if (fee.type === "DONATION") return "Tự nguyện (cư dân tự nhập)";
-    if (!fee.unitPrice || Number(fee.unitPrice) <= 0) return "__";
+    if (!fee.unitPrice || Number(fee.unitPrice) <= 0) return "—";
     return `${new Intl.NumberFormat("vi-VN").format(Number(fee.unitPrice))} ${unitSuffix(fee.unit)}`.trim();
   };
   const getPeriodStatusLabel = (status) => (status === "OPEN" ? "Đang mở" : "Đã đóng");
   const getPeriodStatusTone = (status) => (status === "OPEN" ? "green" : "gray");
   const formatDate = (value) => {
-    if (!value) return "__";
+    if (!value) return "—";
     try {
       return new Date(value).toLocaleDateString("vi-VN");
     } catch {
@@ -111,13 +132,18 @@ export function Fees() {
 
   const handleSearch = () => loadFees();
   const handleResetFilters = async () => {
-    setFilters({ keyword: "", type: "ALL", active: "ALL" });
+    setFilters({ keyword: "", type: activeKind, active: "ALL" });
     const res = await listFeesAPI();
     if (res.success) setFees(res.data?.items || []);
   };
 
   const openCreateForm = () => {
-    setFormData(emptyForm);
+    setFormData({
+      ...emptyForm,
+      type: activeKind,
+      unitPrice: activeKind === "DONATION" ? "" : emptyForm.unitPrice,
+      unit: activeKind === "DONATION" ? "NONE" : emptyForm.unit,
+    });
     setEditingId(null);
     setError("");
     setShowForm(true);
@@ -188,7 +214,7 @@ export function Fees() {
 
   // ---- Đợt thu ----
   const openPeriodForm = () => {
-    setPeriodForm({ ...emptyPeriodForm, feeId: fees[0]?.id ? String(fees[0].id) : "" });
+    setPeriodForm({ ...emptyPeriodForm, feeId: scopedFees[0]?.id ? String(scopedFees[0].id) : "" });
     setPeriodError("");
     setShowPeriodForm(true);
   };
@@ -239,8 +265,7 @@ export function Fees() {
     <>
       <SectionHeader
         title="Quản lý khoản thu"
-        desc="Tạo khoản thu cho các khoản phát sinh sau này. Khoản thu định kỳ (phí dịch vụ, phí quản lý) được phát hành qua mục Đợt thu phí bên dưới."
-        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> Tạo khoản thu</Button>}
+        action={<Button onClick={openCreateForm}><Plus className="h-4 w-4" /> {activeKindConfig.createFee}</Button>}
       />
 
       {pageError && (
@@ -248,7 +273,39 @@ export function Fees() {
       )}
 
       <Card className="mb-5">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">{activeKindConfig.title}</h3>
+          </div>
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200">
+            {[
+              { key: "MANDATORY", label: "Phí bắt buộc" },
+              { key: "DONATION", label: "Đóng góp" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  setActiveKind(item.key);
+                  setFilters((prev) => ({ ...prev, type: item.key }));
+                  setShowForm(false);
+                  setShowPeriodForm(false);
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
+                  activeKind === item.key
+                    ? "bg-white text-sky-700 shadow-sm ring-1 ring-sky-100"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mb-5">
+        <div className="grid gap-4 md:grid-cols-2">
           <Input
             label="Tìm theo tên khoản thu"
             placeholder="VD: phí quản lý"
@@ -256,11 +313,6 @@ export function Fees() {
             onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
-          <Select label="Loại khoản thu" value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
-            <option value="ALL">Tất cả</option>
-            <option value="MANDATORY">Bắt buộc</option>
-            <option value="DONATION">Tự nguyện</option>
-          </Select>
           <Select label="Trạng thái" value={filters.active} onChange={(e) => setFilters({ ...filters, active: e.target.value })}>
             <option value="ALL">Tất cả</option>
             <option value="ACTIVE">Đang dùng</option>
@@ -290,15 +342,15 @@ export function Fees() {
               {loading && (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Đang tải dữ liệu…</td></tr>
               )}
-              {!loading && fees.length === 0 && (
+              {!loading && scopedFees.length === 0 && (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Chưa có khoản thu nào.</td></tr>
               )}
-              {!loading && fees.map((fee) => (
+              {!loading && scopedFees.map((fee) => (
                 <tr key={fee.id} className="hover:bg-slate-50/80">
                   <td className="px-5 py-4 font-semibold text-slate-800">{fee.name}</td>
                   <td className="px-5 py-4"><Badge tone={getTypeTone(fee.type)}>{getTypeLabel(fee.type)}</Badge></td>
                   <td className="px-5 py-4 text-slate-700">{formatUnitPrice(fee)}</td>
-                  <td className="px-5 py-4 text-slate-600">{fee.description || "__"}</td>
+                  <td className="px-5 py-4 text-slate-600">{fee.description || "—"}</td>
                   <td className="px-5 py-4"><Badge tone={getStatusTone(fee.active)}>{getStatusLabel(fee.active)}</Badge></td>
                   <td className="px-5 py-4 text-right">
                     <button onClick={() => openDetail(fee)} className="font-semibold text-sky-700 hover:text-sky-900">Chi tiết</button>
@@ -313,9 +365,8 @@ export function Fees() {
       {/* ===================== ĐỢT THU ===================== */}
       <div className="mt-8">
         <SectionHeader
-          title="Đợt thu phí"
-          desc="Khoản thu định kỳ lặp lại theo thời gian. Khi tạo một đợt thu, hệ thống tự phát hành phiếu thu cho mọi hộ với số tiền tính theo đơn giá hiện hành của khoản thu."
-          action={<Button onClick={openPeriodForm} disabled={fees.length === 0}><Plus className="h-4 w-4" /> Tạo đợt thu</Button>}
+          title={activeKindConfig.periodTitle}
+          action={<Button onClick={openPeriodForm} disabled={scopedFees.length === 0}><Plus className="h-4 w-4" /> {activeKindConfig.createPeriod}</Button>}
         />
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="overflow-x-auto">
@@ -331,10 +382,10 @@ export function Fees() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {periods.length === 0 && (
+                {scopedPeriods.length === 0 && (
                   <tr><td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-slate-500">Chưa có đợt thu nào.</td></tr>
                 )}
-                {periods.map((p) => (
+                {scopedPeriods.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/80">
                     <td className="px-5 py-4 font-semibold text-slate-800">{p.name}</td>
                     <td className="px-5 py-4 text-slate-700">{feeName(p.feeId)}</td>
@@ -343,7 +394,7 @@ export function Fees() {
                     <td className="px-5 py-4"><Badge tone={getPeriodStatusTone(p.status)}>{getPeriodStatusLabel(p.status)}</Badge></td>
                     <td className="px-5 py-4 text-right">
                       {p.status === "OPEN" ? (
-                        <button onClick={() => setCloseConfirm(p)} className="font-semibold text-rose-700 hover:text-rose-900">Đóng đợt</button>
+                          <button onClick={() => setCloseConfirm(p)} className="font-semibold text-rose-700 hover:text-rose-900">Đóng đợt</button>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
@@ -360,27 +411,18 @@ export function Fees() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-black">{editingId ? "Chi tiết khoản thu" : "Tạo khoản thu mới"}</h3>
+            <h3 className="mb-4 text-lg font-black">
+              {editingId ? "Chi tiết khoản thu" : activeKind === "DONATION" ? "Tạo khoản đóng góp" : "Tạo khoản phí"}
+            </h3>
             <div className="space-y-4">
-              <Input label="Tên khoản thu" placeholder="VD: Phí quản lý chung cư" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+              <Input
+                label={formData.type === "DONATION" ? "Tên khoản đóng góp" : "Tên khoản phí"}
+                placeholder={formData.type === "DONATION" ? "VD: Quỹ Trung thu" : "VD: Phí quản lý chung cư"}
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
               <div className="grid gap-4 md:grid-cols-2">
-                <Select
-                  label="Loại"
-                  value={formData.type}
-                  onChange={(e) => {
-                    const type = e.target.value;
-                    setFormData({
-                      ...formData,
-                      type,
-                      // Tự nguyện: bỏ đơn giá & đơn vị; Bắt buộc: mặc định theo m².
-                      unitPrice: type === "DONATION" ? "" : formData.unitPrice,
-                      unit: type === "DONATION" ? "NONE" : (formData.unit === "NONE" ? "PER_M2" : formData.unit),
-                    });
-                  }}
-                >
-                  <option value="MANDATORY">Bắt buộc</option>
-                  <option value="DONATION">Tự nguyện</option>
-                </Select>
+                <Input label="Loại" value={formData.type === "DONATION" ? "Đóng góp tự nguyện" : "Phí bắt buộc"} disabled />
                 <Select label="Trạng thái" value={formData.active ? "ACTIVE" : "INACTIVE"} onChange={(e) => setFormData({ ...formData, active: e.target.value === "ACTIVE" })}>
                   <option value="ACTIVE">Đang dùng</option>
                   <option value="INACTIVE">Ngừng dùng</option>
@@ -401,14 +443,15 @@ export function Fees() {
                   </Select>
                 </div>
               )}
-              {formData.type === "DONATION" && (
-                <p className="-mt-1 text-xs font-medium text-violet-700">
-                  Khoản tự nguyện: mặc định VND, không có đơn giá — cư dân chủ động nhập số tiền khi thanh toán.
-                </p>
-              )}
               <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-slate-700">Mô tả</span>
-                <textarea rows={4} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100" placeholder="Nhập mô tả khoản thu..." />
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">{formData.type === "DONATION" ? "Mục đích đóng góp" : "Mô tả"}</span>
+                <textarea
+                  rows={4}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                  placeholder={formData.type === "DONATION" ? "VD: Tổ chức chương trình Trung thu cho cư dân nhí..." : "Nhập mô tả khoản thu..."}
+                />
               </label>
 
               {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{error}</div>}
@@ -444,18 +487,20 @@ export function Fees() {
       {showPeriodForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-black">Tạo đợt thu mới</h3>
+            <h3 className="mb-4 text-lg font-black">{activeKindConfig.createPeriod}</h3>
             <div className="space-y-4">
-              <Select label="Khoản thu" value={periodForm.feeId} onChange={(e) => setPeriodForm({ ...periodForm, feeId: e.target.value })}>
-                {fees.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              <Select label={activeKind === "DONATION" ? "Khoản đóng góp" : "Khoản phí"} value={periodForm.feeId} onChange={(e) => setPeriodForm({ ...periodForm, feeId: e.target.value })}>
+                {scopedFees.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </Select>
-              <Input label="Tên đợt thu" placeholder="VD: Phí quản lý tháng 6/2026" value={periodForm.name} onChange={(e) => setPeriodForm({ ...periodForm, name: e.target.value })} />
+              <Input label={activeKindConfig.periodNameLabel} placeholder={activeKindConfig.periodPlaceholder} value={periodForm.name} onChange={(e) => setPeriodForm({ ...periodForm, name: e.target.value })} />
               <div className="grid gap-4 md:grid-cols-2">
                 <Input label="Từ ngày" type="date" value={periodForm.startDate} onChange={(e) => setPeriodForm({ ...periodForm, startDate: e.target.value })} />
                 <Input label="Đến ngày" type="date" value={periodForm.endDate} onChange={(e) => setPeriodForm({ ...periodForm, endDate: e.target.value })} />
               </div>
               <p className="rounded-xl bg-sky-50 px-4 py-3 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
-                Khi lưu, hệ thống sẽ tự phát hành phiếu thu cho tất cả các hộ đang hoạt động, số tiền tính theo đơn giá hiện hành của khoản thu.
+                {selectedPeriodIsDonation
+                  ? "Khi lưu, hệ thống mở đợt đóng góp cho các hộ đang hoạt động. Khoản này không tính vào công nợ và chỉ ghi nhận số tiền cư dân thực đóng."
+                  : "Khi lưu, hệ thống sẽ tự phát hành phiếu thu cho tất cả các hộ đang hoạt động, số tiền tính theo đơn giá hiện hành của khoản phí."}
               </p>
               {periodError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{periodError}</div>}
               <div className="flex justify-end gap-3 pt-2">

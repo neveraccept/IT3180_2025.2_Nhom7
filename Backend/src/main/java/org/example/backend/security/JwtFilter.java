@@ -5,8 +5,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.backend.entity.Role;
 import org.example.backend.entity.User;
+import org.example.backend.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,9 +24,11 @@ public class JwtFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
 
     private final JwtUtil tokenProvider;
+    private final UserRepository userRepository;
 
-    public JwtFilter(JwtUtil tokenProvider) {
+    public JwtFilter(JwtUtil tokenProvider, UserRepository userRepository) {
         this.tokenProvider = tokenProvider;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -38,33 +40,31 @@ public class JwtFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                // 2.  Trích xuất toàn bộ thông tin từ token
+                // Token chỉ dùng để lấy userId; role/active/deleted luôn được đối chiếu lại với DB.
                 Claims claims = tokenProvider.getClaimsFromJWT(jwt);
-                String username = claims.getSubject();
                 // JJWT có thể parse số thành Integer hoặc Long, dùng Number.class để an toàn ép kiểu
                 Number userIdClaim = claims.get("userId", Number.class);
-                String roleName = claims.get("role", String.class);
 
                 // Token thiếu claim bắt buộc → coi như không hợp lệ, bỏ qua xác thực
-                if (userIdClaim == null || roleName == null) {
-                    log.warn("JWT thiếu claim userId/role, bỏ qua thiết lập xác thực");
+                if (userIdClaim == null) {
+                    log.warn("JWT thiếu claim userId, bỏ qua thiết lập xác thực");
                     filterChain.doFilter(request, response);
                     return;
                 }
                 Long userId = userIdClaim.longValue();
 
-                // 2. Tạo đối tượng User "ảo" chỉ chứa các thông tin định danh
-                Role role = new Role(roleName);
-                User user = new User();
-                user.setId(userId);
-                user.setUsername(username);
-                user.setRole(role);
-                user.setActive(true); // Token hợp lệ đồng nghĩa với tài khoản đang active
+                // Nạp user thật từ DB (JOIN FETCH role) thay vì tin thông tin trong token.
+                // Tài khoản đã bị xóa mềm / khóa / không tồn tại → từ chối xác thực dù token còn hạn.
+                User user = userRepository.findByIdWithRole(userId).orElse(null);
+                if (user == null || user.isDeleted() || !user.isActive()) {
+                    log.debug("Từ chối xác thực: user id={} không tồn tại hoặc đã bị khóa/xóa", userId);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
 
-                // 3. Đóng gói vào CustomUserDetails
+                // Đóng gói User (kèm role hiện tại trong DB) vào CustomUserDetails
                 CustomUserDetails userDetails = new CustomUserDetails(user);
 
-                // 4. Set vào SecurityContext
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -73,7 +73,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 if (log.isDebugEnabled()) {
                     log.debug("Xác thực thành công cho user '{}' với quyền {}",
-                            username, authentication.getAuthorities());
+                            user.getUsername(), authentication.getAuthorities());
                 }
             }
         } catch (Exception ex) {

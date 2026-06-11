@@ -53,7 +53,6 @@ public class HouseholdLifecycleService {
 
 
     //  Xem hộ dân/hộ khẩu đang ở trong căn hộ
-
     @Transactional(readOnly = true)
     public HouseholdSummaryDTO getActiveHousehold(Long apartmentId) {
         requireApartment(apartmentId);
@@ -64,8 +63,8 @@ public class HouseholdLifecycleService {
                         "Căn hộ id=" + apartmentId + " hiện không có hộ dân đang cư trú"));
         return mapper.toHouseholdSummary(h);
     }
-    //  cán hộ dân vào căn hộ trống
 
+    //  cán hộ dân vào căn hộ trống
     @LogAdminAction(entity = "Household", action = "CREATE", description = "Gán hộ dân vào căn hộ",
             detail = "'Hộ ' + #result.code() + ' vào căn hộ ' + #result.apartmentCode()")
     @Transactional
@@ -76,8 +75,8 @@ public class HouseholdLifecycleService {
     }
 
     /**
-     * Action 1 – Bàn giao nhà (Move-in): tìm căn hộ theo MÃ, tạo hộ + chủ hộ,
-     * đổi căn hộ sang OCCUPIED và (tùy chọn) cấp tài khoản đăng nhập cho chủ hộ.
+     * Bàn giao nhà: tìm căn hộ theo mã, tạo hộ + chủ hộ,
+     * đổi căn hộ sang OCCUPIED và  cấp tài khoản đăng nhập cho chủ hộ.
      * Toàn bộ trong 1 giao dịch: lỗi ở bất kỳ bước nào -> rollback tất cả.
      */
     @LogAdminAction(entity = "Household", action = "CREATE", description = "Bàn giao nhà cho hộ mới",
@@ -150,7 +149,6 @@ public class HouseholdLifecycleService {
         // Cập nhật quan hệ in-memory để map đầy đủ trả về
         h.getResidents().add(head);
 
-        // ---- Cập nhật trạng thái căn hộ ----
         ap.setStatus(ApartmentStatus.OCCUPIED);
         apartmentRepository.save(ap);
 
@@ -158,8 +156,7 @@ public class HouseholdLifecycleService {
     }
 
     /**
-     * Action 2 – Thêm nhân khẩu vào hộ đã có: tái dùng ResidentService.createResident
-     * (đã có sẵn kiểm tra hộ ACTIVE + trùng CCCD). householdId lấy từ path.
+     * Thêm nhân khẩu vào hộ đã có: tương tự tạo Resident bình thường nhưng gán householdId vào. Cần đảm bảo hộ đang ACTIVE
      */
     @Transactional
     public ResidentDetailDTO addMember(Long householdId, AddMemberRequest req) {
@@ -167,7 +164,7 @@ public class HouseholdLifecycleService {
     }
 
     /**
-     * Action 4 – Chuyển đi / Giải tán hộ theo householdId:
+     * Chuyển đi / Giải tán hộ theo householdId:
      * Household -> MOVED_OUT, mọi nhân khẩu ACTIVE -> MOVED_OUT, căn hộ -> AVAILABLE,
      * và KHÓA toàn bộ tài khoản cư dân gắn với hộ. Tất cả trong 1 giao dịch.
      */
@@ -192,7 +189,6 @@ public class HouseholdLifecycleService {
 
 
     // Cập nhật hoặc Chuyển hộ ra khỏi căn hộ
-
     @LogAdminAction(entity = "Household", action = "UPDATE", description = "Cập nhật/chuyển hộ dân khỏi căn hộ")
     @Transactional
     public HouseholdSummaryDTO updateHousehold(Long apartmentId, UpdateHouseholdRequest req) {
@@ -275,7 +271,7 @@ public class HouseholdLifecycleService {
         return mapper.toHouseholdSummary(h);
     }
 
-    // chuển khỏi căn h
+    // chuển khỏi căn hộ
     private HouseholdSummaryDTO doMoveOut(Apartment ap, Household h) {
         h.setStatus(HouseholdStatus.MOVED_OUT);
         householdRepository.save(h);
@@ -285,7 +281,7 @@ public class HouseholdLifecycleService {
         residentRepository.markAllResidentsMovedOut(h.getId(),
                 ResidentStatus.MOVED_OUT);
 
-        // Khóa toàn bộ tài khoản cư dân gắn với hộ (Action 4 - phần tài khoản).
+        // Khóa toàn bộ tài khoản cư dân gắn với hộ ( phần tài khoản).
         // Đặt ở đây để cả 2 luồng move-out (qua căn hộ và qua householdId) đều khóa nhất quán.
         userService.lockUsersByHousehold(h.getId());
 
@@ -297,7 +293,6 @@ public class HouseholdLifecycleService {
     }
 
 
-    //  Helpers
     private Apartment requireApartment(Long id) {
         return apartmentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(

@@ -14,7 +14,6 @@ public final class AuditContext {
     private AuditContext() {
     }
 
-    /** Service gọi để bổ sung mô tả chi tiết cho thao tác đang chạy. */
     public static void detail(String text) {
         if (text != null && !text.isBlank()) {
             DETAIL.set(text);

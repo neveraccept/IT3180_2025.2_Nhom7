@@ -24,10 +24,13 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             countQuery = "SELECT COUNT(p) FROM Payment p WHERE p.household.id = :householdId")
     Page<Payment> findByHousehold_Id(@Param("householdId") Long householdId, Pageable pageable);
 
-    Page<Payment> findByFeePeriod_Id(Long feePeriodId, Pageable pageable);
-
     /** Số phiếu thu đã sinh cho một đợt thu — dùng để backfill những đợt chưa có phiếu. */
     long countByFeePeriod_Id(Long feePeriodId);
+
+    /** Id các phiếu thu của một đợt theo trạng thái — dùng khi đóng đợt để rà soát giao dịch batch còn treo. */
+    @Query("SELECT p.id FROM Payment p WHERE p.feePeriod.id = :feePeriodId AND p.status = :status")
+    java.util.List<Long> findIdsByFeePeriodAndStatus(@Param("feePeriodId") Long feePeriodId,
+                                                     @Param("status") String status);
 
     @Query(value = """
             SELECT p FROM Payment p

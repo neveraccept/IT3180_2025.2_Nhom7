@@ -46,11 +46,15 @@ export const getPendingAccountsAPI = () => callApi(axiosClient.get("/api/users/p
 export const createInternalAccountAPI = (payload) =>
   callApi(axiosClient.post("/api/users", payload));
 
-// PUT /api/users/{id}/approve -> Admin duyệt tài khoản cư dân
-export const approveAccountAPI = (id) => callApi(axiosClient.put(`/api/users/${id}/approve`));
+// PUT /api/users/{id}/approve -> Admin duyệt tài khoản cư dân.
+// payload (tùy chọn) gắn/tạo nhân khẩu cho tài khoản:
+//   { linkResidentId?, idCard?, dateOfBirth?, gender?, relationToHead?, residencyStatus?, newHouseholdCode?, moveInDate? }
+export const approveAccountAPI = (id, payload) =>
+  callApi(axiosClient.put(`/api/users/${id}/approve`, payload || {}));
 
-// DELETE /api/users/{id}/reject -> Admin từ chối & xóa tài khoản chờ duyệt
-export const rejectAccountAPI = (id) => callApi(axiosClient.delete(`/api/users/${id}/reject`));
+// DELETE /api/users/{id}/reject?reason=... -> Admin từ chối & xóa tài khoản chờ duyệt (kèm lý do)
+export const rejectAccountAPI = (id, reason) =>
+  callApi(axiosClient.delete(`/api/users/${id}/reject`, { params: reason ? { reason } : undefined }));
 
 // PUT /api/users/{id} -> Admin cập nhật thông tin tài khoản
 export const updateUserAPI = (id, payload) => callApi(axiosClient.put(`/api/users/${id}`, payload));

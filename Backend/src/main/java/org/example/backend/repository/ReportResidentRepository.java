@@ -21,12 +21,6 @@ import java.util.List;
 @Repository
 public interface ReportResidentRepository extends JpaRepository<Resident, Long> {
 
-    long countByStatus(ResidentStatus status);
-
-    long countByStatusAndResidencyStatus(ResidentStatus status, ResidencyStatus residencyStatus);
-
-    long countByStatusAndGender(ResidentStatus status, Gender gender);
-
     @Query("""
             SELECT COUNT(r) FROM Resident r
             WHERE r.status = :status

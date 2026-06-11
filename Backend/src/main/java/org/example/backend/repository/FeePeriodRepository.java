@@ -11,6 +11,6 @@ public interface FeePeriodRepository extends JpaRepository<FeePeriod, Long> {
     boolean existsByFeeId(Long feeId);
     Page<FeePeriod> findByFeeId(Long feeId, Pageable pageable);
 
-    // Chống tạo trùng đợt thu (vd: hoá đơn phí gửi xe cùng tháng).
+    // Chống tạo trùng đợt thu (vd: hóa đơn phí gửi xe cùng tháng).
     boolean existsByFeeIdAndName(Long feeId, String name);
 }

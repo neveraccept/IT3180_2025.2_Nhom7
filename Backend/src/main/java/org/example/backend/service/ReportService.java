@@ -263,8 +263,6 @@ public class ReportService {
 
     @Transactional
     public byte[] exportResidentExcel() {
-        // Excel xuất CHI TIẾT danh sách nhân khẩu đang cư trú (theo yêu cầu nghiệp vụ),
-        // thay vì các con số tổng hợp như màn hình xem trước.
         List<Resident> residents = residentRepository
                 .findDetailedByStatusInRange(ResidentStatus.ACTIVE, null, null);
         ReportData data = buildResidentDetailReport(residents);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Download } from "lucide-react";
+import { Download, BarChart3 } from "lucide-react";
 import { money } from "../utils/helpers";
 import { Button, Card, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
@@ -231,7 +231,6 @@ export function Statistics() {
 
       <SectionHeader
         title="Trình xuất báo cáo"
-        desc="Thiết lập bộ lọc, xem trước dữ liệu và xuất báo cáo Excel/PDF."
       />
 
       <Card className="mb-6">
@@ -394,8 +393,16 @@ export function Statistics() {
             )}
           </>
         ) : (
-          <div className="px-5 py-10 text-center text-sm font-semibold text-slate-500">
-            Vui lòng chọn loại báo cáo, thiết lập bộ lọc và nhấn 'Áp dụng' để xem trước dữ liệu.
+          <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-50 text-sky-500 ring-1 ring-sky-100">
+              <BarChart3 className="h-8 w-8" />
+            </div>
+            <h3 className="text-base font-black text-slate-800">Chưa có dữ liệu xem trước</h3>
+            <p className="mt-1.5 max-w-md text-sm leading-6 text-slate-500">
+              Chọn loại báo cáo và thiết lập bộ lọc, sau đó nhấn{" "}
+              <span className="font-semibold text-slate-700">"Áp dụng"</span> để xem trước, hoặc{" "}
+              <span className="font-semibold text-slate-700">"Xuất Excel/PDF"</span> để tải báo cáo về máy.
+            </p>
           </div>
         )}
       </Card>

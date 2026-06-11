@@ -61,7 +61,7 @@ public class ResidentService {
         r.setFullName(req.fullName().trim());
         r.setIdCard(req.idCard().trim());
         r.setDateOfBirth(req.dateOfBirth());
-        r.setGender(req.gender()); // Enum
+        r.setGender(req.gender());
         r.setRelationToHead(req.relationToHead().trim());
 
         // Mặc định PERMANENT nếu người dùng không truyền vào
@@ -171,7 +171,6 @@ public class ResidentService {
         return residentMapper.toDetail(r);
     }
 
-    // Helper
     private Resident findActiveResidentOrThrow(Long id) {
         Resident r = residentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(

@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 /**
  * Body cho POST /api/admin/utility-fees/generate.
  * Tạo một đợt thu "Phí điện nước" cho tháng/năm chỉ định và sinh phiếu nộp cho mỗi hộ
- * dựa trên tổng số tiền các hoá đơn điện/nước/internet CHƯA NỘP của hộ đó trong tháng.
+ * dựa trên tổng số tiền các hóa đơn điện/nước/internet CHƯA NỘP của hộ đó trong tháng.
  */
 public record GenerateUtilityFeeRequest(
         @NotNull(message = "Tháng không được để trống")
