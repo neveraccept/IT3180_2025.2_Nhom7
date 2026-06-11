@@ -7,9 +7,5 @@ public record OtpRequest(
         @NotBlank(message = "Email không được để trống")
         @Email(message = "Email không đúng định dạng")
         String email
-
-//        @NotBlank(message = "Mục đích (purpose) không được để trống")
-//        String purpose
-        // Giá trị hợp lệ thường là: "REGISTER" hoặc "FORGOT_PASSWORD"
 ) {
 }

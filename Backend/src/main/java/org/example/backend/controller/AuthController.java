@@ -5,14 +5,12 @@ import org.example.backend.dto.*;
 import org.example.backend.dto.request.*;
 import org.example.backend.dto.response.ApiResponse;
 import org.example.backend.entity.User;
-import org.example.backend.security.CustomUserDetails;
 import org.example.backend.service.AuthService;
 import org.example.backend.service.EmailService;
 import org.example.backend.service.OtpService;
 import org.example.backend.service.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -26,7 +24,10 @@ public class AuthController {
 	private final UserMapper mapper;
 
 	@Autowired
-	public AuthController(OtpService otpService, EmailService emailService, AuthService authService, UserMapper mapper) {
+	public AuthController(OtpService otpService,
+						  EmailService emailService,
+						  AuthService authService,
+						  UserMapper mapper) {
 		this.otpService = otpService;
 		this.emailService = emailService;
 		this.authService = authService;
@@ -34,7 +35,7 @@ public class AuthController {
 	}
 
 	// 1. API Gửi mã OTP
-	@PostMapping("/register/send-otp")
+	@PostMapping({"/send-otp", "/register/send-otp"})
 	public ResponseEntity<?> sendOtp(@Valid @RequestBody OtpRequest request) {
 		try {
 			// Sinh mã OTP và băm lưu vào DB
@@ -50,7 +51,7 @@ public class AuthController {
 	}
 
 	// 2. API Xác thực mã OTP
-	@PostMapping("/register/verify-otp")
+	@PostMapping({"/verify-otp", "/register/verify-otp"})
 	public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
 		try {
 			boolean isValid = otpService.verifyOtp(request, "REGISTER");
@@ -78,7 +79,7 @@ public class AuthController {
 
 		} catch (IllegalArgumentException ex) {
 			String errorMsg = ex.getMessage();
-			String errorCode = "CREATE_USER_FAILED"; // Mã mặc định
+			String errorCode = "CREATE_USER_FAILED";
 
 			// Phân loại mã lỗi (ErrorCode) dựa trên thông điệp thực tế từ AuthService
 			if (errorMsg.contains("Tên đăng nhập đã tồn tại")) {
@@ -99,62 +100,6 @@ public class AuthController {
 		} catch (Exception ex) {
 			// Lỗi 500: Các lỗi bất ngờ từ Server (ví dụ: đứt kết nối Database)
 			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"));
-		}
-	}
-
-	// 4. API tạo tài khoản nội bộ
-	@PostMapping("/createAccount")
-	public ResponseEntity<?> createInternalAccount(@Valid @RequestBody AdminRegisterRequest req) {
-		try {
-			// 1. Gọi Service để tạo tài khoản
-			User createdUser = authService.createInternalAccount(req);
-
-			// 2. Ép kiểu sang DTO để ẩn thông tin nhạy cảm
-			UserDTO responseDto = mapper.toDto(createdUser);
-
-			return ResponseEntity.status(201).body(ApiResponse.ok(responseDto, "Tạo tài khoản nội bộ thành công"));
-
-		} catch (IllegalArgumentException ex) {
-			String errorMsg = ex.getMessage();
-			String errorCode = "CREATE_USER_FAILED"; // Mã mặc định
-
-			// Phân loại mã lỗi (ErrorCode) dựa trên thông điệp từ UserService
-			if (errorMsg.contains("Username")) {
-				errorCode = "USERNAME_EXISTS";
-			} else if (errorMsg.contains("OTP")) {
-				errorCode = "EMAIL_NON_VERIFIED";
-			} else if (errorMsg.contains("Email")) {
-				errorCode = "EMAIL_EXISTS";
-			} else if (errorMsg.contains("Mật khẩu")) {
-				errorCode = "PASSWORD_MISMATCH";
-			} else if (errorMsg.contains("vai trò")) {
-				errorCode = "ROLE_NOT_FOUND";
-			}
-
-			// Trả về mã lỗi 400 kèm chính xác ErrorCode và câu thông báo
-			return ResponseEntity.badRequest().body(ApiResponse.error(errorCode, errorMsg));
-
-		} catch (Exception ex) {
-			// Lỗi 500: Các lỗi không lường trước (như mất kết nối DB)
-			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau"));
-		}
-	}
-
-	// API duyệt tài khoản
-	@PutMapping("/{id}/approve")
-	public ResponseEntity<?> approveResidentAccount(@PathVariable Long id) {
-		try {
-			// Gọi logic từ UserService
-			User approvedUser = authService.approveResidentAccount(id);
-
-			// Ép sang UserDTO trước khi trả về
-			UserDTO responseDto = mapper.toDto(approvedUser);
-
-			return ResponseEntity.ok(ApiResponse.ok(responseDto, "Duyệt tài khoản cư dân thành công"));
-		} catch (IllegalArgumentException ex) {
-			return ResponseEntity.badRequest().body(ApiResponse.error("APPROVE_FAILED", ex.getMessage()));
-		} catch (Exception ex) {
-			return ResponseEntity.internalServerError().body(ApiResponse.error("SERVER_ERROR", "Đã xảy ra lỗi hệ thống khi duyệt tài khoản"));
 		}
 	}
 
@@ -181,29 +126,9 @@ public class AuthController {
 		}
 	}
 
-	// API đổi mật khẩu
-	@PutMapping("/me/password")
-	public ResponseEntity<ApiResponse<Void>> changePassword(
-			@AuthenticationPrincipal CustomUserDetails currentUser,
-			@Valid @RequestBody ChangePasswordRequest request) {
-
-		// 1. Gọi Service Layer xử lý logic đổi mật khẩu
-		authService.changePassword(currentUser.getId(), request);
-
-		// 2. Bọc kết quả vào cấu trúc ApiResponse chuẩn hóa của dự án
-		ApiResponse<Void> response = new ApiResponse<>(
-				true,
-				null,
-				"Đổi mật khẩu thành công.",
-				"200"
-		);
-
-		return ResponseEntity.ok(response);
-	}
-
-	// 6. API Yêu cầu gửi OTP Quên mật khẩu
+	// API Yêu cầu gửi OTP Quên mật khẩu
 	@PostMapping("/forgot-password/send-otp")
-	public ResponseEntity<?> sendForgotPasswordOtp(@RequestBody OtpRequest request) {
+	public ResponseEntity<?> sendForgotPasswordOtp(@Valid @RequestBody OtpRequest request) {
 		try {
 			String email = request.email();
 			if (email == null || email.isBlank()) {
@@ -219,7 +144,7 @@ public class AuthController {
 		}
 	}
 
-	// 7. API Đặt lại mật khẩu bằng OTP
+	// API Đặt lại mật khẩu bằng OTP
 	@PostMapping("/reset-password")
 	public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
 		try {

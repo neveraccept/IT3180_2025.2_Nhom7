@@ -1,0 +1,94 @@
+// ============================================================
+//  AuthContext — lưu JWT + thông tin user, khôi phục phiên khi tải lại trang
+// ============================================================
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { getStoredAuth, setStoredAuth, clearStoredAuth, setAuthFailureHandler, touchSession } from "../api/axiosClient";
+
+const AuthContext = createContext(null);
+
+// Chuẩn hoá object auth (đã lưu) -> user dùng cho UI.
+function toUser(auth) {
+  if (!auth?.token) return null;
+  return {
+    userId: auth.userId,
+    username: auth.username,
+    name: auth.username,
+    fullName: auth.username,
+    role: auth.role, // "ADMIN" | "RESIDENT"
+    householdId: auth.householdId ?? null,
+    token: auth.token,
+  };
+}
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
+
+  // Khôi phục phiên từ JWT đã lưu.
+  useEffect(() => {
+    setUser(toUser(getStoredAuth()));
+    setInitializing(false);
+  }, []);
+
+  useEffect(() => setAuthFailureHandler(() => setUser(null)), []);
+
+  // Heartbeat: trong khi đã đăng nhập và tab đang mở, định kỳ gia hạn lastSeen.
+  // Khi tắt tab, heartbeat dừng -> nếu vắng quá 10 phút, phiên hết hạn.
+  useEffect(() => {
+    if (!user) return;
+    touchSession(); // đánh dấu ngay khi phiên bắt đầu / khôi phục
+    const intervalId = setInterval(touchSession, 30 * 1000); // mỗi 30s
+    const onVisible = () => {
+      if (document.visibilityState === "visible") touchSession();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", touchSession);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", touchSession);
+    };
+  }, [user]);
+
+  // Gọi sau khi loginAPI thành công (nhận object auth đã lưu localStorage).
+  const loginWithAuth = useCallback((auth) => {
+    setStoredAuth(auth);
+    setUser(toUser(auth));
+  }, []);
+
+  const logout = useCallback(() => {
+    clearStoredAuth();
+    setUser(null);
+  }, []);
+
+  // Cập nhật cục bộ thông tin hiển thị (vd: sau khi sửa hồ sơ).
+  const updateUser = useCallback((patch) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = typeof patch === "function" ? patch(prev) : patch;
+      return { ...prev, ...next };
+    });
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        setUser: updateUser,
+        loginWithAuth,
+        logout,
+        isAuthenticated: !!user,
+        role: user?.role || null,
+        initializing,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+}

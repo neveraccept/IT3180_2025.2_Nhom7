@@ -27,16 +27,13 @@ public class ComplaintService {
     private final ComplaintRepository complaintRepository;
     private final ComplaintMapper mapper;
     private final CurrentUserService currentUserService;
-    private final AuditLogService auditLogService;
 
     public ComplaintService(ComplaintRepository complaintRepository,
                             ComplaintMapper mapper,
-                            CurrentUserService currentUserService,
-                            AuditLogService auditLogService) {
+                            CurrentUserService currentUserService) {
         this.complaintRepository = complaintRepository;
         this.mapper = mapper;
         this.currentUserService = currentUserService;
-        this.auditLogService = auditLogService;
     }
 
     // F8.1 – Cư dân gửi khiếu nại
@@ -61,9 +58,6 @@ public class ComplaintService {
         c.setStatus(ComplaintStatus.NEW);
 
         Complaint saved = complaintRepository.save(c);
-
-        auditLogService.log("COMPLAINT_CREATE", "COMPLAINT", saved.getId(),
-                "Cư dân " + sender.getFullName() + " gửi khiếu nại: " + saved.getTitle());
 
         return mapper.toDto(saved);
     }
@@ -129,21 +123,17 @@ public class ComplaintService {
         }
 
         User admin = currentUserService.getCurrentUser();
-        c.setResponse(req.response());
+        if (req.response() != null && !req.response().isBlank()) {
+            c.setResponse(req.response().trim());
+        }
         c.setStatus(req.status());
         c.setHandledBy(admin);
         c.setRespondedAt(LocalDateTime.now());
 
         Complaint saved = complaintRepository.save(c);
 
-        auditLogService.log("COMPLAINT_RESPOND", "COMPLAINT", saved.getId(),
-                "Admin " + admin.getFullName() + " phản hồi khiếu nại #" + saved.getId()
-                        + " → trạng thái " + saved.getStatus());
-
         return mapper.toDto(saved);
     }
-
-    // Helpers
 
     private Complaint requireComplaint(Long id) {
         return complaintRepository.findById(id)

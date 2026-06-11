@@ -1,6 +1,7 @@
 package org.example.backend.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.response.PageResponse;
 import org.example.backend.dto.ResidentSummaryDTO;
 import org.example.backend.dto.ResidentDetailDTO;
@@ -33,9 +34,10 @@ public class ResidentService {
     private final HouseholdRepository householdRepository;
     private final ResidentMapper residentMapper;
     private final ApartmentMapper apartmentMapper;
-    private final AuditLogService auditLogService;
 
     //Thêm nhân khẩu vào hộ khẩu
+    @LogAdminAction(entity = "Resident", action = "CREATE", description = "Thêm nhân khẩu vào hộ khẩu",
+            detail = "'Nhân khẩu: ' + #result.fullName() + ' - hộ ' + #result.householdCode()")
     public ResidentDetailDTO createResident(CreateResidentRequest req) {
 
         Household household = householdRepository.findById(req.householdId())
@@ -59,7 +61,7 @@ public class ResidentService {
         r.setFullName(req.fullName().trim());
         r.setIdCard(req.idCard().trim());
         r.setDateOfBirth(req.dateOfBirth());
-        r.setGender(req.gender()); // Enum
+        r.setGender(req.gender());
         r.setRelationToHead(req.relationToHead().trim());
 
         // Mặc định PERMANENT nếu người dùng không truyền vào
@@ -69,13 +71,12 @@ public class ResidentService {
 
         Resident saved = residentRepository.save(r);
 
-        auditLogService.log("CREATE_RESIDENT", "RESIDENT", saved.getId(),
-                "Thêm nhân khẩu " + saved.getFullName() + " vào hộ khẩu " + household.getCode());
-
         return residentMapper.toDetail(saved);
     }
 
     // Sửa nhân khẩu
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Cập nhật thông tin nhân khẩu",
+            detail = "'Nhân khẩu: ' + #result.fullName()")
     public ResidentDetailDTO updateResident(Long id, UpdateResidentRequest req) {
 
         Resident r = findActiveResidentOrThrow(id);
@@ -94,34 +95,45 @@ public class ResidentService {
 
         Resident saved = residentRepository.save(r);
 
-        auditLogService.log("UPDATE_RESIDENT", "RESIDENT", saved.getId(),
-                "Cập nhật thông tin nhân khẩu " + saved.getFullName());
-
         return residentMapper.toDetail(saved);
     }
 
     //  Chuyển nhân khẩu khỏi hộ
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu ra khỏi hộ (MOVED_OUT)",
+            detail = "'Nhân khẩu: ' + #result.fullName() + ' - hộ ' + #result.householdCode()")
     public ResidentDetailDTO moveOutResident(Long id) {
 
         Resident r = findActiveResidentOrThrow(id);
+        Household h = r.getHousehold();
+        if (h != null
+                && h.getHeadOfHousehold() != null
+                && h.getHeadOfHousehold().getId().equals(r.getId())) {
+            throw new BadRequestException(
+                    "HEAD_OF_HOUSEHOLD_CANNOT_MOVE_OUT",
+                    "Không thể chuyển chủ hộ khỏi hộ. Vui lòng thao tác ở phần căn hộ để đổi chủ hộ hoặc chuyển cả căn hộ đi.");
+        }
+
         r.setStatus(ResidentStatus.MOVED_OUT);
         Resident saved = residentRepository.save(r);
-
-        auditLogService.log("MOVE_OUT_RESIDENT", "RESIDENT", saved.getId(),
-                "Chuyển nhân khẩu " + saved.getFullName() + " khỏi hộ khẩu "
-                        + (saved.getHousehold() != null ? saved.getHousehold().getCode() : ""));
 
         return residentMapper.toDetail(saved);
     }
 
     //  Đăng ký tạm trú
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Đăng ký tạm trú cho nhân khẩu",
+            detail = "'Nhân khẩu: ' + #result.fullName()")
     public ResidentDetailDTO registerTemporaryResidence(Long id) {
-        return changeResidencyStatus(id, ResidencyStatus.TEMPORARY,
-                "REGISTER_TEMPORARY_RESIDENCE", "Đăng ký tạm trú cho nhân khẩu ");
+        return changeResidencyStatus(id, ResidencyStatus.TEMPORARY);
     }
 
-    private ResidentDetailDTO changeResidencyStatus(
-            Long id, ResidencyStatus newResidency, String action, String descPrefix) {
+    //  Chuyển tạm trú về thường trú
+    @LogAdminAction(entity = "Resident", action = "UPDATE", description = "Chuyển nhân khẩu về thường trú",
+            detail = "'Nhân khẩu: ' + #result.fullName()")
+    public ResidentDetailDTO registerPermanentResidence(Long id) {
+        return changeResidencyStatus(id, ResidencyStatus.PERMANENT);
+    }
+
+    private ResidentDetailDTO changeResidencyStatus(Long id, ResidencyStatus newResidency) {
 
         Resident r = findActiveResidentOrThrow(id);
 
@@ -133,9 +145,6 @@ public class ResidentService {
 
         r.setResidencyStatus(newResidency);
         Resident saved = residentRepository.save(r);
-
-        auditLogService.log(action, "RESIDENT", saved.getId(),
-                descPrefix + saved.getFullName());
 
         return residentMapper.toDetail(saved);
     }
@@ -162,7 +171,6 @@ public class ResidentService {
         return residentMapper.toDetail(r);
     }
 
-    // Helper
     private Resident findActiveResidentOrThrow(Long id) {
         Resident r = residentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(

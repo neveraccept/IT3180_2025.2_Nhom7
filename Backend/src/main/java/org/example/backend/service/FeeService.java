@@ -1,7 +1,11 @@
 package org.example.backend.service;
 
+import org.example.backend.aspect.AuditContext;
+import org.example.backend.aspect.LogAdminAction;
 import org.example.backend.dto.FeeDTO;
 import org.example.backend.entity.Fee;
+import org.example.backend.exception.BadRequestException;
+import org.example.backend.exception.NotFoundException;
 import org.example.backend.repository.FeePeriodRepository;
 import org.example.backend.repository.FeeRepository;
 import org.springframework.beans.BeanUtils;
@@ -9,8 +13,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.Set;
+
 @Service
 public class FeeService {
+
+    /**
+     * Các đơn vị tính hợp lệ cho khoản thu.
+     * - PER_M2: theo m² diện tích căn hộ
+     * - PER_PERSON: theo số nhân khẩu trong hộ
+     * - PER_HOUSEHOLD / FIXED: cố định theo hộ
+     * - PER_VEHICLE: theo số phương tiện
+     * - NONE: không áp đơn giá (dùng cho khoản tự nguyện, cư dân tự nhập số tiền)
+     */
+    private static final Set<String> VALID_UNITS =
+            Set.of("PER_M2", "PER_PERSON", "PER_HOUSEHOLD", "PER_VEHICLE", "FIXED", "NONE");
 
     @Autowired
     private FeeRepository feeRepository;
@@ -18,28 +36,32 @@ public class FeeService {
     @Autowired
     private FeePeriodRepository feePeriodRepository;
 
-    // ... Khai báo thêm AuditLogService nếu cần (AuditLog) ...
-
+    @LogAdminAction(entity = "Fee", action = "CREATE", description = "Tạo khoản thu",
+            detail = "'Khoản thu: ' + #result.name + ' (' + #result.type + ')'")
     @Transactional
     public FeeDTO createFee(FeeDTO dto) {
         if(feeRepository.existsByName(dto.getName())) {
-            throw new RuntimeException("Tên khoản thu đã tồn tại");
+            throw new BadRequestException("FEE_NAME_DUPLICATE", "Tên khoản thu đã tồn tại");
         }
+        normalizeAndValidate(dto);
         Fee fee = new Fee();
         BeanUtils.copyProperties(dto, fee, "id");
         fee.setActive(true);
         return convertToDto(feeRepository.save(fee));
     }
 
+    @LogAdminAction(entity = "Fee", action = "UPDATE", description = "Cập nhật khoản thu",
+            detail = "'Khoản thu: ' + #result.name")
     @Transactional
     public FeeDTO updateFee(Long id, FeeDTO dto) {
         Fee fee = feeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Khoản thu không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_NOT_FOUND", "Khoản thu không tồn tại"));
 
         if(!fee.getName().equals(dto.getName()) && feeRepository.existsByName(dto.getName())) {
-            throw new RuntimeException("Tên khoản thu đã tồn tại");
+            throw new BadRequestException("FEE_NAME_DUPLICATE", "Tên khoản thu đã tồn tại");
         }
 
+        normalizeAndValidate(dto);
         fee.setName(dto.getName());
         fee.setType(dto.getType());
         fee.setUnitPrice(dto.getUnitPrice());
@@ -48,20 +70,49 @@ public class FeeService {
         return convertToDto(feeRepository.save(fee));
     }
 
+    /**
+     * Chuẩn hoá & kiểm tra dữ liệu khoản thu trước khi lưu.
+     * - Khoản tự nguyện (DONATION): không áp đơn giá -> unit = NONE, unitPrice = 0
+     *   (cư dân chủ động nhập số tiền khi thanh toán).
+     * - Khoản bắt buộc (MANDATORY): đơn vị tính phải nằm trong danh sách hợp lệ
+     *   (bao gồm PER_PERSON - tính theo số người).
+     */
+    private void normalizeAndValidate(FeeDTO dto) {
+        String type = dto.getType();
+        if (type == null || (!type.equals("MANDATORY") && !type.equals("DONATION"))) {
+            throw new BadRequestException("FEE_TYPE_INVALID", "Loại khoản thu không hợp lệ (chỉ MANDATORY hoặc DONATION)");
+        }
+
+        if ("DONATION".equals(type)) {
+            dto.setUnit("NONE");
+            dto.setUnitPrice(BigDecimal.ZERO);
+            return;
+        }
+
+        String unit = dto.getUnit();
+        if (unit == null || !VALID_UNITS.contains(unit)) {
+            throw new BadRequestException("FEE_UNIT_INVALID", "Đơn vị tính không hợp lệ. Cho phép: " + VALID_UNITS);
+        }
+        if (dto.getUnitPrice() == null || dto.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("FEE_PRICE_INVALID", "Khoản thu bắt buộc phải có đơn giá lớn hơn 0");
+        }
+    }
+
+    @LogAdminAction(entity = "Fee", action = "DELETE", description = "Xóa hoặc ngừng sử dụng khoản thu")
     @Transactional
     public void deleteOrDeactivateFee(Long id) {
         Fee fee = feeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Khoản thu không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_NOT_FOUND", "Khoản thu không tồn tại"));
 
         boolean hasPeriods = feePeriodRepository.existsByFeeId(id);
         // Tương tự check bảng payments nếu cần
         if(hasPeriods) {
             fee.setActive(false);
             feeRepository.save(fee);
-            // Ghi audit log: DEACTIVATE_FEE
+            AuditContext.detail("Ngừng sử dụng khoản thu: " + fee.getName());
         } else {
             feeRepository.delete(fee);
-            // Ghi audit log: DELETE_FEE
+            AuditContext.detail("Xóa khoản thu: " + fee.getName());
         }
     }
 
@@ -81,7 +132,7 @@ public class FeeService {
 
     public FeeDTO getFeeById(Long id) {
         Fee fee = feeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Khoản thu không tồn tại"));
+                .orElseThrow(() -> new NotFoundException("FEE_NOT_FOUND", "Khoản thu không tồn tại"));
         return convertToDto(fee);
     }
 }

@@ -1,9 +1,12 @@
 package org.example.backend.controller;
 
+import jakarta.validation.Valid;
 import org.example.backend.dto.FeeDTO;
+import org.example.backend.dto.response.ApiResponse;
+import org.example.backend.dto.response.PageResponse;
 import org.example.backend.service.FeeService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,43 +17,43 @@ public class FeeController {
     @Autowired
     private FeeService feeService;
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<?> createFee(@RequestBody FeeDTO feeDTO) {
-        return ResponseEntity.ok(feeService.createFee(feeDTO));
+    public ApiResponse<FeeDTO> createFee(@Valid @RequestBody FeeDTO feeDTO) {
+        return ApiResponse.ok(feeService.createFee(feeDTO), "Tạo khoản thu thành công");
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateFee(@PathVariable Long id, @RequestBody FeeDTO feeDTO) {
-        return ResponseEntity.ok(feeService.updateFee(id, feeDTO));
+    public ApiResponse<FeeDTO> updateFee(@PathVariable Long id, @Valid @RequestBody FeeDTO feeDTO) {
+        return ApiResponse.ok(feeService.updateFee(id, feeDTO), "Cập nhật khoản thu thành công");
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteFee(@PathVariable Long id) {
+    public ApiResponse<Void> deleteFee(@PathVariable Long id) {
         feeService.deleteOrDeactivateFee(id);
-        return ResponseEntity.ok().build();
+        return ApiResponse.ok(null, "Xoá khoản thu thành công");
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<?> getAllFees(org.springframework.data.domain.Pageable pageable) {
-        return ResponseEntity.ok(feeService.getAllFees(pageable));
+    public ApiResponse<PageResponse<FeeDTO>> getAllFees(Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(feeService.getAllFees(pageable)));
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/search")
-    public ResponseEntity<?> searchFees(@RequestParam(required = false) String keyword,
-                                        @RequestParam(required = false) String type,
-                                        @RequestParam(required = false) Boolean active,
-                                        org.springframework.data.domain.Pageable pageable) {
-        return ResponseEntity.ok(feeService.searchFees(keyword, type, active, pageable));
+    public ApiResponse<PageResponse<FeeDTO>> searchFees(@RequestParam(required = false) String keyword,
+                                                        @RequestParam(required = false) String type,
+                                                        @RequestParam(required = false) Boolean active,
+                                                        Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(feeService.searchFees(keyword, type, active, pageable)));
     }
 
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
-    public ResponseEntity<?> getFeeById(@PathVariable Long id) {
-        return ResponseEntity.ok(feeService.getFeeById(id));
+    public ApiResponse<FeeDTO> getFeeById(@PathVariable Long id) {
+        return ApiResponse.ok(feeService.getFeeById(id));
     }
 }

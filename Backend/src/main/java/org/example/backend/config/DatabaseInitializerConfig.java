@@ -6,11 +6,13 @@ import org.example.backend.repository.RoleRepository;
 import org.example.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@Order(1) // Phải chạy TRƯỚC InitialDataConfig: tạo sẵn Role (ADMIN/RESIDENT) và tài khoản admin dùng chung.
 public class DatabaseInitializerConfig implements CommandLineRunner {
 
     private final UserRepository userRepository;
@@ -53,23 +55,6 @@ public class DatabaseInitializerConfig implements CommandLineRunner {
 
             userRepository.save(admin);
             System.out.println("Đã tự động tạo tài khoản Admin (admin / admin123)");
-        }
-
-        // 3. Tự động khởi tạo tài khoản Resident dùng chung để tiện test
-        if (!userRepository.existsByUsername("user")) {
-            Role residentRole = roleRepository.findByName("RESIDENT").get();
-
-            User resident = User.builder()
-                    .username("user")
-                    .passwordHash(passwordEncoder.encode("user123")) // Mật khẩu theo yêu cầu là user123
-                    .fullName("Cư dân Test")
-                    .role(residentRole) // Gán role RESIDENT
-                    .active(true) // Bật sẵn active = true để có thể đăng nhập ngay mà không cần Admin duyệt
-                    .emailVerified(true)
-                    .build();
-
-            userRepository.save(resident);
-            System.out.println("Đã tự động tạo tài khoản Resident (user / user123)");
         }
     }
 }
