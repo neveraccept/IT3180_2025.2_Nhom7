@@ -420,7 +420,10 @@ export function Apartments() {
           onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
         <Select label="Tầng" value={filters.floor} onChange={(e) => setFilters({ ...filters, floor: e.target.value })}>
           <option>Tất cả tầng</option>
-          {Array.from({ length: 30 }, (_, i) => <option key={i + 1}>{`Tầng ${i + 1}`}</option>)}
+          {/* Chỉ tầng có căn hộ: tầng 1 (ki-ốt) + tầng ở 6..30. Tầng đế 2..5 không có căn hộ. */}
+          {[1, ...Array.from({ length: 25 }, (_, i) => i + 6)].map((f) => (
+            <option key={f}>{`Tầng ${f}`}</option>
+          ))}
         </Select>
         <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option>Tất cả</option>
