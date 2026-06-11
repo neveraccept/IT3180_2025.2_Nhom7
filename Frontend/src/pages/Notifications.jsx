@@ -13,7 +13,9 @@ import {
 } from "../api/notificationApi";
 import { searchApartmentsAPI, getApartmentDetailAPI } from "../api/apartmentApi";
 
-const floors = Array.from({ length: 30 }, (_, i) => i + 1);
+// Chỉ tầng có cư dân mới gửi được thông báo theo tầng: tầng ở 6..29 + penthouse 30.
+// Tầng 1 (ki-ốt) và tầng đế 2..5 không có cư dân nên không liệt kê.
+const floors = Array.from({ length: 25 }, (_, i) => i + 6);
 
 const getFloorType = (floor) => {
   const f = Number(floor);
@@ -44,7 +46,7 @@ export function Notifications({ role }) {
     title: "",
     content: "",
     scope: "ALL",
-    floor: "1",
+    floor: "6",
   });
   const [composeError, setComposeError] = useState("");
   const [sendLoading, setSendLoading] = useState(false);
@@ -143,7 +145,7 @@ export function Notifications({ role }) {
   };
 
   const resetComposeForm = () => {
-    setComposeData({ title: "", content: "", scope: "ALL", floor: "1" });
+    setComposeData({ title: "", content: "", scope: "ALL", floor: "6" });
     setComposeError("");
     setAptCodeInput("");
     setFoundHousehold(null);
