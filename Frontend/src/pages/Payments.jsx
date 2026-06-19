@@ -5,6 +5,7 @@ import { money } from "../utils/helpers";
 import { Badge, Button, Card, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { listAdminPaymentsAPI, confirmCashPaymentAPI, confirmCashPaymentsBatchAPI } from "../api/paymentApi";
+import { resolveHouseholdByApartmentCodeAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 5 (ADMIN) — Thu phí / công nợ.
@@ -58,7 +59,7 @@ export function Payments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
-  const [filters, setFilters] = useState({ householdId: "", keyword: "", status: "ALL", kind: "ALL" });
+  const [filters, setFilters] = useState({ apartmentCode: "", keyword: "", status: "ALL", kind: "ALL" });
   const [selected, setSelected] = useState(null);
   const [cashAmount, setCashAmount] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -122,12 +123,26 @@ export function Payments() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = () => loadPayments(1);
+  // Lọc theo hộ = nhập mã căn hộ -> resolve ra householdId rồi mới gọi API (backend chỉ nhận householdId).
+  const handleSearch = async () => {
+    let householdId;
+    if (filters.apartmentCode.trim()) {
+      setLoading(true);
+      const res = await resolveHouseholdByApartmentCodeAPI(filters.apartmentCode);
+      if (!res.success) {
+        setLoading(false);
+        setPageError(res.message);
+        return;
+      }
+      householdId = res.householdId;
+    }
+    loadPayments(1, { ...filters, householdId });
+  };
 
   const handleResetFilters = () => {
-    const reset = { householdId: "", keyword: "", status: "ALL", kind: "ALL" };
+    const reset = { apartmentCode: "", keyword: "", status: "ALL", kind: "ALL" };
     setFilters(reset);
-    loadPayments(1, reset);
+    loadPayments(1, { ...reset, householdId: undefined });
   };
 
   // ----- Lựa chọn hàng loạt -----
@@ -217,10 +232,10 @@ export function Payments() {
       <Card className="mb-5">
         <div className="grid gap-4 md:grid-cols-5">
           <Input
-            label="Mã hộ (householdId)"
-            placeholder="VD: 1"
-            value={filters.householdId}
-            onChange={(e) => setFilters({ ...filters, householdId: e.target.value })}
+            label="Mã căn hộ"
+            placeholder="VD: A12-01"
+            value={filters.apartmentCode}
+            onChange={(e) => setFilters({ ...filters, apartmentCode: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
           <Input
