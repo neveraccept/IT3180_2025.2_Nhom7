@@ -23,6 +23,7 @@ public class ParkingMapper {
     public ParkingSlotDTO toSlotDto(ParkingSlot s, ParkingRegistration activeReg) {
         String licensePlate = null;
         String householdCode = null;
+        String apartmentCode = null;
         if (activeReg != null) {
             Vehicle v = activeReg.getVehicle();
             if (v != null) {
@@ -31,13 +32,16 @@ public class ParkingMapper {
                 Household hh = v.getHousehold();
                 if (hh != null) {
                     householdCode = hh.getCode();
+                    if (hh.getApartment() != null) {
+                        apartmentCode = hh.getApartment().getCode();
+                    }
                 }
             }
         }
         return new ParkingSlotDTO(
                 s.getId(), s.getCode(), s.getType(), s.getStatus(),
                 activeReg != null ? activeReg.getId() : null,
-                licensePlate, householdCode);
+                licensePlate, householdCode, apartmentCode);
     }
 
     public ParkingRegistrationDTO toRegistrationDto(ParkingRegistration r) {

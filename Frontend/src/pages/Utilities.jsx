@@ -495,8 +495,8 @@ export function Utilities() {
               <div className="grid gap-4 md:grid-cols-2">
                 {editingBill ? (
                   <Input
-                    label="Hộ"
-                    value={editingBill.householdCode || formData.householdId}
+                    label="Căn hộ"
+                    value={editingBill.apartmentCode || editingBill.householdCode || formData.householdId}
                     disabled
                   />
                 ) : (
@@ -610,7 +610,7 @@ export function Utilities() {
               <h3 className="text-lg font-bold text-slate-900">Xóa hóa đơn</h3>
             </div>
             <p className="mb-6 text-slate-600">
-              Bạn có chắc muốn xóa hóa đơn <strong>{getUtilityLabel(deleteConfirm.type)}</strong> hộ <strong>{deleteConfirm.householdCode || deleteConfirm.householdId}</strong> tháng <strong>{deleteConfirm.month}/{deleteConfirm.year}</strong>?
+              Bạn có chắc muốn xóa hóa đơn <strong>{getUtilityLabel(deleteConfirm.type)}</strong> căn hộ <strong>{deleteConfirm.apartmentCode || deleteConfirm.householdCode || deleteConfirm.householdId}</strong> tháng <strong>{deleteConfirm.month}/{deleteConfirm.year}</strong>?
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
@@ -656,7 +656,7 @@ export function Utilities() {
                     title="Chọn tất cả hóa đơn chưa nộp trên trang"
                   />
                 </th>
-                <th className="px-5 py-4">Hộ</th>
+                <th className="px-5 py-4">Căn hộ</th>
                 <th className="px-5 py-4">Loại hóa đơn</th>
                 <th className="px-5 py-4">Tháng/Năm</th>
                 <th className="px-5 py-4">Chỉ số (cũ → mới)</th>
@@ -687,7 +687,7 @@ export function Utilities() {
                       title={unpaid ? "Chọn hóa đơn này" : "Hóa đơn đã nộp"}
                     />
                   </td>
-                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.householdCode || bill.householdId}</td>
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.apartmentCode || bill.householdCode || bill.householdId}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{getUtilityLabel(bill.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{bill.month}/{bill.year}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">

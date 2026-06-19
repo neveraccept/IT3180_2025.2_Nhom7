@@ -298,7 +298,7 @@ export function Payments() {
                     title="Chọn tất cả phiếu chưa nộp trên trang"
                   />
                 </th>
-                <th className="px-5 py-4">Hộ</th>
+                <th className="px-5 py-4">Căn hộ</th>
                 <th className="px-5 py-4">Khoản thu</th>
                 <th className="px-5 py-4">Đợt thu</th>
                 <th className="px-5 py-4 text-right">Số tiền</th>
@@ -327,7 +327,7 @@ export function Payments() {
                         title={!unpaid ? "Phiếu đã nộp" : needsAmount(p) ? "Khoản tự nguyện — thu tiền mặt riêng để nhập số tiền" : "Chọn phiếu này"}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{p.householdCode || p.householdId}</td>
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{p.apartmentCode || p.householdCode || p.householdId}</td>
                     <td className="px-5 py-4 text-slate-700">{p.feeName || "—"}</td>
                     <td className="px-5 py-4 text-slate-700">{p.feePeriodName || "—"}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{dueDisplay(p)}</td>
@@ -369,7 +369,7 @@ export function Payments() {
             {needsAmount(selected) ? (
               <>
                 <p className="mb-4 text-sm text-slate-600">
-                  Khoản <strong>{selected.feeName || selected.feePeriodName}</strong> là khoản tự nguyện. Nhập số tiền hộ <strong>{selected.householdCode || selected.householdId}</strong> đóng góp bằng tiền mặt:
+                  Khoản <strong>{selected.feeName || selected.feePeriodName}</strong> là khoản tự nguyện. Nhập số tiền căn hộ <strong>{selected.apartmentCode || selected.householdCode || selected.householdId}</strong> đóng góp bằng tiền mặt:
                 </p>
                 <div className="mb-5">
                   <Input
@@ -386,7 +386,7 @@ export function Payments() {
               </>
             ) : (
               <p className="mb-5 text-sm text-slate-600">
-                Xác nhận hộ <strong>{selected.householdCode || selected.householdId}</strong> đã nộp đủ <strong>{money(selected.amountDue)}</strong> cho khoản <strong>{selected.feeName || selected.feePeriodName}</strong> bằng tiền mặt?
+                Xác nhận căn hộ <strong>{selected.apartmentCode || selected.householdCode || selected.householdId}</strong> đã nộp đủ <strong>{money(selected.amountDue)}</strong> cho khoản <strong>{selected.feeName || selected.feePeriodName}</strong> bằng tiền mặt?
               </p>
             )}
             <div className="flex justify-end gap-3">

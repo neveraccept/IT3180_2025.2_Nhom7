@@ -248,10 +248,7 @@ function AdminVehicles() {
       setPageError(res.message);
       return;
     }
-    await loadVehicles(
-      res.householdId,
-      `Kết quả tra cứu căn hộ ${res.aptCode}${res.householdCode ? ` (hộ ${res.householdCode})` : ""}`
-    );
+    await loadVehicles(res.householdId, `Kết quả tra cứu căn hộ ${res.aptCode}`);
   };
 
   const loadVehiclesBySlot = () => {
@@ -386,7 +383,7 @@ function AdminVehicles() {
     setSaving(false);
     setShowForm(false);
     showToast(editingVehicle ? "Đã cập nhật xe" : form.parkingSlotId ? "Đã đăng ký xe và gán chỗ gửi" : "Đã đăng ký xe");
-    if (editingVehicle && loadedHousehold) await loadVehicles(loadedHousehold);
+    if (editingVehicle && loadedHousehold) await loadVehicles(loadedHousehold, slotLookupTitle);
     const freshSlots = await loadSlots();
     refreshLookupSlots(freshSlots);
     loadSummary();
@@ -402,7 +399,7 @@ function AdminVehicles() {
     }
     setShowForm(false);
     showToast("Đã hủy đăng ký xe");
-    if (loadedHousehold) await loadVehicles(loadedHousehold);
+    if (loadedHousehold) await loadVehicles(loadedHousehold, slotLookupTitle);
     loadSummary();
     refreshLookupSlots(await loadSlots());
   };
@@ -586,7 +583,7 @@ function AdminVehicles() {
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{s.code}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(s.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.licensePlate ?? "—"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.householdCode ?? "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.apartmentCode ?? s.householdCode ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{slotStatusBadge(s.status)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-right">
                     {s.status === "EMPTY" ? (

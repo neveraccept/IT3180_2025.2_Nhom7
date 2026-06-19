@@ -15,6 +15,7 @@ public record PaymentDetailDTO(
         String feeType,
         Long householdId,
         String householdCode,
+        String apartmentCode,
         BigDecimal amountDue,
         BigDecimal amountPaid,
         LocalDate paidDate,
@@ -37,6 +38,8 @@ public record PaymentDetailDTO(
                         ? p.getFeePeriod().getFee().getType() : null,
                 p.getHousehold() != null ? p.getHousehold().getId() : null,
                 p.getHousehold() != null ? p.getHousehold().getCode() : null,
+                p.getHousehold() != null && p.getHousehold().getApartment() != null
+                        ? p.getHousehold().getApartment().getCode() : null,
                 p.getAmountDue(),
                 p.getAmountPaid(),
                 p.getPaidDate(),

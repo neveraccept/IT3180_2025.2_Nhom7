@@ -13,6 +13,8 @@ public class VehicleMapper {
                 v.getId(),
                 v.getHousehold() != null ? v.getHousehold().getId() : null,
                 v.getHousehold() != null ? v.getHousehold().getCode() : null,
+                v.getHousehold() != null && v.getHousehold().getApartment() != null
+                        ? v.getHousehold().getApartment().getCode() : null,
                 v.getLicensePlate(),
                 v.getType(),
                 v.getRegisteredDate(),
