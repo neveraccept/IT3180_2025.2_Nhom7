@@ -18,7 +18,7 @@ import {
   generateParkingFeesAPI,
 } from "../api/vehicleApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
-import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
+import { getApartmentDetailAPI, listApartmentsAPI, resolveHouseholdByApartmentCodeAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 6 — Phương tiện (Vehicle) + chỗ gửi xe (Parking).
@@ -56,7 +56,7 @@ function AdminVehicles() {
   const [summary, setSummary] = useState(null);
   const [slots, setSlots] = useState([]);
   const [lookupSlots, setLookupSlots] = useState(null);
-  const [searchHouseholdId, setSearchHouseholdId] = useState("");
+  const [searchAptCode, setSearchAptCode] = useState("");
   const [searchSlotCode, setSearchSlotCode] = useState("");
   const [searchLicensePlate, setSearchLicensePlate] = useState("");
   const [loadedHousehold, setLoadedHousehold] = useState("");
@@ -212,10 +212,12 @@ function AdminVehicles() {
     return slots.find((slot) => String(slot.licensePlate || "").trim().toLowerCase() === normalizedPlate) || null;
   };
 
-  const loadVehicles = async (hid) => {
-    const id = (hid ?? searchHouseholdId).toString().trim();
+  // Tra cứu xe theo householdId đã biết (dùng cho cả reload sau khi sửa/xóa xe).
+  // label: nhãn hiển thị tiêu đề kết quả; mặc định theo householdId nếu không truyền.
+  const loadVehicles = async (hid, label) => {
+    const id = String(hid ?? "").trim();
     if (!id) {
-      setPageError("Nhập mã hộ (householdId) để tra cứu xe");
+      setPageError("Nhập mã căn hộ để tra cứu xe");
       return;
     }
     setPageError("");
@@ -226,11 +228,27 @@ function AdminVehicles() {
         .filter(Boolean);
       setLookupSlots(matchedSlots);
       setLoadedHousehold(id);
-      setSlotLookupTitle(`Kết quả tra cứu theo hộ #${id}`);
+      setSlotLookupTitle(label || `Kết quả tra cứu theo hộ #${id}`);
       setSlotFilter("ALL");
     } else {
       setPageError(res.message || "Không tải được danh sách xe của hộ");
     }
+  };
+
+  // Tra cứu theo mã căn hộ: resolve ra hộ đang ở rồi mới gọi API theo householdId.
+  const handleLookupByApartment = async () => {
+    const code = searchAptCode.trim();
+    if (!code) {
+      setPageError("Nhập mã căn hộ để tra cứu xe");
+      return;
+    }
+    setPageError("");
+    const res = await resolveHouseholdByApartmentCodeAPI(code);
+    if (!res.success) {
+      setPageError(res.message);
+      return;
+    }
+    await loadVehicles(res.householdId, `Kết quả tra cứu căn hộ ${res.aptCode}`);
   };
 
   const loadVehiclesBySlot = () => {
@@ -365,7 +383,7 @@ function AdminVehicles() {
     setSaving(false);
     setShowForm(false);
     showToast(editingVehicle ? "Đã cập nhật xe" : form.parkingSlotId ? "Đã đăng ký xe và gán chỗ gửi" : "Đã đăng ký xe");
-    if (editingVehicle && loadedHousehold) await loadVehicles(loadedHousehold);
+    if (editingVehicle && loadedHousehold) await loadVehicles(loadedHousehold, slotLookupTitle);
     const freshSlots = await loadSlots();
     refreshLookupSlots(freshSlots);
     loadSummary();
@@ -381,7 +399,7 @@ function AdminVehicles() {
     }
     setShowForm(false);
     showToast("Đã hủy đăng ký xe");
-    if (loadedHousehold) await loadVehicles(loadedHousehold);
+    if (loadedHousehold) await loadVehicles(loadedHousehold, slotLookupTitle);
     loadSummary();
     refreshLookupSlots(await loadSlots());
   };
@@ -471,14 +489,14 @@ function AdminVehicles() {
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <Input
-              label="Mã hộ (householdId)"
-              placeholder="VD: 1"
-              value={searchHouseholdId}
-              onChange={(e) => setSearchHouseholdId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && loadVehicles()}
+              label="Mã căn hộ"
+              placeholder="VD: A12-01"
+              value={searchAptCode}
+              onChange={(e) => setSearchAptCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLookupByApartment()}
             />
             <div className="flex items-end">
-              <Button onClick={() => loadVehicles()}><Search className="h-4 w-4" /> Tra cứu</Button>
+              <Button onClick={handleLookupByApartment}><Search className="h-4 w-4" /> Tra cứu</Button>
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -565,7 +583,7 @@ function AdminVehicles() {
                   <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{s.code}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(s.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.licensePlate ?? "—"}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.householdCode ?? "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{s.apartmentCode ?? s.householdCode ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-4">{slotStatusBadge(s.status)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-right">
                     {s.status === "EMPTY" ? (

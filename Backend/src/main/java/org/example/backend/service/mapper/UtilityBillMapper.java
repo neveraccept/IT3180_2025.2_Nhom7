@@ -13,6 +13,8 @@ public class UtilityBillMapper {
                 b.getId(),
                 b.getHousehold() != null ? b.getHousehold().getId() : null,
                 b.getHousehold() != null ? b.getHousehold().getCode() : null,
+                b.getHousehold() != null && b.getHousehold().getApartment() != null
+                        ? b.getHousehold().getApartment().getCode() : null,
                 b.getType(),
                 b.getMonth(),
                 b.getYear(),

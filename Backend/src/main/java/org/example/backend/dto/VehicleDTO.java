@@ -9,6 +9,7 @@ public record VehicleDTO(
         Long id,
         Long householdId,
         String householdCode,
+        String apartmentCode,
         String licensePlate,
         VehicleType type,
         LocalDate registeredDate,

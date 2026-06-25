@@ -12,12 +12,13 @@ import org.springframework.stereotype.Repository;
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     // Fetch-join các quan hệ to-one mà PaymentDetailDTO.from(...) sẽ đọc
-    // (feePeriod, feePeriod.fee, household, collectedBy) để tránh N+1 khi map sang DTO.
+    // (feePeriod, feePeriod.fee, household, household.apartment, collectedBy) để tránh N+1 khi map sang DTO.
     @Query(value = """
             SELECT p FROM Payment p
             LEFT JOIN FETCH p.feePeriod fp
             LEFT JOIN FETCH fp.fee
-            LEFT JOIN FETCH p.household
+            LEFT JOIN FETCH p.household h
+            LEFT JOIN FETCH h.apartment
             LEFT JOIN FETCH p.collectedBy
             WHERE p.household.id = :householdId
             """,
@@ -36,7 +37,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             SELECT p FROM Payment p
             LEFT JOIN FETCH p.feePeriod fp
             LEFT JOIN FETCH fp.fee f
-            LEFT JOIN FETCH p.household
+            LEFT JOIN FETCH p.household h
+            LEFT JOIN FETCH h.apartment
             LEFT JOIN FETCH p.collectedBy
             WHERE (:householdId IS NULL OR p.household.id = :householdId)
               AND (:status IS NULL OR p.status = :status)

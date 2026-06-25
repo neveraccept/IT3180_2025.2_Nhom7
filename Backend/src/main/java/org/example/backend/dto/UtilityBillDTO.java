@@ -12,6 +12,7 @@ public record UtilityBillDTO(
         Long id,
         Long householdId,
         String householdCode,
+        String apartmentCode,
         UtilityType type,
         Integer month,
         Integer year,

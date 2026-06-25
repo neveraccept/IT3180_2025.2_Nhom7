@@ -5,6 +5,7 @@ import { money } from "../utils/helpers";
 import { Badge, Button, Card, Input, Select, Pagination } from "../components/common";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { listAdminPaymentsAPI, confirmCashPaymentAPI, confirmCashPaymentsBatchAPI } from "../api/paymentApi";
+import { resolveHouseholdByApartmentCodeAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 5 (ADMIN) — Thu phí / công nợ.
@@ -58,7 +59,7 @@ export function Payments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
-  const [filters, setFilters] = useState({ householdId: "", keyword: "", status: "ALL", kind: "ALL" });
+  const [filters, setFilters] = useState({ apartmentCode: "", keyword: "", status: "ALL", kind: "ALL" });
   const [selected, setSelected] = useState(null);
   const [cashAmount, setCashAmount] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -122,12 +123,26 @@ export function Payments() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = () => loadPayments(1);
+  // Lọc theo hộ = nhập mã căn hộ -> resolve ra householdId rồi mới gọi API (backend chỉ nhận householdId).
+  const handleSearch = async () => {
+    let householdId;
+    if (filters.apartmentCode.trim()) {
+      setLoading(true);
+      const res = await resolveHouseholdByApartmentCodeAPI(filters.apartmentCode);
+      if (!res.success) {
+        setLoading(false);
+        setPageError(res.message);
+        return;
+      }
+      householdId = res.householdId;
+    }
+    loadPayments(1, { ...filters, householdId });
+  };
 
   const handleResetFilters = () => {
-    const reset = { householdId: "", keyword: "", status: "ALL", kind: "ALL" };
+    const reset = { apartmentCode: "", keyword: "", status: "ALL", kind: "ALL" };
     setFilters(reset);
-    loadPayments(1, reset);
+    loadPayments(1, { ...reset, householdId: undefined });
   };
 
   // ----- Lựa chọn hàng loạt -----
@@ -217,10 +232,10 @@ export function Payments() {
       <Card className="mb-5">
         <div className="grid gap-4 md:grid-cols-5">
           <Input
-            label="Mã hộ (householdId)"
-            placeholder="VD: 1"
-            value={filters.householdId}
-            onChange={(e) => setFilters({ ...filters, householdId: e.target.value })}
+            label="Mã căn hộ"
+            placeholder="VD: A12-01"
+            value={filters.apartmentCode}
+            onChange={(e) => setFilters({ ...filters, apartmentCode: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
           <Input
@@ -283,7 +298,7 @@ export function Payments() {
                     title="Chọn tất cả phiếu chưa nộp trên trang"
                   />
                 </th>
-                <th className="px-5 py-4">Hộ</th>
+                <th className="px-5 py-4">Căn hộ</th>
                 <th className="px-5 py-4">Khoản thu</th>
                 <th className="px-5 py-4">Đợt thu</th>
                 <th className="px-5 py-4 text-right">Số tiền</th>
@@ -312,7 +327,7 @@ export function Payments() {
                         title={!unpaid ? "Phiếu đã nộp" : needsAmount(p) ? "Khoản tự nguyện — thu tiền mặt riêng để nhập số tiền" : "Chọn phiếu này"}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{p.householdCode || p.householdId}</td>
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{p.apartmentCode || p.householdCode || p.householdId}</td>
                     <td className="px-5 py-4 text-slate-700">{p.feeName || "—"}</td>
                     <td className="px-5 py-4 text-slate-700">{p.feePeriodName || "—"}</td>
                     <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{dueDisplay(p)}</td>
@@ -354,7 +369,7 @@ export function Payments() {
             {needsAmount(selected) ? (
               <>
                 <p className="mb-4 text-sm text-slate-600">
-                  Khoản <strong>{selected.feeName || selected.feePeriodName}</strong> là khoản tự nguyện. Nhập số tiền hộ <strong>{selected.householdCode || selected.householdId}</strong> đóng góp bằng tiền mặt:
+                  Khoản <strong>{selected.feeName || selected.feePeriodName}</strong> là khoản tự nguyện. Nhập số tiền căn hộ <strong>{selected.apartmentCode || selected.householdCode || selected.householdId}</strong> đóng góp bằng tiền mặt:
                 </p>
                 <div className="mb-5">
                   <Input
@@ -371,7 +386,7 @@ export function Payments() {
               </>
             ) : (
               <p className="mb-5 text-sm text-slate-600">
-                Xác nhận hộ <strong>{selected.householdCode || selected.householdId}</strong> đã nộp đủ <strong>{money(selected.amountDue)}</strong> cho khoản <strong>{selected.feeName || selected.feePeriodName}</strong> bằng tiền mặt?
+                Xác nhận căn hộ <strong>{selected.apartmentCode || selected.householdCode || selected.householdId}</strong> đã nộp đủ <strong>{money(selected.amountDue)}</strong> cho khoản <strong>{selected.feeName || selected.feePeriodName}</strong> bằng tiền mặt?
               </p>
             )}
             <div className="flex justify-end gap-3">

@@ -17,7 +17,7 @@ import {
 } from "../api/utilityApi";
 import { downloadBlob } from "../api/reportApi";
 import { listSystemConfigsAPI, updateSystemConfigAPI, CONFIG_KEYS } from "../api/systemConfigApi";
-import { getApartmentDetailAPI, listApartmentsAPI } from "../api/apartmentApi";
+import { getApartmentDetailAPI, listApartmentsAPI, resolveHouseholdByApartmentCodeAPI } from "../api/apartmentApi";
 
 // ============================================================
 //  Module 7 — Quản lý hóa đơn điện/nước/internet (ADMIN).
@@ -69,7 +69,7 @@ export function Utilities() {
   const [importError, setImportError] = useState("");
   const [importResult, setImportResult] = useState(null);
 
-  const [searchFilters, setSearchFilters] = useState({ householdId: "", type: "", month: "", year: "", status: "" });
+  const [searchFilters, setSearchFilters] = useState({ apartmentCode: "", type: "", month: "", year: "", status: "" });
   const emptyForm = { apartmentId: "", householdId: "", type: "ELECTRICITY", month: new Date().getMonth() + 1, year: new Date().getFullYear(), oldIndex: "", newIndex: "", amount: "" };
   const [formData, setFormData] = useState(emptyForm);
   const [apartmentOptions, setApartmentOptions] = useState([]);
@@ -138,12 +138,12 @@ export function Utilities() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const loadBills = useCallback(async (targetPage = 1) => {
+  const loadBills = useCallback(async (targetPage = 1, householdId) => {
     setLoading(true);
     setPageError("");
     setSelectedIds(new Set());
     const res = await searchUtilityBillsAPI({
-      householdId: searchFilters.householdId || undefined,
+      householdId: householdId || undefined,
       type: searchFilters.type || undefined,
       month: searchFilters.month || undefined,
       year: searchFilters.year || undefined,
@@ -168,9 +168,21 @@ export function Utilities() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = () => loadBills(1);
+  // Lọc theo hộ = nhập mã căn hộ -> resolve ra householdId rồi mới gọi API (backend chỉ nhận householdId).
+  const handleSearch = async () => {
+    let householdId;
+    if (searchFilters.apartmentCode.trim()) {
+      const res = await resolveHouseholdByApartmentCodeAPI(searchFilters.apartmentCode);
+      if (!res.success) {
+        setPageError(res.message);
+        return;
+      }
+      householdId = res.householdId;
+    }
+    loadBills(1, householdId);
+  };
   const handleResetSearch = () => {
-    setSearchFilters({ householdId: "", type: "", month: "", year: "", status: "" });
+    setSearchFilters({ apartmentCode: "", type: "", month: "", year: "", status: "" });
     setTimeout(() => loadBills(1), 0);
   };
 
@@ -412,10 +424,10 @@ export function Utilities() {
       <Card className="mb-5">
         <div className="grid gap-4 md:grid-cols-5">
           <Input
-            label="Mã hộ (householdId)"
-            placeholder="VD: 1"
-            value={searchFilters.householdId}
-            onChange={(e) => setSearchFilters({ ...searchFilters, householdId: e.target.value })}
+            label="Mã căn hộ"
+            placeholder="VD: A12-01"
+            value={searchFilters.apartmentCode}
+            onChange={(e) => setSearchFilters({ ...searchFilters, apartmentCode: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
           <Select label="Loại hóa đơn" value={searchFilters.type} onChange={(e) => setSearchFilters({ ...searchFilters, type: e.target.value })}>
@@ -483,8 +495,8 @@ export function Utilities() {
               <div className="grid gap-4 md:grid-cols-2">
                 {editingBill ? (
                   <Input
-                    label="Hộ"
-                    value={editingBill.householdCode || formData.householdId}
+                    label="Căn hộ"
+                    value={editingBill.apartmentCode || editingBill.householdCode || formData.householdId}
                     disabled
                   />
                 ) : (
@@ -598,7 +610,7 @@ export function Utilities() {
               <h3 className="text-lg font-bold text-slate-900">Xóa hóa đơn</h3>
             </div>
             <p className="mb-6 text-slate-600">
-              Bạn có chắc muốn xóa hóa đơn <strong>{getUtilityLabel(deleteConfirm.type)}</strong> hộ <strong>{deleteConfirm.householdCode || deleteConfirm.householdId}</strong> tháng <strong>{deleteConfirm.month}/{deleteConfirm.year}</strong>?
+              Bạn có chắc muốn xóa hóa đơn <strong>{getUtilityLabel(deleteConfirm.type)}</strong> căn hộ <strong>{deleteConfirm.apartmentCode || deleteConfirm.householdCode || deleteConfirm.householdId}</strong> tháng <strong>{deleteConfirm.month}/{deleteConfirm.year}</strong>?
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
@@ -644,7 +656,7 @@ export function Utilities() {
                     title="Chọn tất cả hóa đơn chưa nộp trên trang"
                   />
                 </th>
-                <th className="px-5 py-4">Hộ</th>
+                <th className="px-5 py-4">Căn hộ</th>
                 <th className="px-5 py-4">Loại hóa đơn</th>
                 <th className="px-5 py-4">Tháng/Năm</th>
                 <th className="px-5 py-4">Chỉ số (cũ → mới)</th>
@@ -675,7 +687,7 @@ export function Utilities() {
                       title={unpaid ? "Chọn hóa đơn này" : "Hóa đơn đã nộp"}
                     />
                   </td>
-                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.householdCode || bill.householdId}</td>
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{bill.apartmentCode || bill.householdCode || bill.householdId}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{getUtilityLabel(bill.type)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">{bill.month}/{bill.year}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">
