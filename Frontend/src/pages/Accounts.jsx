@@ -504,7 +504,7 @@ export function Accounts() {
                         Căn hộ <b>{aptCtx.apartment.code}</b> đang trống → sẽ lập <b>hộ mới</b>, cư dân làm <b>chủ hộ</b>.
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <Input label="Mã hộ khẩu mới" placeholder="VD: HK001" value={resForm.newHouseholdCode} onChange={(e) => setR({ newHouseholdCode: e.target.value })} />
+                        <Input label="Mã hộ khẩu mới" placeholder="VD: HK-A12-01" value={resForm.newHouseholdCode} onChange={(e) => setR({ newHouseholdCode: e.target.value })} />
                         <Input label="Ngày chuyển đến" type="date" value={resForm.moveInDate} onChange={(e) => setR({ moveInDate: e.target.value })} />
                         <Input label="CCCD/CMND chủ hộ" placeholder="9 hoặc 12 chữ số" value={resForm.idCard} onChange={(e) => setR({ idCard: e.target.value })} />
                         <Input label="Ngày sinh" type="date" value={resForm.dateOfBirth} onChange={(e) => setR({ dateOfBirth: e.target.value })} />
