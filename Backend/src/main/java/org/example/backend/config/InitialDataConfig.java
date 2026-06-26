@@ -364,7 +364,7 @@ public class InitialDataConfig implements CommandLineRunner {
         // --- Các loại phí cơ bản ---
         Fee mgmtFee = buildFee("Phí quản lý", "MANDATORY", "PER_M2", BigDecimal.valueOf(7_000),
                 "Phí quản lý vận hành tính theo m² diện tích căn hộ");
-        Fee cleaningFee = buildFee("Phí vệ sinh", "MANDATORY", "FIXED", BigDecimal.valueOf(50_000),
+        Fee cleaningFee = buildFee("Phí vệ sinh", "MANDATORY", "PER_HOUSEHOLD", BigDecimal.valueOf(50_000),
                 "Phí vệ sinh khu vực chung, thu cố định theo hộ");
         Fee maintenanceFee = buildFee("Phí bảo trì", "MANDATORY", "PER_M2", BigDecimal.valueOf(2_000),
                 "Phí bảo trì hạ tầng tính theo m² diện tích căn hộ");

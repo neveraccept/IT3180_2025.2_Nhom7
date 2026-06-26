@@ -448,7 +448,7 @@ export function Registrations() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <Input
                         label="Mã hộ khẩu mới"
-                        placeholder="VD: HK001"
+                        placeholder="VD: HK-A12-01"
                         value={approveForm.newHouseholdCode}
                         onChange={(e) => setF({ newHouseholdCode: e.target.value })}
                       />

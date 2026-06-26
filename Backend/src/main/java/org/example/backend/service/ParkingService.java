@@ -192,6 +192,11 @@ public class ParkingService {
             slot.setStatus(ParkingSlotStatus.EMPTY);
             slotRepository.save(slot);
         }
+        // Gỡ xe khỏi chỗ gửi
+        if (reg.getVehicle() != null) {
+            reg.getVehicle().setActive(false);
+            vehicleRepository.save(reg.getVehicle());
+        }
         registrationRepository.save(reg);
 
         return mapper.toRegistrationDto(reg);

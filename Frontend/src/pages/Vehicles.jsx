@@ -9,7 +9,6 @@ import {
   updateVehicleAPI,
   cancelVehicleAPI,
   listVehiclesByHouseholdAPI,
-  listMyVehiclesAPI,
   listParkingSlotsAPI,
   getParkingSummaryAPI,
   createParkingRegistrationAPI,
@@ -734,40 +733,18 @@ function AdminVehicles() {
 
 // ----------------------------- RESIDENT -----------------------------
 function ResidentVehicles() {
-  const [vehicles, setVehicles] = useState([]);
   const [regs, setRegs] = useState([]);
-  const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
 
-  const vehicleTypeByPlate = useMemo(
-    () => new Map(vehicles.map((v) => [String(v.licensePlate || "").trim().toLowerCase(), v.type])),
-    [vehicles]
-  );
-  const parkingPrices = useMemo(
-    () => new Map(configs.map((c) => [c.configKey, Number(c.configValue)])),
-    [configs]
-  );
-  const systemMonthlyFeeOf = (registration) => {
-    const plateKey = String(registration.licensePlate || "").trim().toLowerCase();
-    const vehicleType = vehicleTypeByPlate.get(plateKey);
-    const priceKey = parkingPriceKeyByVehicleType(vehicleType);
-    const systemFee = priceKey ? parkingPrices.get(priceKey) : undefined;
-    return Number.isFinite(systemFee) ? systemFee : getRegistrationMonthlyFee(registration);
-  };
+  const systemMonthlyFeeOf = (registration) => getRegistrationMonthlyFee(registration);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [vRes, rRes, cRes] = await Promise.all([
-        listMyVehiclesAPI(),
-        listMyParkingRegistrationsAPI(),
-        listSystemConfigsAPI(),
-      ]);
-      if (vRes.success) setVehicles(vRes.data?.items || []);
-      else setPageError(vRes.message || "Không tải được danh sách xe");
+      const rRes = await listMyParkingRegistrationsAPI();
       if (rRes.success) setRegs(rRes.data?.items || []);
-      if (cRes.success) setConfigs(cRes.data || []);
+      else setPageError(rRes.message || "Không tải được danh sách gửi xe");
       setLoading(false);
     })();
   }, []);
@@ -778,34 +755,6 @@ function ResidentVehicles() {
       {pageError && (
         <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">{pageError}</div>
       )}
-
-      <Card className="mb-8 !p-0">
-        <div className="border-b border-slate-200 px-5 py-5"><h3 className="font-black text-slate-900">Xe đã đăng ký</h3></div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-4">Biển số</th>
-                <th className="px-5 py-4">Loại</th>
-                <th className="px-5 py-4">Ngày đăng ký</th>
-                <th className="px-5 py-4">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && <tr><td colSpan={4} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Đang tải…</td></tr>}
-              {!loading && vehicles.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-sm font-semibold text-slate-500">Hộ bạn chưa có xe nào.</td></tr>}
-              {!loading && vehicles.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-50/80">
-                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{v.licensePlate}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{typeLabel(v.type)}</td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">{v.registeredDate || "—"}</td>
-                  <td className="whitespace-nowrap px-5 py-4"><Badge tone={v.active ? "green" : "gray"}>{v.active ? "Đang gửi" : "Đã hủy"}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
 
       <Card className="!p-0">
         <div className="border-b border-slate-200 px-5 py-5"><h3 className="font-black text-slate-900">Lượt gửi xe</h3></div>
